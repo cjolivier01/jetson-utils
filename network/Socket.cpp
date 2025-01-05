@@ -462,7 +462,7 @@ bool Socket::Send( void* buffer, size_t size, uint32_t remoteIP, uint16_t remote
 	
 	const int64_t res = sendto(mSock, (void*)buffer, size, 0, (struct sockaddr*)&addr, sizeof(addr));
 	
-	if( res != size )
+	if( (size_t) res != size )
 	{
 		LogError(LOG_NETWORK "failed send() to %s port %hu  (%li of %zu bytes)\n", IPv4AddressToStr(remoteIP).c_str(), remotePort, res, size);
 		printErrno();

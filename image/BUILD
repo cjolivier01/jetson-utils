@@ -8,6 +8,7 @@ cc_library(
         "imageWriter.cpp",
     ],
     copts = [
+        "-Wno-error=switch",
         "-Wno-deprecated-declarations",
     ],
     visibility = ["//visibility:public"],
@@ -47,6 +48,9 @@ cc_library(
     hdrs = [
         "imageFormat.h",
         "imageFormat.inl",
+    ],
+    copts=[
+        "-Wno-error=switch",
     ],
     includes = ["."],
     visibility = ["//visibility:public"],

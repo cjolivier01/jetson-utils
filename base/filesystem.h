@@ -145,7 +145,6 @@ bool listDir( const std::string& path, std::vector<std::string>& list, uint32_t 
 
 /**
  * Return the directory 
-/**
  * Verify path and return true if the file exists.
  * @param mask filter by file type (by default, any file including directories will be checked).
  *             The mask should consist of fileTypes OR'd together (e.g. `FILE_REGULAR|FILE_DIR`).

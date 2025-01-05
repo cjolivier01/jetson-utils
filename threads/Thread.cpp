@@ -186,7 +186,7 @@ bool Thread::SetPriorityLevel( int priority )
 }
 
 
-static int THREAD_STACK_SIZE = 200 * 1024;
+// static int THREAD_STACK_SIZE = 200 * 1024;
 static int PREALLOC_SIZE     = 200 * 1024 * 1024;
 
 // InitRealtime

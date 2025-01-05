@@ -132,7 +132,7 @@ public:
 protected:
 	imageLoader( const videoOptions& options );
 
-	inline bool isLooping() const { return (mOptions.loop < 0) || ((mOptions.loop > 0) && (mLoopCount < mOptions.loop)); }
+	inline bool isLooping() const { return (mOptions.loop < 0) || ((mOptions.loop > 0) && (mLoopCount < (size_t)mOptions.loop)); }
 
 	bool mEOS;
 	size_t mLoopCount;
