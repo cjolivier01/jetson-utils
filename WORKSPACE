@@ -25,6 +25,18 @@ rules_cuda_dependencies()
 
 register_detected_cuda_toolchains()
 
+git_repository(
+    name = "rules_python",
+    remote = "https://github.com/bazelbuild/rules_python.git",
+    tag = "0.1.0",
+)
+
+http_archive(
+    name = "pybind11",
+    urls = ["https://github.com/pybind/pybind11/archive/refs/tags/v2.10.4.tar.gz"],
+    strip_prefix = "pybind11-2.10.4",
+)
+
 new_git_repository(
     name = "glib",
     build_file = "//buildfiles:third_party/glib.BUILD",
