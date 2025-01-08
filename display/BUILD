@@ -6,6 +6,7 @@ cc_library(
     copts = [
         "-Wno-deprecated-declarations",
         "-Wno-sign-compare",
+        "-Wno-error=switch",
     ],
     linkopts = [
         "-lGL",

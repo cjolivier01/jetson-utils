@@ -86,6 +86,10 @@ cc_library(
         "gstUtility.h",
         "nvbuf_utils.h",
     ],
+    copts=[
+        "-Wno-error=switch",
+        "-Wno-error=unused-function",
+    ],
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = [

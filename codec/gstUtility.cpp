@@ -188,12 +188,12 @@ void rilog_debug_function(GstDebugCategory* category, GstDebugLevel level,
 	//	g_object_get(object, "name", &name, NULL);
 
 	const char* typeName  = " ";
-	const char* className = " ";
+	//const char* className = " ";
 
 	if( object != NULL )
 	{
 		typeName  = G_OBJECT_TYPE_NAME(object);
-		className = G_OBJECT_CLASS_NAME(object);
+		//className = G_OBJECT_CLASS_NAME(object);
 	}
 
 	LogVerbose(LOG_GSTREAMER "%s %s %s\n" SEP "%s:%i  %s\n" SEP "%s\n", 
