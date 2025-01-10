@@ -37,16 +37,23 @@ http_archive(
     strip_prefix = "pybind11-2.10.4",
 )
 
-new_git_repository(
+new_local_repository(
     name = "glib",
-    build_file = "//buildfiles:third_party/glib.BUILD",
-    commit = "763cc3b238398614c20069fd67642730e3a6519b",
-    patch_cmds = [
-        "meson setup builddir -Ddebug=true -Dprefix=$(pwd)/external",
-        "ninja -C builddir install",
-    ],
-    remote = "https://github.com/GNOME/glib.git",
+    build_file = "@//buildfiles:third_party/glib_nobuild.BUILD",
+    # path = "/usr/local",
+    path = "/usr",
 )
+
+# new_git_repository(
+#     name = "glib",
+#     build_file = "//buildfiles:third_party/glib.BUILD",
+#     commit = "763cc3b238398614c20069fd67642730e3a6519b",
+#     patch_cmds = [
+#         "meson setup builddir -Ddebug=true -Dprefix=$(pwd)/external",
+#         "ninja -C builddir install",
+#     ],
+#     remote = "https://github.com/GNOME/glib.git",
+# )
 
 new_local_repository(
     name = "json_glib",
@@ -54,14 +61,21 @@ new_local_repository(
     path = "/usr",
 )
 
-new_git_repository(
+new_local_repository(
     name = "gstreamer",
-    build_file = "//buildfiles:third_party/gstreamer.BUILD",
-    commit = "2d8273151571fcab887cc81de48e87aeb61b5c06",
-    patch_cmds = [
-        "meson setup builddir -Ddebug=true -Dprefix=$(pwd)/external",
-        "ninja -C builddir install",
-    ],
-    remote = "https://github.com/GStreamer/gstreamer.git",
-    shallow_since = "1712695735 +0100",
+    build_file = "@//buildfiles:third_party/gstreamer_nobuild.BUILD",
+    # path = "/usr/local",
+    path = "/usr",
 )
+
+# new_git_repository(
+#     name = "gstreamer",
+#     build_file = "//buildfiles:third_party/gstreamer.BUILD",
+#     commit = "2d8273151571fcab887cc81de48e87aeb61b5c06",
+#     patch_cmds = [
+#         "meson setup builddir -Ddebug=true -Dprefix=$(pwd)/external",
+#         "ninja -C builddir install",
+#     ],
+#     remote = "https://github.com/GStreamer/gstreamer.git",
+#     shallow_since = "1712695735 +0100",
+# )

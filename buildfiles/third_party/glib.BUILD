@@ -27,23 +27,6 @@ cc_import(
     shared_library = "libgobject-2.0.so",
 )
 
-# cc_library(
-#     name = "glib",
-#     hdrs = glob([
-#         "**/*.h",
-#     ]),
-#     includes = [
-#         ".",
-#         "glib",
-#         "_build/glib",
-#         "_build",
-#     ],
-#     visibility = ["//visibility:public"],
-#     deps = [
-#         "libgobject",
-#     ],
-# )
-
 config_setting(
     name = "aarch64-linux-gnu",
     define_values = {"multiarch": "aarch64-linux-gnu"},
@@ -83,7 +66,11 @@ cc_library(
     linkopts = [
         "-Lexternal/lib/x86_64-linux-gnu",
         "-lglib-2.0",
-    ],
+    ] + select({
+        ":aarch64-linux-gnu": ["-Lexternal/lib/aarch64-linux-gnu"],
+        ":x86_64-linux-gnu": ["-Lexternal/lib/x86_64-linux-gnu"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         "libgobject",
