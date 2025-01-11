@@ -33,6 +33,7 @@ cc_library(
         "//base:base_includes",
         "//camera:camera_includes",
         "//image",
+        "@glib",
     ],
 )
 

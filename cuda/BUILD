@@ -1,6 +1,17 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_cuda//cuda:defs.bzl", "cuda_library")
 
+config_setting(
+    name = "aarch64-linux-gnu",
+    constraint_values = ["@platforms//cpu:aarch64"],
+)
+
+config_setting(
+    name = "x86_64-linux-gnu",
+    constraint_values = ["@platforms//cpu:x86_64"],
+)
+
+
 cc_library(
     name = "cuda_lib",
     srcs = [

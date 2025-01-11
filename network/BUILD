@@ -17,7 +17,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":network_basic",
-        "//base",
+        "//base:base",
         "//codec:gst_utility",
         "//threads",
         "@glib",

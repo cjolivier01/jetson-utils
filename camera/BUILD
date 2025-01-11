@@ -13,8 +13,8 @@ cc_library(
     deps = [
         ":camera_includes",
         "//cuda:colorspace_lib",
-        #"//video:video_includes",
         "//video:video_source",
+        "@glib",
     ],
 )
 
@@ -32,5 +32,6 @@ cc_library(
         "//codec:codec_includes",
         "//codec:gst_buffer_manager",
         "//threads",
+        "@glib",
     ],
 )

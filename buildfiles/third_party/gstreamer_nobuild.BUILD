@@ -1,11 +1,11 @@
 config_setting(
   name = "aarch64-linux-gnu",
-  values = { "cpu": "k8" },
+  constraint_values = ["@platforms//cpu:aarch64"],
 )
 
 config_setting(
   name = "x86_64-linux-gnu",
-  values = { "cpu": "arm64" },
+  constraint_values = ["@platforms//cpu:x86_64"],
 )
 
 cc_binary(
@@ -26,9 +26,9 @@ cc_library(
     hdrs = glob([
         "include/gstreamer-1.0/**/*.h",
     ]),
-    copts = [
-        "-Iinclude/gstreamer-1.0",
-    ],
+    # copts = [
+    #     "-Iinclude/gstreamer-1.0",
+    # ],
     includes = ["include/gstreamer-1.0"],
     linkopts = select({
         ":aarch64-linux-gnu": ["-Llib/aarch64-linux-gnu"],

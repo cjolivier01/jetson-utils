@@ -17,9 +17,12 @@ cc_library(
 cc_library(
     name = "base_includes",
     srcs = [],
-    hdrs = glob(["*.h"]),
+    hdrs = glob(
+        [
+            "*.h",
+            "*.hpp",
+        ],
+    ),
     includes = ["."],
     visibility = ["//visibility:public"],
-    deps = [
-    ],
 )
