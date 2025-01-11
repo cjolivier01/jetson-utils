@@ -11,7 +11,6 @@ config_setting(
     constraint_values = ["@platforms//cpu:x86_64"],
 )
 
-
 cc_library(
     name = "cuda_lib",
     srcs = [
@@ -26,8 +25,8 @@ cc_library(
         "-DWITH_CUDA",
     ],
     linkopts = select({
-        ":aarch64-linux-gnu": ["/usr/local/cuda-12.6/targets/aarch64-linux/lib"],
-        ":x86_64-linux-gnu": ["/usr/local/cuda-12.6/targets/x86_64-linux/lib"],
+        ":aarch64-linux-gnu": ["-L/usr/local/cuda-12.6/targets/aarch64-linux/lib"],
+        ":x86_64-linux-gnu": ["-L/usr/local/cuda-12.6/targets/x86_64-linux/lib"],
         "//conditions:default": [],
     }) + [
         "-lnppig_static",
@@ -63,8 +62,8 @@ cc_library(
         "-DWITH_CUDA",
     ],
     linkopts = select({
-        ":aarch64-linux-gnu": ["/usr/local/cuda-12.6/targets/aarch64-linux/lib"],
-        ":x86_64-linux-gnu": ["/usr/local/cuda-12.6/targets/x86_64-linux/lib"],
+        ":aarch64-linux-gnu": ["-L/usr/local/cuda-12.6/targets/aarch64-linux/lib"],
+        ":x86_64-linux-gnu": ["-L/usr/local/cuda-12.6/targets/x86_64-linux/lib"],
         "//conditions:default": [],
     }) + [
         "-lnppig_static",
