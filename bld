@@ -1,2 +1,10 @@
 #!/bin/bash
-bazelisk build //...
+
+CPU="$(uname -p)"
+if [ "$CPU" == "x86_64" ]; then
+  CPU="k8"
+fi
+
+BAZEL_FLAGS="--config=debug --cpu=${CPU}"
+
+bazelisk build ${BAZEL_FLAGS} //...

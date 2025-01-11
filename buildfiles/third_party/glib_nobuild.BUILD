@@ -25,44 +25,30 @@ cc_binary(
 cc_import(
     name = "libgobject",
     shared_library = "libgobject-2.0.so",
+    visibility = ["//visibility:public"],
 )
 
 config_setting(
   name = "aarch64-linux-gnu",
-  define_values = {"multiarch": "aarch64-linux-gnu"},
+  values = { "cpu": "k8" },
 )
 
 config_setting(
   name = "x86_64-linux-gnu",
-  define_values = {"multiarch": "x86_64-linux-gnu"},
+  values = { "cpu": "arm64" },
 )
 
 cc_library(
     name = "glib",
     hdrs = glob([
         "include/glib-2.0/**/*.h",
-        "lib/x86_64-linux-gnu/glib-2.0/include/**/*.h",
-    ])+ select({
-      ":aarch64-linux-gnu":   ["lib/aarch64-linux-gnu/glib-2.0/include/**/*.h"],
-      ":x86_64-linux-gnu":    ["lib/x86_64-linux-gnu/glib-2.0/include/**/*.h"],
-      "//conditions:default": [],
-    }),
+    ]),
     includes = [
       "include/glib-2.0",
-      "lib/x86_64-linux-gnu/glib-2.0/include",
-    ] + select({
-      ":aarch64-linux-gnu":   ["lib/aarch64-linux-gnu/glib-2.0/include"],
-      ":x86_64-linux-gnu":    ["lib/x86_64-linux-gnu/glib-2.0/include"],
-      "//conditions:default": [],
-    }),
+    ],
     copts=[
         "-Iinclude/glib-2.0",
-        "-Ilib/x86_64-linux-gnu/glib-2.0/include",
-    ]+ select({
-      ":aarch64-linux-gnu":   ["-Ilib/aarch64-linux-gnu/glib-2.0/include"],
-      ":x86_64-linux-gnu":    ["-Ilib/x86_64-linux-gnu/glib-2.0/include"],
-      "//conditions:default": [],
-    }),
+    ],
     linkopts = [
         "-Llib/x86_64-linux-gnu",
         "-lglib-2.0",
@@ -73,8 +59,12 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        "libgobject",
-    ],
+        ":libgobject",
+    ] + select({
+        ":aarch64-linux-gnu": ["@glibconfig_x86//:glibconfig"],
+        ":x86_64-linux-gnu": ["@glibconfig_aarch64//:glibconfig"],
+        "//conditions:default": [],
+    }),
 )
 
 gobject_stub_content = """

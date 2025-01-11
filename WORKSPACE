@@ -6,12 +6,6 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_r
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-new_local_repository(
-    name = "libsoup",
-    build_file = "@//buildfiles:third_party/libsoup.BUILD",
-    path = "/usr",
-)
-
 git_repository(
     name = "rules_cuda",
     # v0.2.3 breaks some lubcupti for our version of bazel
@@ -44,17 +38,6 @@ new_local_repository(
     path = "/usr",
 )
 
-# new_git_repository(
-#     name = "glib",
-#     build_file = "//buildfiles:third_party/glib.BUILD",
-#     commit = "763cc3b238398614c20069fd67642730e3a6519b",
-#     patch_cmds = [
-#         "meson setup builddir -Ddebug=true -Dprefix=$(pwd)/external",
-#         "ninja -C builddir install",
-#     ],
-#     remote = "https://github.com/GNOME/glib.git",
-# )
-
 new_local_repository(
     name = "json_glib",
     build_file = "@//buildfiles:third_party/json_glib.BUILD",
@@ -68,14 +51,8 @@ new_local_repository(
     path = "/usr",
 )
 
-# new_git_repository(
-#     name = "gstreamer",
-#     build_file = "//buildfiles:third_party/gstreamer.BUILD",
-#     commit = "2d8273151571fcab887cc81de48e87aeb61b5c06",
-#     patch_cmds = [
-#         "meson setup builddir -Ddebug=true -Dprefix=$(pwd)/external",
-#         "ninja -C builddir install",
-#     ],
-#     remote = "https://github.com/GStreamer/gstreamer.git",
-#     shallow_since = "1712695735 +0100",
-# )
+new_local_repository(
+    name = "libsoup",
+    build_file = "@//buildfiles:third_party/libsoup.BUILD",
+    path = "/usr",
+)

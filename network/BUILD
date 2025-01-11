@@ -20,6 +20,7 @@ cc_library(
         "//base",
         "//codec:gst_utility",
         "//threads",
+        "@glib",
         "@libsoup",
     ],
 )
