@@ -14,8 +14,11 @@ cc_library(
         "-Wno-error=deprecated-declarations",
         "-DWITH_CUDA",
     ],
-    linkopts = [
-        "-L/usr/local/cuda-12.6/targets/x86_64-linux/lib",
+    linkopts = select({
+        ":aarch64-linux-gnu": ["/usr/local/cuda-12.6/targets/aarch64-linux/lib"],
+        ":x86_64-linux-gnu": ["/usr/local/cuda-12.6/targets/x86_64-linux/lib"],
+        "//conditions:default": [],
+    }) + [
         "-lnppig_static",
         "-lnppc_static",
         "-lnppif_static",
@@ -48,8 +51,11 @@ cc_library(
         "-Wno-error=deprecated-declarations",
         "-DWITH_CUDA",
     ],
-    linkopts = [
-        "-L/usr/local/cuda-12.6/targets/x86_64-linux/lib",
+    linkopts = select({
+        ":aarch64-linux-gnu": ["/usr/local/cuda-12.6/targets/aarch64-linux/lib"],
+        ":x86_64-linux-gnu": ["/usr/local/cuda-12.6/targets/x86_64-linux/lib"],
+        "//conditions:default": [],
+    }) + [
         "-lnppig_static",
         "-lnppc_static",
         "-lnppif_static",
