@@ -25,7 +25,10 @@ cc_library(
         "-DWITH_CUDA",
     ],
     linkopts = select({
-        ":aarch64-linux-gnu": ["-L/usr/local/cuda-12.6/targets/aarch64-linux/lib"],
+        ":aarch64-linux-gnu": [
+            "-L/usr/local/cuda-12.6/targets/aarch64-linux/lib",
+            "-L/usr/lib/aarch64-linux-gnu/nvidia",
+        ],
         ":x86_64-linux-gnu": ["-L/usr/local/cuda-12.6/targets/x86_64-linux/lib"],
         "//conditions:default": [],
     }) + [
@@ -62,7 +65,10 @@ cc_library(
         "-DWITH_CUDA",
     ],
     linkopts = select({
-        ":aarch64-linux-gnu": ["-L/usr/local/cuda-12.6/targets/aarch64-linux/lib"],
+        ":aarch64-linux-gnu": [
+            "-L/usr/local/cuda-12.6/targets/aarch64-linux/lib",
+            "-L/usr/lib/aarch64-linux-gnu/nvidia",
+        ],
         ":x86_64-linux-gnu": ["-L/usr/local/cuda-12.6/targets/x86_64-linux/lib"],
         "//conditions:default": [],
     }) + [
