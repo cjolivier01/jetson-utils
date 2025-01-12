@@ -38,43 +38,55 @@ __global__ void gpuCropPitched( T* input, T* output, int offsetX, int offsetY,
   ((T*)((size_t)(output) + out_y * outputPitch))[out_x] = ((T*)((size_t)(input) + in_y * inputPitch))[in_x];
 }
 
-
 // launchCrop
-template<typename T>
-static cudaError_t launchCropPitched( T* input, T* output, const int4& roi, size_t inputWidth, size_t inputHeight, int inputPitch, int outputPitch, cudaStream_t stream )
-{
-	if( !input || !output )
-		return cudaErrorInvalidDevicePointer;
+template <typename T>
+static cudaError_t launchCropPitched(
+    T* input,
+    T* output,
+    const int4& src_roi,
+    size_t inputWidth,
+    size_t inputHeight,
+    int inputPitch,
+    int outputPitch,
+    cudaStream_t stream) {
+  if (!input || !output)
+    return cudaErrorInvalidDevicePointer;
 
-	if( inputWidth == 0 || inputHeight == 0 )
-		return cudaErrorInvalidValue;
+  if (inputWidth == 0 || inputHeight == 0)
+    return cudaErrorInvalidValue;
 
-	// get the ROI/output dimensions
-	const int outputWidth = roi.z - roi.x;
-	const int outputHeight = roi.w - roi.y;
+  // get the ROI/output dimensions
+  const int outputWidth = src_roi.z - src_roi.x;
+  const int outputHeight = src_roi.w - src_roi.y;
 
-	// validate the requested ROI
-	if( outputWidth <= 0 || outputHeight <= 0 )
-		return cudaErrorInvalidValue;
+  // validate the requested ROI
+  if (outputWidth <= 0 || outputHeight <= 0)
+    return cudaErrorInvalidValue;
 
-	if( outputWidth > inputWidth || outputHeight > inputHeight )
-		return cudaErrorInvalidValue;
+  if (outputWidth > inputWidth || outputHeight > inputHeight)
+    return cudaErrorInvalidValue;
 
-	if( roi.x < 0 || roi.y < 0 || roi.z < 0 || roi.w < 0 )
-		return cudaErrorInvalidValue;
+  size_t out_width_max = outputPitch / sizeof(T);
+  if (outputWidth > out_width_max) {
+    printf("failed: if (outputWidth > out_width_max)\n");
+    return cudaErrorInvalidValue;
+  }
 
-	if( roi.z > inputWidth || roi.w > inputHeight )
-		return cudaErrorInvalidValue;
+  if (src_roi.x < 0 || src_roi.y < 0 || src_roi.z < 0 || src_roi.w < 0)
+    return cudaErrorInvalidValue;
 
-	// launch kernel
-	const dim3 blockDim(8, 8);
-	const dim3 gridDim(iDivUp(outputWidth,blockDim.x), iDivUp(outputHeight,blockDim.y));
+  if (src_roi.z > inputWidth || src_roi.w > inputHeight)
+    return cudaErrorInvalidValue;
 
-	gpuCropPitched<T><<<gridDim, blockDim, 0, stream>>>(input, output, roi.x, roi.y, inputWidth, outputWidth, outputHeight, inputPitch, outputPitch);
+  // launch kernel
+  const dim3 blockDim(8, 8);
+  const dim3 gridDim(iDivUp(outputWidth, blockDim.x), iDivUp(outputHeight, blockDim.y));
 
-	return CUDA(cudaGetLastError());
+  gpuCropPitched<T><<<gridDim, blockDim, 0, stream>>>(
+      input, output, src_roi.x, src_roi.y, inputWidth, outputWidth, outputHeight, inputPitch, outputPitch);
+
+  return CUDA(cudaGetLastError());
 }
-
 
 // gpuCrop
 template<typename T>
