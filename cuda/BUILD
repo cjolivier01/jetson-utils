@@ -112,7 +112,9 @@ cuda_library(
         "-std=c++17",
         "-Xcompiler=-fPIC",
         "-Xcompiler=-g",
+        "-Xcompiler=-O0",
         "-g",
+        "-O0",
     ],
     visibility = ["//visibility:public"],
     deps = [
