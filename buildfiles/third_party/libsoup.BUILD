@@ -19,12 +19,12 @@ cc_library(
         "include/nlohmann",
     ],
     linkopts = select({
-        ":aarch64-linux-gnu": [
-            "-l:/usr/lib/aarch64-linux-gnu/libsoup-2.4.so",
-        ],
-        ":x86_64-linux-gnu": ["-l:/usr/lib/x86_64-linux-gnu/libsoup-2.4.so"],
+        ":aarch64-linux-gnu": ["-L/usr/lib/aarch64-linux-gnu"],
+        ":x86_64-linux-gnu": ["-L/usr/lib/x86_64-linux-gnu"],
         "//conditions:default": [],
-    }),
+    }) + [
+        "-l:libsoup-2.4.so",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "@glib",
