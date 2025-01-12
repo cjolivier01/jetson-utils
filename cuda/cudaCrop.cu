@@ -23,6 +23,58 @@
 #include "cudaCrop.h"
 
 
+template<typename T>
+__global__ void gpuCropPitched( T* input, T* output, int offsetX, int offsetY, 
+					int inWidth, int outWidth, int outHeight, int inputPitch, int outputPitch )
+{
+	const int out_x = blockIdx.x * blockDim.x + threadIdx.x;
+	const int out_y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if( out_x >= outWidth || out_y >= outHeight )
+		return;
+
+	const int in_x = out_x + offsetX;
+	const int in_y = out_y + offsetY;
+  ((T*)((size_t)(output) + out_y * outputPitch))[out_x] = ((T*)((size_t)(input) + in_y * inputPitch))[in_x];
+}
+
+
+// launchCrop
+template<typename T>
+static cudaError_t launchCropPitched( T* input, T* output, const int4& roi, size_t inputWidth, size_t inputHeight, int inputPitch, int outputPitch, cudaStream_t stream )
+{
+	if( !input || !output )
+		return cudaErrorInvalidDevicePointer;
+
+	if( inputWidth == 0 || inputHeight == 0 )
+		return cudaErrorInvalidValue;
+
+	// get the ROI/output dimensions
+	const int outputWidth = roi.z - roi.x;
+	const int outputHeight = roi.w - roi.y;
+
+	// validate the requested ROI
+	if( outputWidth <= 0 || outputHeight <= 0 )
+		return cudaErrorInvalidValue;
+
+	if( outputWidth > inputWidth || outputHeight > inputHeight )
+		return cudaErrorInvalidValue;
+
+	if( roi.x < 0 || roi.y < 0 || roi.z < 0 || roi.w < 0 )
+		return cudaErrorInvalidValue;
+
+	if( roi.z > inputWidth || roi.w > inputHeight )
+		return cudaErrorInvalidValue;
+
+	// launch kernel
+	const dim3 blockDim(8, 8);
+	const dim3 gridDim(iDivUp(outputWidth,blockDim.x), iDivUp(outputHeight,blockDim.y));
+
+	gpuCropPitched<T><<<gridDim, blockDim, 0, stream>>>(input, output, roi.x, roi.y, inputWidth, outputWidth, outputHeight, inputPitch, outputPitch);
+
+	return CUDA(cudaGetLastError());
+}
+
 
 // gpuCrop
 template<typename T>
@@ -102,6 +154,11 @@ cudaError_t cudaCrop( uchar4* input, uchar4* output, const int4& roi, size_t inp
 	return launchCrop<uchar4>(input, output, roi, inputWidth, inputHeight, stream);
 }
 
+cudaError_t cudaCrop( uchar4* input, uchar4* output, const int4& roi, size_t inputWidth, size_t inputHeight, size_t inputPitch, size_t outputPitch, cudaStream_t stream )
+{
+	return launchCropPitched<uchar4>(input, output, roi, inputWidth, inputHeight, inputPitch, outputPitch, stream);
+}
+
 // cudaCrop (float3)
 cudaError_t cudaCrop( float3* input, float3* output, const int4& roi, size_t inputWidth, size_t inputHeight, cudaStream_t stream )
 {
@@ -112,6 +169,10 @@ cudaError_t cudaCrop( float3* input, float3* output, const int4& roi, size_t inp
 cudaError_t cudaCrop( float4* input, float4* output, const int4& roi, size_t inputWidth, size_t inputHeight, cudaStream_t stream )
 {
 	return launchCrop<float4>(input, output, roi, inputWidth, inputHeight, stream);
+}
+
+cudaError_t cudaCrop( float4* input, float4* output, const int4& roi, size_t inputWidth, size_t inputHeight, size_t inputPitch, size_t outputPitch, cudaStream_t stream) {
+  return launchCropPitched<float4>(input, output, roi, inputWidth, inputHeight, inputPitch, outputPitch, stream);
 }
 
 //-----------------------------------------------------------------------------------

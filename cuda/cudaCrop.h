@@ -119,6 +119,7 @@ cudaError_t cudaCrop( uchar3* input, uchar3* output, const int4& roi, size_t inp
  * @ingroup crop
  */
 cudaError_t cudaCrop( uchar4* input, uchar4* output, const int4& roi, size_t inputWidth, size_t inputHeight, cudaStream_t stream=0 );
+cudaError_t cudaCrop( uchar4* input, uchar4* output, const int4& roi, size_t inputWidth, size_t inputHeight, size_t inputPitch, size_t outputPitch, cudaStream_t stream = 0);
 
 /**
  * Crop a float3 RGB/BGR image to the specified region of interest (ROI).
@@ -165,6 +166,7 @@ cudaError_t cudaCrop( float3* input, float3* output, const int4& roi, size_t inp
  * @ingroup crop
  */
 cudaError_t cudaCrop( float4* input, float4* output, const int4& roi, size_t inputWidth, size_t inputHeight, cudaStream_t stream=0 );
+cudaError_t cudaCrop( float4* input, float4* output, const int4& roi, size_t inputWidth, size_t inputHeight, size_t inputPitch, size_t outputPitch, cudaStream_t stream=0 );
 
 /**
  * Crop a float4 RGBA/BGRA image to the specified region of interest (ROI).
