@@ -22,7 +22,8 @@ cc_library(
         "-std=c++17",
         "-fPIC",
         "-Wno-error=deprecated-declarations",
-        "-DWITH_CUDA",
+        "-g",
+        "-O0",
     ],
     linkopts = select({
         ":aarch64-linux-gnu": [
@@ -62,7 +63,6 @@ cc_library(
         "-std=c++17",
         "-fPIC",
         "-Wno-error=deprecated-declarations",
-        "-DWITH_CUDA",
     ],
     linkopts = select({
         ":aarch64-linux-gnu": [
@@ -113,6 +113,8 @@ cuda_library(
         "-Xcompiler=-fPIC",
         "-Xcompiler=-g",
         "-Xcompiler=-O0",
+        # "-keep",
+        # "-keep-dir=/tmp/cuda_temp",
         "-g",
         "-O0",
     ],
@@ -139,10 +141,14 @@ cuda_library(
         "cudaFilterMode.cuh",
     ],
     copts = [
+        # "-keep",
+        # "-keep-dir=/tmp/cuda_temp",
         "-std=c++17",
         "-Xcompiler=-fPIC",
         "-Xcompiler=-g",
+        "-Xcompiler=-O0",
         "-g",
+        "-O0",
     ],
     visibility = ["//visibility:public"],
     deps = [
