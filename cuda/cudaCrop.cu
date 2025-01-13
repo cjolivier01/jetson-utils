@@ -28,7 +28,7 @@
 extern "C" __global__ void gpuCropPitched( uchar4* input, uchar4* output, int offsetX, int offsetY, 
 					int inWidth, int outWidth, int outHeight, int inputPitch, int outputPitch )
 {
-	printf("ENTER gpuCropPitched\n");
+	//printf("ENTER gpuCropPitched\n");
   using T = uchar4;
 	const int out_x = blockIdx.x * blockDim.x + threadIdx.x;
 	const int out_y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -39,7 +39,7 @@ extern "C" __global__ void gpuCropPitched( uchar4* input, uchar4* output, int of
 	const int in_x = out_x + offsetX;
 	const int in_y = out_y + offsetY;
   ((T*)((size_t)(output) + out_y * outputPitch))[out_x] = ((T*)((size_t)(input) + in_y * inputPitch))[in_x];
-	printf("LEAVE gpuCropPitched\n");
+	//printf("LEAVE gpuCropPitched\n");
 }
 
 
@@ -98,10 +98,13 @@ static cudaError_t launchCropPitched(
   const dim3 blockDim(8, 8);
   const dim3 gridDim(iDivUp(outputWidth, blockDim.x), iDivUp(outputHeight, blockDim.y));
 
+	//cudaError_t last_error = cudaGetLastError();
+	//printf("last error: %d\n", last_error);
+
   gpuCropPitched<<<gridDim, blockDim, 0, stream>>>(
       input, output, src_roi.x, src_roi.y, inputWidth, outputWidth, outputHeight, inputPitch, outputPitch);
 
-	printf("ran it\n");
+	//printf("ran it\n");
 
   return CUDA(cudaGetLastError());
 }
