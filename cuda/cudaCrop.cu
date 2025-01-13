@@ -27,6 +27,7 @@ template<typename T>
 __global__ void gpuCropPitched( T* input, T* output, int offsetX, int offsetY, 
 					int inWidth, int outWidth, int outHeight, int inputPitch, int outputPitch )
 {
+	printf("gpuCropPitched\n");
 	const int out_x = blockIdx.x * blockDim.x + threadIdx.x;
 	const int out_y = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -52,19 +53,25 @@ static cudaError_t launchCropPitched(
   if (!input || !output)
     return cudaErrorInvalidDevicePointer;
 
-  if (inputWidth == 0 || inputHeight == 0)
+  if (inputWidth == 0 || inputHeight == 0) {
+		printf("inputWidth == 0 || inputHeight == 0\n");
     return cudaErrorInvalidValue;
+	}
 
   // get the ROI/output dimensions
   const int outputWidth = src_roi.z - src_roi.x;
   const int outputHeight = src_roi.w - src_roi.y;
 
   // validate the requested ROI
-  if (outputWidth <= 0 || outputHeight <= 0)
-    return cudaErrorInvalidValue;
+  if (outputWidth <= 0 || outputHeight <= 0) {
+		printf("(outputWidth <= 0 || outputHeight <= 0)\n");
+		return cudaErrorInvalidValue;
+	}
 
-  if (outputWidth > inputWidth || outputHeight > inputHeight)
+  if (outputWidth > inputWidth || outputHeight > inputHeight) {
+		printf("outputWidth > inputWidth || outputHeight > inputHeight\n");
     return cudaErrorInvalidValue;
+	}
 
   size_t out_width_max = outputPitch / sizeof(T);
   if (outputWidth > out_width_max) {
@@ -72,11 +79,15 @@ static cudaError_t launchCropPitched(
     return cudaErrorInvalidValue;
   }
 
-  if (src_roi.x < 0 || src_roi.y < 0 || src_roi.z < 0 || src_roi.w < 0)
+  if (src_roi.x < 0 || src_roi.y < 0 || src_roi.z < 0 || src_roi.w < 0) {
+		printf("src_roi.x < 0 || src_roi.y < 0 || src_roi.z < 0 || src_roi.w < 0\n");
     return cudaErrorInvalidValue;
+	}
 
-  if (src_roi.z > inputWidth || src_roi.w > inputHeight)
+  if (src_roi.z > inputWidth || src_roi.w > inputHeight) {
+		printf("src_roi.z > inputWidth || src_roi.w > inputHeight\n");
     return cudaErrorInvalidValue;
+	}
 
   // launch kernel
   const dim3 blockDim(8, 8);
@@ -84,6 +95,8 @@ static cudaError_t launchCropPitched(
 
   gpuCropPitched<T><<<gridDim, blockDim, 0, stream>>>(
       input, output, src_roi.x, src_roi.y, inputWidth, outputWidth, outputHeight, inputPitch, outputPitch);
+
+	printf("ran it\n");
 
   return CUDA(cudaGetLastError());
 }
