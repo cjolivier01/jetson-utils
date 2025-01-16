@@ -24,12 +24,10 @@
 
 #include <cassert>
 
-//template<typename T>
-extern "C" __global__ void gpuCropPitched( uchar4* input, uchar4* output, int offsetX, int offsetY, 
+template<typename T>
+__global__ void gpuCropPitched( T* input, T* output, int offsetX, int offsetY, 
 					int inWidth, int outWidth, int outHeight, int inputPitch, int outputPitch )
 {
-	//printf("ENTER gpuCropPitched\n");
-  using T = uchar4;
 	const int out_x = blockIdx.x * blockDim.x + threadIdx.x;
 	const int out_y = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -39,22 +37,20 @@ extern "C" __global__ void gpuCropPitched( uchar4* input, uchar4* output, int of
 	const int in_x = out_x + offsetX;
 	const int in_y = out_y + offsetY;
   ((T*)((size_t)(output) + out_y * outputPitch))[out_x] = ((T*)((size_t)(input) + in_y * inputPitch))[in_x];
-	//printf("LEAVE gpuCropPitched\n");
 }
 
 
 // launchCrop
-//template <typename T>
+template <typename T>
 static cudaError_t launchCropPitched(
-    uchar4* input,
-    uchar4* output,
+    T* input,
+    T* output,
     const int4& src_roi,
     size_t inputWidth,
     size_t inputHeight,
     int inputPitch,
     int outputPitch,
     cudaStream_t stream) {
-  using T = uchar4;
   if (!input || !output)
     return cudaErrorInvalidDevicePointer;
 
@@ -98,13 +94,8 @@ static cudaError_t launchCropPitched(
   const dim3 blockDim(8, 8);
   const dim3 gridDim(iDivUp(outputWidth, blockDim.x), iDivUp(outputHeight, blockDim.y));
 
-	//cudaError_t last_error = cudaGetLastError();
-	//printf("last error: %d\n", last_error);
-
   gpuCropPitched<<<gridDim, blockDim, 0, stream>>>(
       input, output, src_roi.x, src_roi.y, inputWidth, outputWidth, outputHeight, inputPitch, outputPitch);
-
-	//printf("ran it\n");
 
   return CUDA(cudaGetLastError());
 }
@@ -204,9 +195,9 @@ cudaError_t cudaCrop( float4* input, float4* output, const int4& roi, size_t inp
 	return launchCrop<float4>(input, output, roi, inputWidth, inputHeight, stream);
 }
 
-// cudaError_t cudaCrop( float4* input, float4* output, const int4& roi, size_t inputWidth, size_t inputHeight, size_t inputPitch, size_t outputPitch, cudaStream_t stream) {
-//   return launchCropPitched<float4>(input, output, roi, inputWidth, inputHeight, inputPitch, outputPitch, stream);
-// }
+cudaError_t cudaCrop( float4* input, float4* output, const int4& roi, size_t inputWidth, size_t inputHeight, size_t inputPitch, size_t outputPitch, cudaStream_t stream) {
+  return launchCropPitched<float4>(input, output, roi, inputWidth, inputHeight, inputPitch, outputPitch, stream);
+}
 
 //-----------------------------------------------------------------------------------
 cudaError_t cudaCrop( void* input, void* output, const int4& roi, size_t inputWidth, size_t inputHeight, imageFormat format, cudaStream_t stream )
