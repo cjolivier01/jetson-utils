@@ -1,4 +1,4 @@
-#load("@rules_python//python:defs.bzl", "py_extension")
+load("@rules_python//python:defs.bzl", "py_extension")
 
 cc_library(
     name = "jetson_utils_lib",
@@ -6,6 +6,7 @@ cc_library(
     hdrs = glob(["*.h"]),
     copts = [
         "-std=c++17",  # Use C++17 (or higher if needed)
+        "-fPIC",
     ],
     deps = [
         "//base:base",
