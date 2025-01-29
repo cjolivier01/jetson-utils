@@ -19,9 +19,15 @@ rules_cuda_dependencies()
 
 register_detected_cuda_toolchains()
 
-# load("//:conda.bzl", "detect_conda_python")
+load("//:conda.bzl", "detect_conda_python")
 
 # detect_conda_python(name = "conda_python")
+
+new_local_repository(
+    name = "conda_python",
+    path = "/home/colivier/.conda/envs/ubuntu",
+    build_file = "@//buildfiles:third_party/python.BUILD",
+)
 
 git_repository(
     name = "rules_python",
@@ -71,10 +77,4 @@ new_local_repository(
     name = "libsoup",
     build_file = "@//buildfiles:third_party/libsoup.BUILD",
     path = "/usr",
-)
-
-new_local_repository(
-    name = "conda_python",
-    path = "/home/colivier/.conda/envs/ubuntu",
-    build_file = "@//buildfiles:third_party/python.BUILD",
 )
