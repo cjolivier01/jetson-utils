@@ -1,16 +1,17 @@
-# load("@rules_python//python:defs.bzl", "py_extension")
+#load("@rules_python//python:defs.bzl", "py_extension")
 
-# cc_library(
-#     name = "jetson_utils_lib",
-#     srcs = glob(["*.cpp"]),
-#     hdrs = glob(["*.h"]),
-#     copts = [
-#         "-std=c++17",  # Use C++17 (or higher if needed)
-#     ],
-#     deps = [
-#         "@pybind11",  # Pybind11 dependency
-#     ],
-# )
+cc_library(
+    name = "jetson_utils_lib",
+    srcs = glob(["*.cpp"]),
+    hdrs = glob(["*.h"]),
+    copts = [
+        "-std=c++17",  # Use C++17 (or higher if needed)
+    ],
+    deps = [
+        # "@pybind11",  # Pybind11 dependency
+        "@conda_python//:python",
+    ],
+)
 
 # # py_extension(
 #     name = "jetson_utils",  # The Python extension's name

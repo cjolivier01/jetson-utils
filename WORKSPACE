@@ -19,6 +19,10 @@ rules_cuda_dependencies()
 
 register_detected_cuda_toolchains()
 
+load("//:conda.bzl", "detect_conda_python")
+
+detect_conda_python(name = "conda_python")
+
 git_repository(
     name = "rules_python",
     remote = "https://github.com/bazelbuild/rules_python.git",
@@ -68,3 +72,10 @@ new_local_repository(
     build_file = "@//buildfiles:third_party/libsoup.BUILD",
     path = "/usr",
 )
+
+# new_local_repository(
+#     name = "conda_python",
+#     path = "/home/miniforge3/envs/ubuntu",
+#     build_file = "@//buildfiles:third_party/python.BUILD",
+# )
+
