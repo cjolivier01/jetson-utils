@@ -22,7 +22,10 @@ def _detect_conda_python(repository_ctx):
 cc_library(
     name = "python",
     hdrs = glob(["include/**/*.h"]),
-    includes = ["include", "include/python3.11"],
+    includes = [
+        "include",
+        "include/python3.11",
+    ],
     visibility = ["//visibility:public"],
 )
 """)

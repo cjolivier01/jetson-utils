@@ -1,11 +1,11 @@
 
 cc_library(
-    name = "pythonxdde",
+    name = "python",
     hdrs = glob(["include/**/*.h"]),
     includes = [
       "include",
       "include/python3.11"
-    ],  # This makes #include <Python.h> work
+    ],
     linkopts = [
       "-Llib",
       "-lpython3",

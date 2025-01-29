@@ -8,7 +8,9 @@ cc_library(
         "-std=c++17",  # Use C++17 (or higher if needed)
     ],
     deps = [
-        # "@pybind11",  # Pybind11 dependency
+        "//base:base",
+        "//image:image",
+        "//camera:camera",
         "@conda_python//:python",
     ],
 )
