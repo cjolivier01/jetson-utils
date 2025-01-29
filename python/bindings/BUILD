@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_extension")
+# load("@rules_python//python:defs.bzl", "py_extension")
 
 cc_library(
     name = "jetson_utils_lib",
