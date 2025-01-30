@@ -24,5 +24,14 @@
         "PYTHONPATH": "${workspaceRoot}/build:${workspaceRoot}/src:${workspaceRoot}/external/MOTChallengeEvalKit"
       }
     },
-  ]
+    {
+      "name": "gl-display-test",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/bazel-bin/display/gl-display-test/gl_display_test",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "JU Build All",
+    },
+    ]
 }
