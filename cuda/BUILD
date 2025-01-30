@@ -27,10 +27,10 @@ cc_library(
     ],
     linkopts = select({
         ":aarch64-linux-gnu": [
-            "-L/usr/local/cuda-12.8/targets/aarch64-linux/lib",
+            "-L/usr/local/cuda/targets/aarch64-linux/lib",
             "-L/usr/lib/aarch64-linux-gnu/nvidia",
         ],
-        ":x86_64-linux-gnu": ["-L/usr/local/cuda-12.8/targets/x86_64-linux/lib"],
+        ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
         "//conditions:default": [],
     }) + [
         "-lnppig_static",
@@ -66,10 +66,10 @@ cc_library(
     ],
     linkopts = select({
         ":aarch64-linux-gnu": [
-            "-L/usr/local/cuda-12.8/targets/aarch64-linux/lib",
+            "-L/usr/local/cuda/targets/aarch64-linux/lib",
             "-L/usr/lib/aarch64-linux-gnu/nvidia",
         ],
-        ":x86_64-linux-gnu": ["-L/usr/local/cuda-12.8/targets/x86_64-linux/lib"],
+        ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
         "//conditions:default": [],
     }) + [
         "-lnppig_static",
