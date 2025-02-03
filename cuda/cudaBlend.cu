@@ -227,9 +227,10 @@ __global__ void blendKernelRGB(
     return;
   int idx = (y * width + x) * 3;
   float m = mask[y * width + x];
-  blended[idx + 0] = m * lap1[idx + 0] + (1.0f - m) * lap2[idx + 0];
-  blended[idx + 1] = m * lap1[idx + 1] + (1.0f - m) * lap2[idx + 1];
-  blended[idx + 2] = m * lap1[idx + 2] + (1.0f - m) * lap2[idx + 2];
+  float mm1 = 1.0f - m;
+  blended[idx + 0] = m * lap1[idx + 0] + mm1 * lap2[idx + 0];
+  blended[idx + 1] = m * lap1[idx + 1] + mm1 * lap2[idx + 1];
+  blended[idx + 2] = m * lap1[idx + 2] + mm1 * lap2[idx + 2];
 }
 
 // ---------------------------------------------------------------------
