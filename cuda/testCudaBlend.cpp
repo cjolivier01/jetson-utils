@@ -125,6 +125,6 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  std::cout << "Blended image saved as " << argv[4] << std::endl;
+  std::cout << "Blended image saved as: " << argv[4] << std::endl;
   return 0;
 }
