@@ -226,6 +226,7 @@ cuda_library(
     name = "cuda_blend_lib",
     srcs = [
         "cudaBlend.cu",
+        "cudaBlendBatched.cu",
     ],
     hdrs = [
         "cudaBlend.h",
