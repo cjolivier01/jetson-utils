@@ -9,6 +9,7 @@
 #include <cassert>
 #include <vector>
 
+namespace {
 __global__ void remapKernel(const float *src, int srcW, int srcH, float *dest,
                             int destW, int destH, const unsigned short *mapX,
                             const unsigned short *mapY, float defR, float defG,
@@ -110,61 +111,63 @@ __global__ void downsampleKernelMask(const float *input, int inWidth,
 // Upsamples a lower–resolution image by a factor of 2 using bilinear
 // interpolation.
 // ---------------------------------------------------------------------
-__global__ void upsampleKernelRGB(const float *input, int inWidth, int inHeight,
-                                  float *output, int outWidth, int outHeight) {
-  int x = blockIdx.x * blockDim.x + threadIdx.x;
-  int y = blockIdx.y * blockDim.y + threadIdx.y;
-  if (x >= outWidth || y >= outHeight)
-    return;
+// __global__ void upsampleKernelRGB(const float *input, int inWidth, int
+// inHeight,
+//                                   float *output, int outWidth, int outHeight)
+//                                   {
+//   int x = blockIdx.x * blockDim.x + threadIdx.x;
+//   int y = blockIdx.y * blockDim.y + threadIdx.y;
+//   if (x >= outWidth || y >= outHeight)
+//     return;
 
-  // Map output coordinate to input (low–res) coordinate space.
-  float gx = (float)x / 2.0f;
-  float gy = (float)y / 2.0f;
-  int gxi = floorf(gx);
-  int gyi = floorf(gy);
-  float dx = gx - gxi;
-  float dy = gy - gyi;
-  int gxi1 = min(gxi + 1, inWidth - 1);
-  int gyi1 = min(gyi + 1, inHeight - 1);
+//   // Map output coordinate to input (low–res) coordinate space.
+//   float gx = (float)x / 2.0f;
+//   float gy = (float)y / 2.0f;
+//   int gxi = floorf(gx);
+//   int gyi = floorf(gy);
+//   float dx = gx - gxi;
+//   float dy = gy - gyi;
+//   int gxi1 = min(gxi + 1, inWidth - 1);
+//   int gyi1 = min(gyi + 1, inHeight - 1);
 
-  int idx00 = (gyi * inWidth + gxi) * 3;
-  int idx10 = (gyi * inWidth + gxi1) * 3;
-  int idx01 = (gyi1 * inWidth + gxi) * 3;
-  int idx11 = (gyi1 * inWidth + gxi1) * 3;
+//   int idx00 = (gyi * inWidth + gxi) * 3;
+//   int idx10 = (gyi * inWidth + gxi1) * 3;
+//   int idx01 = (gyi1 * inWidth + gxi) * 3;
+//   int idx11 = (gyi1 * inWidth + gxi1) * 3;
 
-  float outR, outG, outB;
-  { // Interpolate for R channel.
-    float val00 = input[idx00 + 0];
-    float val10 = input[idx10 + 0];
-    float val01 = input[idx01 + 0];
-    float val11 = input[idx11 + 0];
-    float val0 = val00 * (1.0f - dx) + val10 * dx;
-    float val1 = val01 * (1.0f - dx) + val11 * dx;
-    outR = val0 * (1.0f - dy) + val1 * dy;
-  }
-  { // Interpolate for G channel.
-    float val00 = input[idx00 + 1];
-    float val10 = input[idx10 + 1];
-    float val01 = input[idx01 + 1];
-    float val11 = input[idx11 + 1];
-    float val0 = val00 * (1.0f - dx) + val10 * dx;
-    float val1 = val01 * (1.0f - dx) + val11 * dx;
-    outG = val0 * (1.0f - dy) + val1 * dy;
-  }
-  { // Interpolate for B channel.
-    float val00 = input[idx00 + 2];
-    float val10 = input[idx10 + 2];
-    float val01 = input[idx01 + 2];
-    float val11 = input[idx11 + 2];
-    float val0 = val00 * (1.0f - dx) + val10 * dx;
-    float val1 = val01 * (1.0f - dx) + val11 * dx;
-    outB = val0 * (1.0f - dy) + val1 * dy;
-  }
-  int idxOut = (y * outWidth + x) * 3;
-  output[idxOut + 0] = outR;
-  output[idxOut + 1] = outG;
-  output[idxOut + 2] = outB;
-}
+//   float outR, outG, outB;
+//   { // Interpolate for R channel.
+//     float val00 = input[idx00 + 0];
+//     float val10 = input[idx10 + 0];
+//     float val01 = input[idx01 + 0];
+//     float val11 = input[idx11 + 0];
+//     float val0 = val00 * (1.0f - dx) + val10 * dx;
+//     float val1 = val01 * (1.0f - dx) + val11 * dx;
+//     outR = val0 * (1.0f - dy) + val1 * dy;
+//   }
+//   { // Interpolate for G channel.
+//     float val00 = input[idx00 + 1];
+//     float val10 = input[idx10 + 1];
+//     float val01 = input[idx01 + 1];
+//     float val11 = input[idx11 + 1];
+//     float val0 = val00 * (1.0f - dx) + val10 * dx;
+//     float val1 = val01 * (1.0f - dx) + val11 * dx;
+//     outG = val0 * (1.0f - dy) + val1 * dy;
+//   }
+//   { // Interpolate for B channel.
+//     float val00 = input[idx00 + 2];
+//     float val10 = input[idx10 + 2];
+//     float val01 = input[idx01 + 2];
+//     float val11 = input[idx11 + 2];
+//     float val0 = val00 * (1.0f - dx) + val10 * dx;
+//     float val1 = val01 * (1.0f - dx) + val11 * dx;
+//     outB = val0 * (1.0f - dy) + val1 * dy;
+//   }
+//   int idxOut = (y * outWidth + x) * 3;
+//   output[idxOut + 0] = outR;
+//   output[idxOut + 1] = outG;
+//   output[idxOut + 2] = outB;
+// }
 
 // ---------------------------------------------------------------------
 // Compute Laplacian kernel for RGB images.
@@ -308,6 +311,7 @@ __global__ void reconstructKernelRGB(const float *lowerRes, int lowWidth,
   reconstruction[idxHigh + 1] = upG + lap[idxHigh + 1];
   reconstruction[idxHigh + 2] = upB + lap[idxHigh + 2];
 }
+} // namespace
 
 // ---------------------------------------------------------------------
 // Host code: main blending pipeline.
