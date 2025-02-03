@@ -222,3 +222,44 @@ cc_library(
         "@local_cuda//:cuda_runtime",
     ],
 )
+
+cuda_library(
+    name = "cuda_blend_lib",
+    srcs = [
+        "cudaBlend.cu",
+    ],
+    hdrs = [
+    ],
+    copts = [
+        "-std=c++17",
+        "-Xcompiler=-fPIC",
+        "-Xcompiler=-g",
+        "-Xcompiler=-O0",
+        "-Xcompiler=-rdynamic",
+        "-G",
+        "-keep",
+        # "-keep-dir=/tmp/cuda_temp",
+        "-g",
+        "-O0",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":colorspace_cuda_lib",
+        ":cuda_lib_headers",
+        "//image",
+        "@local_cuda//:cuda_runtime",
+    ],
+)
+
+cc_binary(
+  name = "test_cuda_blend",
+  srcs = [
+    "testCudaBlend.cpp",
+  ],
+  visibility = ["//visibility:public"],
+  deps = [
+    ":cuda_blend_lib",
+    "@local_cuda//:cuda_runtime",
+    "@opencv_linux//:opencv",
+  ],
+)

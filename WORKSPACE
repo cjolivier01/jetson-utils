@@ -89,3 +89,9 @@ new_local_repository(
     build_file = "@//buildfiles:third_party/libsoup.BUILD",
     path = "/usr",
 )
+
+new_local_repository(
+    name = "opencv_linux",
+    build_file = "@//buildfiles:third_party/opencv_linux.BUILD",
+    path = "/usr/include",
+)
