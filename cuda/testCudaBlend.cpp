@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include "cudaBlend.h"
 
+#include <cassert>
 #include <iostream>
 
 class CudaMat {
@@ -59,7 +60,7 @@ int main(int argc, char** argv) {
   // Load the two images (in color).
   cv::Mat img1 = cv::imread(argv[1], cv::IMREAD_COLOR);
   cv::Mat img2 = cv::imread(argv[2], cv::IMREAD_COLOR);
-  cv::Mat seam_mask = cv::imread(argv[3], cv::IMREAD_ANYDEPTH);
+  //cv::Mat seam_mask = cv::imread(argv[3], cv::IMREAD_ANYDEPTH);
   if (img1.empty() || img2.empty()) {
     std::cerr << "Error loading images!" << std::endl;
     return -1;
@@ -72,22 +73,22 @@ int main(int argc, char** argv) {
   }
 
   // Convert images to float (CV_32FC3) and scale pixel values to [0,1].
-  cv::Mat img1_float, img2_float, mask;
+  cv::Mat img1_float, img2_float;
   img1.convertTo(img1_float, CV_32FC3, 1.0 / 255.0);
   img2.convertTo(img2_float, CV_32FC3, 1.0 / 255.0);
 
-  seam_mask.convertTo(mask, CV_32FC1, 1.0 / 255.0);
+  //seam_mask.convertTo(mask, CV_32FC1, 1.0 / 255.0);
 
   // Create a simple seam mask (single–channel, CV_32FC1):
   // Here we use a hard–coded seam: the left half of the image is taken entirely from image1
   // (mask value 1.0) and the right half from image2 (mask value 0.0). In a more complex case,
   // the mask can be generated based on feature detection or user input.
-  // cv::Mat mask(img1.size(), CV_32FC1);
-  // for (int y = 0; y < mask.rows; y++) {
-  //   for (int x = 0; x < mask.cols; x++) {
-  //     mask.at<float>(y, x) = (x < mask.cols / 2) ? 1.0f : 0.0f;
-  //   }
-  // }
+  cv::Mat mask(img1.size(), CV_32FC1);
+  for (int y = 0; y < mask.rows; y++) {
+    for (int x = 0; x < mask.cols; x++) {
+      mask.at<float>(y, x) = (x < mask.cols / 2) ? 1.0f : 0.0f;
+    }
+  }
 
   // Prepare the output image (as float).
   cv::Mat blended_float(img1.size(), CV_32FC3);
@@ -120,7 +121,7 @@ int main(int argc, char** argv) {
   blended_float.convertTo(blended, CV_8UC3, 255.0);
 
   // Save the final blended image.
-  if (!cv::imwrite(argv[3], blended)) {
+  if (!cv::imwrite(argv[4], blended)) {
     std::cerr << "Failed to save the blended image!" << std::endl;
     return -1;
   }
