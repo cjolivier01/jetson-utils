@@ -1,9 +1,10 @@
 #include <cuda_runtime.h>
-#include <opencv2/opencv.hpp>
-#include "cudaBlend.h"
 
 #include <cassert>
 #include <iostream>
+#include <opencv2/opencv.hpp>
+
+#include "cudaBlend.h"
 
 class CudaMat {
  private:
@@ -12,7 +13,8 @@ class CudaMat {
   int rows, cols, type;
 
  public:
-  CudaMat(const cv::Mat& mat) : rows(mat.rows), cols(mat.cols), type(mat.type()) {
+  CudaMat(const cv::Mat& mat)
+      : rows(mat.rows), cols(mat.cols), type(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
     cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
@@ -30,30 +32,20 @@ class CudaMat {
     return mat;
   }
 
-  void* data() {
-    return d_data;
-  }
-  const void* data() const {
-    return d_data;
-  }
-  size_t bytes() const {
-    return size;
-  }
+  void* data() { return d_data; }
+  const void* data() const { return d_data; }
+  size_t bytes() const { return size; }
 };
 void test_remapping();
-cudaError_t cudaLaplacianBlend(
-    const float* image1,
-    const float* image2,
-    const float* mask,
-    float* output,
-    int imageWidth,
-    int imageHeight,
-    int numLevels);
+cudaError_t cudaLaplacianBlend(const float* image1, const float* image2,
+                               const float* mask, float* output, int imageWidth,
+                               int imageHeight, int numLevels);
 
 int main(int argc, char** argv) {
   // Usage check.
   if (argc < 4) {
-    std::cerr << "Usage: " << argv[0] << " <image1> <image2> <mask> <output>" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " <image1> <image2> <mask> <output>"
+              << std::endl;
     return -1;
   }
 
@@ -80,11 +72,11 @@ int main(int argc, char** argv) {
   seam_mask.convertTo(mask, CV_32FC1, 1.0 / 255.0);
 
   // Create a simple seam mask (single–channel, CV_32FC1):
-  // Here we use a hard–coded seam: the left half of the image is taken entirely from image1
-  // (mask value 1.0) and the right half from image2 (mask value 0.0). In a more complex case,
-  // the mask can be generated based on feature detection or user input.
-  // cv::Mat mask(img1.size(), CV_32FC1);
-  // for (int y = 0; y < mask.rows; y++) {
+  // Here we use a hard–coded seam: the left half of the image is taken entirely
+  // from image1 (mask value 1.0) and the right half from image2 (mask value
+  // 0.0). In a more complex case, the mask can be generated based on feature
+  // detection or user input. cv::Mat mask(img1.size(), CV_32FC1); for (int y =
+  // 0; y < mask.rows; y++) {
   //   for (int x = 0; x < mask.cols; x++) {
   //     mask.at<float>(y, x) = (x < mask.cols / 2) ? 1.0f : 0.0f;
   //   }
@@ -111,29 +103,25 @@ int main(int argc, char** argv) {
 
   auto cu_err = cudaLaplacianBlendWithContext(
       (const float*)cudaImage1Float.data(),
-      (const float*)cudaImage2Float.data(),
-      (const float*)cudaMask.data(),
-      (float*)cudaBlendedFloat.data(),
-      context);
+      (const float*)cudaImage2Float.data(), (const float*)cudaMask.data(),
+      (float*)cudaBlendedFloat.data(), context);
 
 #if 1 /* perf test */
-  auto start_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
-          .count();
+  auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      std::chrono::system_clock::now().time_since_epoch())
+                      .count();
 
   size_t frame_count = 100;
   for (size_t i = 0; i < frame_count; ++i) {
-    cudaLaplacianBlendWithContext(
-        (const float*)cudaImage1Float.data(),
-        (const float*)cudaImage2Float.data(),
-        (const float*)cudaMask.data(),
-        (float*)cudaBlendedFloat.data(),
-        context);
+    cudaLaplacianBlendWithContext((const float*)cudaImage1Float.data(),
+                                  (const float*)cudaImage2Float.data(),
+                                  (const float*)cudaMask.data(),
+                                  (float*)cudaBlendedFloat.data(), context);
   }
 
-  auto stop_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
-          .count();
+  auto stop_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                     std::chrono::system_clock::now().time_since_epoch())
+                     .count();
   float ms = stop_ms - start_ms;
   float sec_per_frame = (ms / 1000) / frame_count;
   std::cout << "Blend speed: " << (1.0 / sec_per_frame) << "fps" << std::endl;
@@ -157,8 +145,8 @@ int main(int argc, char** argv) {
 
 void test_remapping() {
   // Define image dimensions.
-  const int srcW = 4, srcH = 4; // Source image dimensions.
-  const int destW = 4, destH = 4; // Destination image dimensions.
+  const int srcW = 4, srcH = 4;    // Source image dimensions.
+  const int destW = 4, destH = 4;  // Destination image dimensions.
 
   // Allocate and initialize the host source image.
   // Each pixel has 3 channels (RGB) stored as floats.
@@ -177,8 +165,9 @@ void test_remapping() {
   float h_dest[destW * destH * 3] = {0};
 
   // Allocate and initialize the host mapping arrays (unsigned short).
-  // For each destination pixel (x, y), we want to map to source pixel (x-1, y-1).
-  // If (x-1) or (y-1) is negative, we set the mapping to an out-of-range value.
+  // For each destination pixel (x, y), we want to map to source pixel (x-1,
+  // y-1). If (x-1) or (y-1) is negative, we set the mapping to an out-of-range
+  // value.
   unsigned short h_mapX[destW * destH];
   unsigned short h_mapY[destW * destH];
   for (int y = 0; y < destH; y++) {
@@ -187,8 +176,10 @@ void test_remapping() {
       int mapXVal = x - 1;
       int mapYVal = y - 1;
       // If the mapping is negative, assign an out-of-range value.
-      h_mapX[idx] = (mapXVal < 0) ? static_cast<unsigned short>(srcW) : static_cast<unsigned short>(mapXVal);
-      h_mapY[idx] = (mapYVal < 0) ? static_cast<unsigned short>(srcH) : static_cast<unsigned short>(mapYVal);
+      h_mapX[idx] = (mapXVal < 0) ? static_cast<unsigned short>(srcW)
+                                  : static_cast<unsigned short>(mapXVal);
+      h_mapY[idx] = (mapYVal < 0) ? static_cast<unsigned short>(srcH)
+                                  : static_cast<unsigned short>(mapYVal);
     }
   }
 
@@ -201,25 +192,31 @@ void test_remapping() {
   cudaMalloc(&d_mapY, sizeof(unsigned short) * destW * destH);
 
   // Copy data from host to device.
-  cudaMemcpy(d_src, h_src, sizeof(float) * srcW * srcH * 3, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_mapX, h_mapX, sizeof(unsigned short) * destW * destH, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_mapY, h_mapY, sizeof(unsigned short) * destW * destH, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_src, h_src, sizeof(float) * srcW * srcH * 3,
+             cudaMemcpyHostToDevice);
+  cudaMemcpy(d_mapX, h_mapX, sizeof(unsigned short) * destW * destH,
+             cudaMemcpyHostToDevice);
+  cudaMemcpy(d_mapY, h_mapY, sizeof(unsigned short) * destW * destH,
+             cudaMemcpyHostToDevice);
 
   // Define kernel launch configuration.
   // dim3 blockDim(16, 16);
-  // dim3 gridDim((destW + blockDim.x - 1) / blockDim.x, (destH + blockDim.y - 1) / blockDim.y);
+  // dim3 gridDim((destW + blockDim.x - 1) / blockDim.x, (destH + blockDim.y -
+  // 1) / blockDim.y);
 
   // Set default color for unmapped pixels.
   float defaultR = 100.0f, defaultG = 100.0f, defaultB = 100.0f;
 
   // Launch the remap kernel.
-  remap_kernel(d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY, defaultR, defaultG, defaultB);
+  remap_kernel(d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY,
+               defaultR, defaultG, defaultB);
 
   // Wait for the kernel to finish.
   cudaDeviceSynchronize();
 
   // Copy the destination image back to host memory.
-  cudaMemcpy(h_dest, d_dest, sizeof(float) * destW * destH * 3, cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_dest, d_dest, sizeof(float) * destW * destH * 3,
+             cudaMemcpyDeviceToHost);
 
   // Print out the destination image.
   // Each pixel is printed as (R, G, B).
@@ -227,7 +224,8 @@ void test_remapping() {
   for (int y = 0; y < destH; y++) {
     for (int x = 0; x < destW; x++) {
       int idx = (y * destW + x) * 3;
-      std::cout << "(" << h_dest[idx + 0] << ", " << h_dest[idx + 1] << ", " << h_dest[idx + 2] << ") ";
+      std::cout << "(" << h_dest[idx + 0] << ", " << h_dest[idx + 1] << ", "
+                << h_dest[idx + 2] << ") ";
     }
     std::cout << std::endl;
   }
