@@ -40,7 +40,7 @@ class CudaMat {
     return size;
   }
 };
-
+void test_remapping();
 cudaError_t cudaLaplacianBlend(
     const float* image1,
     const float* image2,
@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
   // It is assumed that blendImages copies data to/from device memory,
   // launches the appropriate kernels, and returns the blended image.
 
-  cudaLaplacianBlendWithContext(
+  auto cu_err = cudaLaplacianBlendWithContext(
       (const float*)cudaImage1Float.data(),
       (const float*)cudaImage2Float.data(),
       (const float*)cudaMask.data(),
@@ -151,7 +151,8 @@ int main(int argc, char** argv) {
   }
 
   std::cout << "Blended image saved as: " << argv[4] << std::endl;
-  return 0;
+  test_remapping();
+  return cu_err;
 }
 
 void test_remapping() {
