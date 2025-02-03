@@ -120,7 +120,6 @@ cuda_library(
         "-g",
         "-O0",
     ],
-   
     visibility = ["//visibility:public"],
     deps = [
         ":colorspace_cuda_lib",
@@ -229,6 +228,7 @@ cuda_library(
         "cudaBlend.cu",
     ],
     hdrs = [
+        "cudaBlend.h",
     ],
     copts = [
         "-std=c++17",
@@ -242,6 +242,7 @@ cuda_library(
         "-g",
         "-O0",
     ],
+    includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
         ":colorspace_cuda_lib",
@@ -252,14 +253,14 @@ cuda_library(
 )
 
 cc_binary(
-  name = "test_cuda_blend",
-  srcs = [
-    "testCudaBlend.cpp",
-  ],
-  visibility = ["//visibility:public"],
-  deps = [
-    ":cuda_blend_lib",
-    "@local_cuda//:cuda_runtime",
-    "@opencv_linux//:opencv",
-  ],
+    name = "test_cuda_blend",
+    srcs = [
+        "testCudaBlend.cpp",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":cuda_blend_lib",
+        "@local_cuda//:cuda_runtime",
+        "@opencv_linux//:opencv",
+    ],
 )
