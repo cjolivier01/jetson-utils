@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
   cv::Mat blended_float(img1.size(), CV_32FC3);
 
   // Configurable parameter: number of pyramid levels.
-  int numLevels = 4;
+  int numLevels = 12;
   int width = img1.cols;
   int height = img1.rows;
 
@@ -116,11 +116,11 @@ int main(int argc, char** argv) {
       (float*)cudaBlendedFloat.data(),
       context);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
                 .count();
   
-  size_t frame_count = 1000;
+  size_t frame_count = 100;
   for (size_t i = 0; i < frame_count; ++i) {
     cudaLaplacianBlendWithContext(
         (const float*)cudaImage1Float.data(),
