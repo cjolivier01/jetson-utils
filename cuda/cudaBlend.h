@@ -49,7 +49,8 @@ struct CudaLaplacianBlendContext {
 };
 
 // =============================================================================
-// Batched Context Structure
+// Batched Context Structure (for images only; the mask is shared across the
+// batch)
 // =============================================================================
 struct CudaBatchLaplacianBlendContext {
   CudaBatchLaplacianBlendContext(int image_width, int image_height,
@@ -92,6 +93,7 @@ struct CudaBatchLaplacianBlendContext {
   std::vector<int> heights;
   std::vector<float*> d_gauss1;
   std::vector<float*> d_gauss2;
+  // Note: The mask is shared, so each level’s allocation is only for one image.
   std::vector<float*> d_maskPyr;
   std::vector<float*> d_lap1;
   std::vector<float*> d_lap2;
