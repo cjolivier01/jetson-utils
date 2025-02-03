@@ -205,15 +205,14 @@ void test_remapping() {
   cudaMemcpy(d_mapY, h_mapY, sizeof(unsigned short) * destW * destH, cudaMemcpyHostToDevice);
 
   // Define kernel launch configuration.
-  dim3 blockDim(16, 16);
-  dim3 gridDim((destW + blockDim.x - 1) / blockDim.x, (destH + blockDim.y - 1) / blockDim.y);
+  // dim3 blockDim(16, 16);
+  // dim3 gridDim((destW + blockDim.x - 1) / blockDim.x, (destH + blockDim.y - 1) / blockDim.y);
 
   // Set default color for unmapped pixels.
   float defaultR = 100.0f, defaultG = 100.0f, defaultB = 100.0f;
 
   // Launch the remap kernel.
-  remapKernel<<<gridDim, blockDim>>>(
-      d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY, defaultR, defaultG, defaultB);
+  remap_kernel(d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY, defaultR, defaultG, defaultB);
 
   // Wait for the kernel to finish.
   cudaDeviceSynchronize();

@@ -88,7 +88,7 @@ cudaError_t cudaLaplacianBlendWithContext(
  * @param defG  Default green channel value for pixels mapped out-of-range.
  * @param defB  Default blue channel value for pixels mapped out-of-range.
  */
-__global__ void remapKernel(
+cudaError_t remap_kernel(
     const float* src,
     int srcW,
     int srcH,
