@@ -108,13 +108,32 @@ int main(int argc, char** argv) {
   // Call the CUDA–based blending function.
   // It is assumed that blendImages copies data to/from device memory,
   // launches the appropriate kernels, and returns the blended image.
-  
+
   cudaLaplacianBlendWithContext(
       (const float*)cudaImage1Float.data(),
       (const float*)cudaImage2Float.data(),
       (const float*)cudaMask.data(),
       (float*)cudaBlendedFloat.data(),
       context);
+
+  auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count();
+  
+  size_t frame_count = 100;
+  for (size_t i = 0; i < frame_count; ++i) {
+    cudaLaplacianBlendWithContext(
+        (const float*)cudaImage1Float.data(),
+        (const float*)cudaImage2Float.data(),
+        (const float*)cudaMask.data(),
+        (float*)cudaBlendedFloat.data(),
+        context);
+  }
+
+  auto stop_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count();
+  float ms = stop_ms - start_ms;
+  float sec_per_frame = (ms / 1000)/frame_count;
+  std::cout << "Blend speed: " << (1.0/sec_per_frame) <<  "fps" << std::endl;
 
   // Convert the blended image from float back to 8–bit for saving.
   cv::Mat blended;
