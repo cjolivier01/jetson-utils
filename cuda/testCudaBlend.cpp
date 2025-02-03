@@ -116,6 +116,7 @@ int main(int argc, char** argv) {
       (float*)cudaBlendedFloat.data(),
       context);
 
+#if 0 /* perf test */
   auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
                 .count();
   
@@ -134,6 +135,7 @@ int main(int argc, char** argv) {
   float ms = stop_ms - start_ms;
   float sec_per_frame = (ms / 1000)/frame_count;
   std::cout << "Blend speed: " << (1.0/sec_per_frame) <<  "fps" << std::endl;
+#endif
 
   // Convert the blended image from float back to 8–bit for saving.
   cv::Mat blended;
