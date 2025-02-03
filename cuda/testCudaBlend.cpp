@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
                       std::chrono::system_clock::now().time_since_epoch())
                       .count();
 
-  size_t frame_count = 100;
+  size_t frame_count = 1000;
   for (size_t i = 0; i < frame_count; ++i) {
     cudaBatchedLaplacianBlendWithContext((const float*)cudaImage1Float.data(),
                                   (const float*)cudaImage2Float.data(),
