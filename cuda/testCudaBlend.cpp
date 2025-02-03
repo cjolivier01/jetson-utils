@@ -117,9 +117,10 @@ int main(int argc, char** argv) {
       context);
 
 #if 1 /* perf test */
-  auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
-                .count();
-  
+  auto start_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+          .count();
+
   size_t frame_count = 100;
   for (size_t i = 0; i < frame_count; ++i) {
     cudaLaplacianBlendWithContext(
@@ -130,11 +131,12 @@ int main(int argc, char** argv) {
         context);
   }
 
-  auto stop_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
-                .count();
+  auto stop_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+          .count();
   float ms = stop_ms - start_ms;
-  float sec_per_frame = (ms / 1000)/frame_count;
-  std::cout << "Blend speed: " << (1.0/sec_per_frame) <<  "fps" << std::endl;
+  float sec_per_frame = (ms / 1000) / frame_count;
+  std::cout << "Blend speed: " << (1.0 / sec_per_frame) << "fps" << std::endl;
 #endif
 
   // Convert the blended image from float back to 8–bit for saving.
@@ -150,4 +152,89 @@ int main(int argc, char** argv) {
 
   std::cout << "Blended image saved as: " << argv[4] << std::endl;
   return 0;
+}
+
+void test_remapping() {
+  // Define image dimensions.
+  const int srcW = 4, srcH = 4; // Source image dimensions.
+  const int destW = 4, destH = 4; // Destination image dimensions.
+
+  // Allocate and initialize the host source image.
+  // Each pixel has 3 channels (RGB) stored as floats.
+  float h_src[srcW * srcH * 3];
+  for (int y = 0; y < srcH; y++) {
+    for (int x = 0; x < srcW; x++) {
+      int idx = (y * srcW + x) * 3;
+      // Set the pixel to (x, y, x+y)
+      h_src[idx + 0] = static_cast<float>(x);
+      h_src[idx + 1] = static_cast<float>(y);
+      h_src[idx + 2] = static_cast<float>(x + y);
+    }
+  }
+
+  // Allocate and initialize the host destination image.
+  float h_dest[destW * destH * 3] = {0};
+
+  // Allocate and initialize the host mapping arrays (unsigned short).
+  // For each destination pixel (x, y), we want to map to source pixel (x-1, y-1).
+  // If (x-1) or (y-1) is negative, we set the mapping to an out-of-range value.
+  unsigned short h_mapX[destW * destH];
+  unsigned short h_mapY[destW * destH];
+  for (int y = 0; y < destH; y++) {
+    for (int x = 0; x < destW; x++) {
+      int idx = y * destW + x;
+      int mapXVal = x - 1;
+      int mapYVal = y - 1;
+      // If the mapping is negative, assign an out-of-range value.
+      h_mapX[idx] = (mapXVal < 0) ? static_cast<unsigned short>(srcW) : static_cast<unsigned short>(mapXVal);
+      h_mapY[idx] = (mapYVal < 0) ? static_cast<unsigned short>(srcH) : static_cast<unsigned short>(mapYVal);
+    }
+  }
+
+  // Allocate device memory.
+  float *d_src = nullptr, *d_dest = nullptr;
+  unsigned short *d_mapX = nullptr, *d_mapY = nullptr;
+  cudaMalloc(&d_src, sizeof(float) * srcW * srcH * 3);
+  cudaMalloc(&d_dest, sizeof(float) * destW * destH * 3);
+  cudaMalloc(&d_mapX, sizeof(unsigned short) * destW * destH);
+  cudaMalloc(&d_mapY, sizeof(unsigned short) * destW * destH);
+
+  // Copy data from host to device.
+  cudaMemcpy(d_src, h_src, sizeof(float) * srcW * srcH * 3, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_mapX, h_mapX, sizeof(unsigned short) * destW * destH, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_mapY, h_mapY, sizeof(unsigned short) * destW * destH, cudaMemcpyHostToDevice);
+
+  // Define kernel launch configuration.
+  dim3 blockDim(16, 16);
+  dim3 gridDim((destW + blockDim.x - 1) / blockDim.x, (destH + blockDim.y - 1) / blockDim.y);
+
+  // Set default color for unmapped pixels.
+  float defaultR = 100.0f, defaultG = 100.0f, defaultB = 100.0f;
+
+  // Launch the remap kernel.
+  remapKernel<<<gridDim, blockDim>>>(
+      d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY, defaultR, defaultG, defaultB);
+
+  // Wait for the kernel to finish.
+  cudaDeviceSynchronize();
+
+  // Copy the destination image back to host memory.
+  cudaMemcpy(h_dest, d_dest, sizeof(float) * destW * destH * 3, cudaMemcpyDeviceToHost);
+
+  // Print out the destination image.
+  // Each pixel is printed as (R, G, B).
+  std::cout << "Destination image:" << std::endl;
+  for (int y = 0; y < destH; y++) {
+    for (int x = 0; x < destW; x++) {
+      int idx = (y * destW + x) * 3;
+      std::cout << "(" << h_dest[idx + 0] << ", " << h_dest[idx + 1] << ", " << h_dest[idx + 2] << ") ";
+    }
+    std::cout << std::endl;
+  }
+
+  // Clean up device memory.
+  cudaFree(d_src);
+  cudaFree(d_dest);
+  cudaFree(d_mapX);
+  cudaFree(d_mapY);
 }
