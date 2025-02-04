@@ -258,6 +258,9 @@ cc_binary(
     srcs = [
         "testCudaBlend.cpp",
     ],
+    linkopts=[
+      "-ltiff",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_blend_lib",

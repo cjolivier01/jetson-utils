@@ -5,6 +5,7 @@
 #include "imageFormat.h"
 #include "videoOutput.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <filesystem>
@@ -12,9 +13,18 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <thread>
 
 #include <cuda_runtime.h>
 #include <opencv4/opencv2/highgui.hpp>
+
+#include <gdal/gdal.h>
+#include <gdal/gdal_priv.h>
+
+#include <tiffio.h>
+// #include <geotiff/geotiff.h>
+//  #include <xtiffio.h>
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -57,6 +67,72 @@ int wait_key() {
 void show_image(const std::string& label, const cv::Mat& img, bool wait = true) {
   cv::imshow(label, img);
   cv::waitKey(wait ? 0 : 1);
+}
+
+// #ifndef TIFFTAG_GEOTIEPOINTS
+// // The GeoTIFF ModelTiepointTag is defined as tag number 33922.
+// #define TIFFTAG_GEOTIEPOINTS 33922
+// #endif
+
+// #ifndef TIFFTAG_GEOPIXELSCALE
+// // The GeoTIFF ModelPixelScaleTag is defined as tag number 33550.
+// #define TIFFTAG_GEOPIXELSCALE 33550
+// #endif
+
+// A structure to hold TIFF information
+struct TiffInfo {
+  // Resolution information
+  bool validResolution = false;
+  float xResolution = 0.0f;
+  float yResolution = 0.0f;
+  // Resolution unit (e.g., RESUNIT_INCH, RESUNIT_CENTIMETER)
+  uint16_t resolutionUnit = 0;
+
+  // GeoTIFF Tiepoints (each group of 6 values maps image to model coordinates)
+  bool hasGeoTiePoints = false;
+  float xPosition{0};
+  float yPosition{0};
+};
+
+// Function that takes a file name and returns the TIFF information.
+TiffInfo getTiffInfo(const std::string& filename) {
+  TiffInfo info;
+  TIFF* tif = TIFFOpen(filename.c_str(), "r");
+  if (!tif) {
+    std::cerr << "Error: Could not open file " << filename << std::endl;
+    return info;
+  }
+
+  // --- Get Resolution Information ---
+  float xres = 0.0f, yres = 0.0f;
+  if (TIFFGetField(tif, TIFFTAG_XRESOLUTION, &xres) && TIFFGetField(tif, TIFFTAG_YRESOLUTION, &yres)) {
+    info.xResolution = xres;
+    info.yResolution = yres;
+    info.validResolution = true;
+  }
+
+  uint16_t resUnit = 0;
+  if (TIFFGetField(tif, TIFFTAG_RESOLUTIONUNIT, &resUnit)) {
+    info.resolutionUnit = resUnit;
+  }
+
+  float xpos = 0.0f, ypos = 0.0f;
+  if (TIFFGetField(tif, TIFFTAG_XPOSITION, &xpos)) {
+    std::cout << "X Position: " << xpos << std::endl;
+    info.xPosition = xpos;
+  } else {
+    std::cout << "No X Position information found." << std::endl;
+  }
+
+  if (TIFFGetField(tif, TIFFTAG_YPOSITION, &ypos)) {
+    std::cout << "Y Position: " << ypos << std::endl;
+    info.yPosition = ypos;
+  } else {
+    std::cout << "No Y Position information found." << std::endl;
+  }
+
+  TIFFClose(tif);
+  return info;
 }
 
 namespace {
@@ -265,6 +341,44 @@ cv::Mat load_position_mask(const std::string& filename, double* minVal, double* 
   return pos_mask;
 }
 
+struct SpatialTiff {
+  // position in pixels
+  float xpos;
+  float ypos;
+};
+
+std::vector<SpatialTiff> normalize(std::vector<SpatialTiff>&& positions) {
+  float min_x = std::numeric_limits<float>::max();
+  float min_y = std::numeric_limits<float>::max();
+  std::for_each(positions.begin(), positions.end(), [&](const SpatialTiff& sp) {
+    min_x = std::min(min_x, sp.xpos);
+    min_y = std::min(min_y, sp.ypos);
+  });
+  std::for_each(positions.begin(), positions.end(), [&](SpatialTiff& sp) {
+    sp.xpos -= min_x;
+    sp.ypos -= min_y;
+  });
+  return positions;
+}
+
+std::tuple<float, float> get_canvas_size(const std::vector<SpatialTiff>& positions) {
+  float max_x = 0;
+  float max_y = 0;
+  std::for_each(positions.begin(), positions.end(), [&](const SpatialTiff& sp) {
+    assert(sp.xpos >= 0);
+    assert(sp.ypos >= 0);
+    max_x = std::max(max_x, sp.xpos);
+    assert(sp.xpos >= 0);
+    max_y = std::max(max_y, sp.ypos);
+  });
+  return {max_x, max_y};
+}
+
+SpatialTiff get_geo_tiff(const std::string& filename) {
+  TiffInfo info = getTiffInfo(filename);
+  return SpatialTiff{.xpos = info.xPosition * info.xResolution, .ypos = info.yPosition * info.yResolution};
+}
+
 int main(int argc, char** argv) {
   // Usage check.
   if (argc < 4) {
@@ -274,7 +388,20 @@ int main(int argc, char** argv) {
 
   RenderSet display;
 
-  std::string game_id = "stitch_fix";
+  std::string game_id = "stitch-fix";
+  std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id;
+
+  std::string mapping_0_pos = game_dir + "/mapping_0000.tif";
+  std::string mapping_0_x = game_dir + "/mapping_0000_x.tif";
+  std::string mapping_0_y = game_dir + "/mapping_0000_y.tif";
+  std::string mapping_1_pos = game_dir + "/mapping_0001.tif";
+  std::string mapping_1_x = game_dir + "/mapping_0001_x.tif";
+  std::string mapping_1_y = game_dir + "/mapping_0001_y.tif";
+
+  std::vector<SpatialTiff> positions{get_geo_tiff(mapping_0_pos), get_geo_tiff(mapping_1_pos)};
+  positions = normalize(std::move(positions));
+
+  // Normalize
 
   // assert(false);
   //  Load the two images (in color).
