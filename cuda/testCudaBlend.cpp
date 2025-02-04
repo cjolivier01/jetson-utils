@@ -598,6 +598,27 @@ int main(int argc, char** argv) {
 
   cudaDeviceSynchronize();
 
+  // Set default color for unmapped pixels.
+  float defaultR = 128.0f, defaultG = 128.0f, defaultB = 128.0f;
+
+  // Launch the remap kernel.
+  remap_kernel(
+      (float *)cudaImage1Float.data(),
+      cudaImage1Float.width(),
+      cudaImage1Float.height(),
+      (float *)remapped_1.data(),
+      remapped_1.width(),
+      remapped_1.height(),
+      (uint16_t*)remap_1_x.data(),
+      (uint16_t*)remap_1_y.data(),
+      defaultR,
+      defaultG,
+      defaultB);
+
+  cudaDeviceSynchronize();
+
+  cv::imshow("remapped_1", remapped_1.download());
+  cv::waitKey(0);
 
 
   // cv::imshow("img1", img1_float);
