@@ -264,9 +264,9 @@ cudaError_t cudaCutPaste(
     cudaStream_t stream);
 
 template <>
-cudaError_t cudaCutPaste<float>(
-    const float* input,
-    float* output,
+cudaError_t cudaCutPaste<float3>(
+    const float3* input,
+    float3* output,
     const int4& roi,
     int inputWidth,
     int inputHeight,
