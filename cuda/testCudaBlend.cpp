@@ -7,27 +7,135 @@
 
 #include <cassert>
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <mutex>
 
 #include <cuda_runtime.h>
+#include <opencv4/opencv2/highgui.hpp>
+
+#include <fcntl.h>
+#include <stdio.h>
+#include <termios.h>
+#include <unistd.h>
+
+int kbhit() {
+  struct termios oldt, newt;
+  int ch;
+  int oldf;
+
+  tcgetattr(STDIN_FILENO, &oldt);
+  newt = oldt;
+  newt.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+  oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+  fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+  ch = getchar();
+
+  tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+  fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+  if (ch != EOF) {
+    ungetc(ch, stdin);
+    return 1;
+  }
+
+  return 0;
+}
+
+int wait_key() {
+  int c;
+  while (!(c = kbhit())) {
+    usleep(100);
+  }
+  return c;
+}
+
+void show_image(const std::string& label, const cv::Mat& img, bool wait = true) {
+  cv::imshow(label, img);
+  cv::waitKey(wait ? 0 : 1);
+}
+
+namespace {
+
+class CudaMat {
+ private:
+  void* d_data{nullptr};
+  size_t size;
+  int rows_, cols_, type_;
+
+ public:
+  CudaMat(const cv::Mat& mat) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
+    size = mat.total() * mat.elemSize();
+    cudaMalloc(&d_data, size);
+    cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
+  }
+
+  ~CudaMat() {
+    if (d_data) {
+      cudaFree(d_data);
+    }
+  }
+
+  cv::Mat download() const {
+    cv::Mat mat(rows_, cols_, type_);
+    cudaMemcpy(mat.data, d_data, size, cudaMemcpyDeviceToHost);
+    return mat;
+  }
+  void* data() {
+    return d_data;
+  }
+  const void* data() const {
+    return d_data;
+  }
+  size_t bytes() const {
+    return size;
+  }
+  constexpr int width() const {
+    return cols_;
+  }
+  constexpr int height() const {
+    return rows_;
+  }
+  constexpr int type() const {
+    return type_;
+  }
+};
+
+imageFormat get_image_format(const int cv_type) {
+  switch (cv_type) {
+    case CV_8UC3:
+      return imageFormat::IMAGE_RGB8;
+    case CV_8UC4:
+      return imageFormat::IMAGE_RGBA8;
+    case CV_32FC3:
+      return imageFormat::IMAGE_RGB32F;
+    case CV_32FC4:
+      return imageFormat::IMAGE_RGBA32F;
+    default:
+      assert(false);
+  }
+}
 
 struct CudaSurface {
   CudaSurface(int w, int h, imageFormat format, void* data)
       : width(w), height(h), image_format(format), dataptr(data) {}
+  CudaSurface(const CudaMat& cm)
+      : width(cm.width()), height(cm.height()), image_format(get_image_format(cm.type())), dataptr((void*)cm.data()) {}
   int width{0};
   int height{0};
-  void* dataptr{nullptr};
   imageFormat image_format;
+  void* dataptr{nullptr};
 };
 
 class RenderSet {
  public:
-  void render(const std::string& name, CudaSurface& surface, cudaStream_t stream) {
+  void render(const std::string& name, const CudaSurface& surface, cudaStream_t stream = 0) {
     get_video_output(name, surface.width, surface.height)
-        ->Render(surface.dataptr, surface.width, surface.height, surface.image_format, stream);
+        ->Render((void*)surface.dataptr, surface.width, surface.height, surface.image_format, stream);
   }
 
  private:
@@ -53,49 +161,18 @@ class RenderSet {
   std::map<std::string, std::unique_ptr<glDisplay>> video_outputs_;
 };
 
-class CudaMat {
- private:
-  void* d_data = nullptr;
-  size_t size;
-  int rows, cols, type;
+} // namespace
 
- public:
-  CudaMat(const cv::Mat& mat) : rows(mat.rows), cols(mat.cols), type(mat.type()) {
-    size = mat.total() * mat.elemSize();
-    cudaMalloc(&d_data, size);
-    cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
-  }
-
-  ~CudaMat() {
-    if (d_data) {
-      cudaFree(d_data);
-    }
-  }
-
-  cv::Mat download() const {
-    cv::Mat mat(rows, cols, type);
-    cudaMemcpy(mat.data, d_data, size, cudaMemcpyDeviceToHost);
-    return mat;
-  }
-
-  void* data() {
-    return d_data;
-  }
-  const void* data() const {
-    return d_data;
-  }
-  size_t bytes() const {
-    return size;
-  }
-};
 void test_remapping();
 // cudaError_t cudaLaplacianBlend(const float* image1, const float* image2,
-//                                const float* mask, float* output, int imageWidth,
-//                                int imageHeight, int numLevels);
+//                                const float* mask, float* output, int
+//                                imageWidth, int imageHeight, int numLevels);
 
 cv::Mat load_seam_mask(const std::string& filename) {
   cv::Mat seam_mask = cv::imread(filename, cv::IMREAD_ANYDEPTH);
   if (!seam_mask.empty()) {
+    show_image("seam_mask", seam_mask);
+
     double minVal, maxVal;
     cv::Point minLoc, maxLoc;
 
@@ -109,6 +186,8 @@ cv::Mat load_seam_mask(const std::string& filename) {
     // Set all min values to 0 and max values to 1
     seam_mask.setTo(0, minMask); // Set min value locations to 0
     seam_mask.setTo(1, maxMask); // Set max value locations to 1
+
+    cv::minMaxLoc(seam_mask, &minVal, &maxVal, &minLoc, &maxLoc);
   }
   return seam_mask;
 }
@@ -145,11 +224,18 @@ int main(int argc, char** argv) {
     std::cerr << "Usage: " << argv[0] << " <image1> <image2> <mask> <output>" << std::endl;
     return -1;
   }
+
+  RenderSet display;
+
+  std::string game_id = "stitch_fix";
+
   // assert(false);
   //  Load the two images (in color).
   cv::Mat img1 = cv::imread(argv[1], cv::IMREAD_COLOR);
   cv::Mat img2 = cv::imread(argv[2], cv::IMREAD_COLOR);
   cv::Mat seam_mask = load_seam_mask(argv[3]);
+
+  // show_image("seam_mask", seam_mask);
 
   if (img1.empty() || img2.empty()) {
     std::cerr << "Error loading images!" << std::endl;
@@ -189,12 +275,26 @@ int main(int argc, char** argv) {
   int height = img1.rows;
 
   CudaLaplacianBlendContext context(width, height, numLevels);
-  // CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
+  // CudaBatchLaplacianBlendContext context(width, height, numLevels,
+  // /*batch_size=*/1);
 
   CudaMat cudaImage1Float(img1_float);
   CudaMat cudaImage2Float(img2_float);
   CudaMat cudaMask(mask);
   CudaMat cudaBlendedFloat(blended_float);
+
+  cudaSetDevice(0);
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+
+  // cv::imshow("img1", img1_float);
+  // cv::waitKey(0);
+
+  // display.render("cudaImage1Float", CudaSurface(cudaImage1Float), stream);
+  // wait_key();
+  //  cv::waitKey(10);
+  //  char c;
+  //  std::cin >> c;
 
   // Call the CUDA–based blending function.
   // It is assumed that blendImages copies data to/from device memory,
@@ -236,6 +336,10 @@ int main(int argc, char** argv) {
   // Convert the blended image from float back to 8–bit for saving.
   cv::Mat blended;
   blended_float = cudaBlendedFloat.download();
+
+  cv::imshow("blended_float", blended_float);
+  cv::waitKey(0);
+
   blended_float.convertTo(blended, CV_8UC3, 255.0);
 
   // Save the final blended image.
@@ -333,4 +437,8 @@ void test_remapping() {
   cudaFree(d_dest);
   cudaFree(d_mapX);
   cudaFree(d_mapY);
+  // std::cout << "Done. Press a key." << std::endl;
+  // char c;
+  // std::cin >> c;
+  // std::cout << "Exiting..." << std::endl;
 }
