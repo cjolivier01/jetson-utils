@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "cudaBlend.h"
+#include "cudaCrop.h"
 #include "glDisplay.h"
 #include "imageFormat.h"
 #include "videoOutput.h"
@@ -137,9 +138,9 @@ class CudaMat {
  public:
   CudaMat(int w, int h, int elemsize, int channels, int batch_size)
       : rows_(h), cols_(w), batch_size_(batch_size), elemsize_(elemsize), channels_(channels) {
-    // size = mat.total() * mat.elemSize();
     size_t total_size = rows_ * cols_ * elemsize_ * channels_ * batch_size_;
-    cudaMalloc(&d_data, total_size);
+    cudaError_t err = cudaMalloc(&d_data, total_size);
+    assert(err == cudaError_t::cudaSuccess);
   }
   CudaMat(const cv::Mat& mat, bool copy = true) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
     size = mat.total() * mat.elemSize();
@@ -175,8 +176,8 @@ class CudaMat {
     }
   }
 
-  cv::Mat download() const {
-    cv::Mat mat(rows_, cols_, type_);
+  cv::Mat download(int type = -1) const {
+    cv::Mat mat(rows_, cols_, type == -1 ? type_ : type);
     cudaMemcpy(mat.data, d_data, size, cudaMemcpyDeviceToHost);
     return mat;
   }
@@ -196,7 +197,6 @@ class CudaMat {
     return rows_;
   }
   constexpr int type() const {
-    assert(type_);
     return type_;
   }
   constexpr int batch_size() const {
@@ -553,6 +553,55 @@ int main(int argc, char** argv) {
 
   mask_converter.updateMinimizeBlend();
 
+  // assert(false);
+  //  Load the two images (in color).
+  cv::Mat img1 = cv::imread(argv[1], cv::IMREAD_COLOR);
+  cv::Mat img2 = cv::imread(argv[2], cv::IMREAD_COLOR);
+  cv::Mat seam_mask = load_seam_mask(argv[3]);
+
+  // show_image("left", img1, false);
+  // show_image("right", img2, true);
+  // show_image("seam_mask", seam_mask);
+
+  if (img1.empty() || img2.empty()) {
+    std::cerr << "Error loading images!" << std::endl;
+    return -1;
+  }
+
+  // For this simple test, require both images to have the same dimensions.
+  if (img1.size() != img2.size()) {
+    std::cerr << "Images must have the same dimensions!" << std::endl;
+    return -1;
+  }
+
+  // Convert images to float (CV_32FC3) and scale pixel values to [0,1].
+  cv::Mat img1_float, img2_float;
+  img1.convertTo(img1_float, CV_32FC3, 1.0 / 255.0);
+  img2.convertTo(img2_float, CV_32FC3, 1.0 / 255.0);
+
+  seam_mask.convertTo(seam_mask, CV_32FC1);
+  auto minmax = get_min_max(seam_mask);
+  std::cout << "min=" << minmax.first << ", max=" << minmax.second
+            << ", unique val count=" << countUniqueValues(seam_mask) << std::endl;
+
+  // float left = seam_mask.at<float>(0,0);
+  // float right = seam_mask.at<float>(0,seam_mask.cols - 1);
+
+  // Create a simple seam mask (single–channel, CV_32FC1):
+  // Here we use a hard–coded seam: the left half of the image is taken entirely
+  // from image1 (mask value 1.0) and the right half from image2 (mask value
+  // 0.0). In a more complex case, the mask can be generated based on feature
+  // detection or user input. cv::Mat mask(img1.size(), CV_32FC1); for (int y =
+  // 0; y < mask.rows; y++) {
+  //   for (int x = 0; x < mask.cols; x++) {
+  //     mask.at<float>(y, x) = (x < mask.cols / 2) ? 1.0f : 0.0f;
+  //   }
+  // }
+
+  cudaSetDevice(0);
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+
   // partial_1 = remapped_image_1[:, :, :, : self._x2 + self._overlap_pad]
   // partial_2 = remapped_image_2[:, :, :, self._overlapping_width - self._overlap_pad :]
 
@@ -603,55 +652,6 @@ int main(int argc, char** argv) {
 
   assert(blending_1.width() == blending_2.width());
   assert(blending_1.height() == blending_2.height());
-
-  // assert(false);
-  //  Load the two images (in color).
-  cv::Mat img1 = cv::imread(argv[1], cv::IMREAD_COLOR);
-  cv::Mat img2 = cv::imread(argv[2], cv::IMREAD_COLOR);
-  cv::Mat seam_mask = load_seam_mask(argv[3]);
-
-  // show_image("left", img1, false);
-  // show_image("right", img2, true);
-  // show_image("seam_mask", seam_mask);
-
-  if (img1.empty() || img2.empty()) {
-    std::cerr << "Error loading images!" << std::endl;
-    return -1;
-  }
-
-  // For this simple test, require both images to have the same dimensions.
-  if (img1.size() != img2.size()) {
-    std::cerr << "Images must have the same dimensions!" << std::endl;
-    return -1;
-  }
-
-  // Convert images to float (CV_32FC3) and scale pixel values to [0,1].
-  cv::Mat img1_float, img2_float;
-  img1.convertTo(img1_float, CV_32FC3, 1.0 / 255.0);
-  img2.convertTo(img2_float, CV_32FC3, 1.0 / 255.0);
-
-  seam_mask.convertTo(seam_mask, CV_32FC1);
-  auto minmax = get_min_max(seam_mask);
-  std::cout << "min=" << minmax.first << ", max=" << minmax.second
-            << ", unique val count=" << countUniqueValues(seam_mask) << std::endl;
-
-  // float left = seam_mask.at<float>(0,0);
-  // float right = seam_mask.at<float>(0,seam_mask.cols - 1);
-
-  // Create a simple seam mask (single–channel, CV_32FC1):
-  // Here we use a hard–coded seam: the left half of the image is taken entirely
-  // from image1 (mask value 1.0) and the right half from image2 (mask value
-  // 0.0). In a more complex case, the mask can be generated based on feature
-  // detection or user input. cv::Mat mask(img1.size(), CV_32FC1); for (int y =
-  // 0; y < mask.rows; y++) {
-  //   for (int x = 0; x < mask.cols; x++) {
-  //     mask.at<float>(y, x) = (x < mask.cols / 2) ? 1.0f : 0.0f;
-  //   }
-  // }
-
-  cudaSetDevice(0);
-  cudaStream_t stream;
-  cudaStreamCreate(&stream);
 
 // Configurable parameter: number of pyramid levels.
 #ifdef __aarch64__
@@ -705,6 +705,15 @@ int main(int argc, char** argv) {
       defaultB,
       /*batchSize=*/1);
 
+  // cudaCrop(
+  //     cudaRemapped_1.data(),
+  //     partial_1.data(),
+  //     {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_1.height()},
+  //     cudaRemapped_1.width(),
+  //     cudaRemapped_1.height(),
+  //     imageFormat::IMAGE_RGBA32F,
+  //     stream);
+
   batched_remap_kernel(
       (float*)sampleImage2.data(),
       sampleImage2.width(),
@@ -719,14 +728,15 @@ int main(int argc, char** argv) {
       defaultB,
       /*batchSize=*/1);
 
-  // cudaDeviceSynchronize();
+  cudaDeviceSynchronize();
 
+  auto disp = partial_1.download(CV_32FC3);
   // auto disp = cudaRemapped_1.download();
   // auto disp = cudaRemapped_2.download();
   // // auto disp = sampleImage2.download();
-  // disp.convertTo(disp, CV_8UC3, 255.0);
-  // cv::imshow("remapped", disp);
-  // cv::waitKey(0);
+  disp.convertTo(disp, CV_8UC3, 255.0);
+  cv::imshow("remapped", disp);
+  cv::waitKey(0);
 
   // cv::imshow("img1", img1_float);
   // cv::waitKey(0);
