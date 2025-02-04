@@ -1,8 +1,8 @@
 #include <cuda_runtime.h>
 
+#include <opencv2/opencv.hpp>
 #include <cassert>
 #include <iostream>
-#include <opencv2/opencv.hpp>
 
 #include "cudaBlend.h"
 
@@ -13,8 +13,7 @@ class CudaMat {
   int rows, cols, type;
 
  public:
-  CudaMat(const cv::Mat& mat)
-      : rows(mat.rows), cols(mat.cols), type(mat.type()) {
+  CudaMat(const cv::Mat& mat) : rows(mat.rows), cols(mat.cols), type(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
     cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
@@ -32,9 +31,15 @@ class CudaMat {
     return mat;
   }
 
-  void* data() { return d_data; }
-  const void* data() const { return d_data; }
-  size_t bytes() const { return size; }
+  void* data() {
+    return d_data;
+  }
+  const void* data() const {
+    return d_data;
+  }
+  size_t bytes() const {
+    return size;
+  }
 };
 void test_remapping();
 // cudaError_t cudaLaplacianBlend(const float* image1, const float* image2,
@@ -44,15 +49,29 @@ void test_remapping();
 int main(int argc, char** argv) {
   // Usage check.
   if (argc < 4) {
-    std::cerr << "Usage: " << argv[0] << " <image1> <image2> <mask> <output>"
-              << std::endl;
+    std::cerr << "Usage: " << argv[0] << " <image1> <image2> <mask> <output>" << std::endl;
     return -1;
   }
-  //assert(false);
-  // Load the two images (in color).
+  // assert(false);
+  //  Load the two images (in color).
   cv::Mat img1 = cv::imread(argv[1], cv::IMREAD_COLOR);
   cv::Mat img2 = cv::imread(argv[2], cv::IMREAD_COLOR);
   cv::Mat seam_mask = cv::imread(argv[3], cv::IMREAD_ANYDEPTH);
+
+  double minVal, maxVal;
+  cv::Point minLoc, maxLoc;
+
+  // Get the minimum and maximum values and their locations
+  cv::minMaxLoc(seam_mask, &minVal, &maxVal, &minLoc, &maxLoc);
+
+  // Create masks for min and max values
+  cv::Mat minMask = (seam_mask == minVal); // Mask for min value
+  cv::Mat maxMask = (seam_mask == maxVal); // Mask for max value
+
+  // Set all min values to 0 and max values to 1
+  seam_mask.setTo(0, minMask); // Set min value locations to 0
+  seam_mask.setTo(1, maxMask); // Set max value locations to 1
+
   if (img1.empty() || img2.empty()) {
     std::cerr << "Error loading images!" << std::endl;
     return -1;
@@ -91,7 +110,7 @@ int main(int argc, char** argv) {
   int height = img1.rows;
 
   CudaLaplacianBlendContext context(width, height, numLevels);
-  //CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
+  // CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
 
   CudaMat cudaImage1Float(img1_float);
   CudaMat cudaImage2Float(img2_float);
@@ -109,9 +128,10 @@ int main(int argc, char** argv) {
   auto cu_err = cudaLaplacianBlendWithContext(
       (const float*)cudaImage1Float.data(),
       (const float*)cudaImage2Float.data(),
-      // (const float*)cudaImage1Float.data(), 
+      // (const float*)cudaImage1Float.data(),
       (const float*)cudaMask.data(),
-      (float*)cudaBlendedFloat.data(), context);
+      (float*)cudaBlendedFloat.data(),
+      context);
 
 #if 0 /* perf test */
   auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -152,8 +172,8 @@ int main(int argc, char** argv) {
 
 void test_remapping() {
   // Define image dimensions.
-  const int srcW = 4, srcH = 4;    // Source image dimensions.
-  const int destW = 4, destH = 4;  // Destination image dimensions.
+  const int srcW = 4, srcH = 4; // Source image dimensions.
+  const int destW = 4, destH = 4; // Destination image dimensions.
 
   // Allocate and initialize the host source image.
   // Each pixel has 3 channels (RGB) stored as floats.
@@ -183,10 +203,8 @@ void test_remapping() {
       int mapXVal = x - 1;
       int mapYVal = y - 1;
       // If the mapping is negative, assign an out-of-range value.
-      h_mapX[idx] = (mapXVal < 0) ? static_cast<unsigned short>(srcW)
-                                  : static_cast<unsigned short>(mapXVal);
-      h_mapY[idx] = (mapYVal < 0) ? static_cast<unsigned short>(srcH)
-                                  : static_cast<unsigned short>(mapYVal);
+      h_mapX[idx] = (mapXVal < 0) ? static_cast<unsigned short>(srcW) : static_cast<unsigned short>(mapXVal);
+      h_mapY[idx] = (mapYVal < 0) ? static_cast<unsigned short>(srcH) : static_cast<unsigned short>(mapYVal);
     }
   }
 
@@ -199,12 +217,9 @@ void test_remapping() {
   cudaMalloc(&d_mapY, sizeof(unsigned short) * destW * destH);
 
   // Copy data from host to device.
-  cudaMemcpy(d_src, h_src, sizeof(float) * srcW * srcH * 3,
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(d_mapX, h_mapX, sizeof(unsigned short) * destW * destH,
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(d_mapY, h_mapY, sizeof(unsigned short) * destW * destH,
-             cudaMemcpyHostToDevice);
+  cudaMemcpy(d_src, h_src, sizeof(float) * srcW * srcH * 3, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_mapX, h_mapX, sizeof(unsigned short) * destW * destH, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_mapY, h_mapY, sizeof(unsigned short) * destW * destH, cudaMemcpyHostToDevice);
 
   // Define kernel launch configuration.
   // dim3 blockDim(16, 16);
@@ -215,15 +230,13 @@ void test_remapping() {
   float defaultR = 100.0f, defaultG = 100.0f, defaultB = 100.0f;
 
   // Launch the remap kernel.
-  remap_kernel(d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY,
-               defaultR, defaultG, defaultB);
+  remap_kernel(d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY, defaultR, defaultG, defaultB);
 
   // Wait for the kernel to finish.
   cudaDeviceSynchronize();
 
   // Copy the destination image back to host memory.
-  cudaMemcpy(h_dest, d_dest, sizeof(float) * destW * destH * 3,
-             cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_dest, d_dest, sizeof(float) * destW * destH * 3, cudaMemcpyDeviceToHost);
 
   // Print out the destination image.
   // Each pixel is printed as (R, G, B).
@@ -231,8 +244,7 @@ void test_remapping() {
   for (int y = 0; y < destH; y++) {
     for (int x = 0; x < destW; x++) {
       int idx = (y * destW + x) * 3;
-      std::cout << "(" << h_dest[idx + 0] << ", " << h_dest[idx + 1] << ", "
-                << h_dest[idx + 2] << ") ";
+      std::cout << "(" << h_dest[idx + 0] << ", " << h_dest[idx + 1] << ", " << h_dest[idx + 2] << ") ";
     }
     std::cout << std::endl;
   }
