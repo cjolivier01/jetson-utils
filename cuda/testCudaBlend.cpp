@@ -384,6 +384,79 @@ SpatialTiff get_geo_tiff(const std::string& filename) {
   return SpatialTiff{.xpos = info.xPosition * info.xResolution, .ypos = info.yPosition * info.yResolution};
 }
 
+// Example structures for canvas and remapper info.
+// Adjust these as needed for your application.
+struct CanvasInfo {
+  int width;
+  int height;
+  // We assume that positions[1].x will be used below.
+  std::vector<cv::Point> positions;
+};
+
+struct Remapper {
+  int width;
+};
+
+class MaskConverter {
+ public:
+  // Members that hold canvas, blending, and remapper information.
+  CanvasInfo _canvas_info;
+  bool _minimize_blend;
+  int _overlap_pad;
+  Remapper _remapper_1;
+
+  // The function converts a mask cv::Mat so that it has the same size as
+  // _canvas_info, padding if necessary (using replication) and then, if
+  // _minimize_blend is true, returns a horizontally cropped region.
+  cv::Mat convertMaskMat(const cv::Mat& mask) {
+    int padw = 0, padh = 0;
+    // In OpenCV, image width is the number of columns and height is the number of rows.
+    int mwidth = mask.cols;
+    int mheight = mask.rows;
+
+    // Ensure that the incoming mask is not larger than the canvas.
+    assert(mwidth <= _canvas_info.width);
+    assert(mheight <= _canvas_info.height);
+
+    if (mwidth < _canvas_info.width)
+      padw = _canvas_info.width - mwidth;
+    if (mheight < _canvas_info.height)
+      padh = _canvas_info.height - mheight;
+
+    cv::Mat paddedMask;
+    if (padw > 0 || padh > 0) {
+      // In PyTorch the code uses replication padding on the right (width)
+      // and bottom (height). In OpenCV, we use copyMakeBorder with:
+      // top = 0, bottom = padh, left = 0, right = padw, and BORDER_REPLICATE.
+      cv::copyMakeBorder(mask, paddedMask, 0, padh, 0, padw, cv::BORDER_REPLICATE);
+    } else {
+      paddedMask = mask;
+    }
+
+    // Check that the padded mask now matches the canvas dimensions.
+    assert(paddedMask.cols == _canvas_info.width);
+    assert(paddedMask.rows == _canvas_info.height);
+
+    // If we are not minimizing the blend, return the full mask.
+    if (!_minimize_blend)
+      return paddedMask;
+
+    // Otherwise, take a slice of the mask.
+    // In the original Python code the slice is taken along the width dimension:
+    // mask[..., x_start : x_end] where:
+    //   x_start = self._canvas_info.positions[1].x - self._overlap_pad
+    //   x_end   = self._remapper_1.width + self._overlap_pad
+    int x_start = _canvas_info.positions[1].x - _overlap_pad;
+    int x_end = _remapper_1.width + _overlap_pad;
+    // For safety, you may want to add additional bounds checks.
+    assert(x_start >= 0 && x_end <= paddedMask.cols);
+
+    // Define a ROI (region of interest) covering all rows and columns [x_start, x_end)
+    cv::Rect roi(x_start, 0, x_end - x_start, paddedMask.rows);
+    return paddedMask(roi);
+  }
+};
+
 int main(int argc, char** argv) {
   // Usage check.
   if (argc < 4) {
@@ -418,6 +491,34 @@ int main(int argc, char** argv) {
   const size_t canvas_width = std::max(positions[0].xpos + img1_col.cols, positions[1].xpos + img2_col.cols);
   const size_t canvas_height = std::max(positions[0].ypos + img1_col.rows, positions[1].ypos + img2_col.rows);
   std::cout << "Canvas size: " << canvas_width << " x " << canvas_height << std::endl;
+
+  // compute overlap size
+  // if self._minimize_blend:
+  //     self._x1, self._y1, self._x2, self._y2 = (
+  //         self._canvas_info.positions[0].x,
+  //         self._canvas_info.positions[0].y,
+  //         self._canvas_info.positions[1].x,
+  //         self._canvas_info.positions[1].y,
+  //     )
+
+  //     self._remapper_1.xpos = self._x1
+  //     self._remapper_2.xpos = self._x1 + self._overlap_pad  # start overlapping right away
+  //     width_1 = self._remapper_1.width
+  //     self._overlapping_width = width_1 - self._x2
+  //     assert width_1 > self._x2
+  //     # seam tensor box (box we'll be blending)
+  //     self._padded_blended_tlbr = [
+  //         self._x2 - self._overlap_pad,  # x1
+  //         max(0, min(self._y1, self._y2) - self._overlap_pad),  # y1
+  //         width_1 + self._overlap_pad,  # x2
+  //         min(
+  //             self._canvas_info.height,
+  //             max(self._y1 + self._remapper_1.height, self._y2 + self._remapper_2.height)
+  //             + self._overlap_pad,
+  //         ),  # y2
+  //     ]
+  //     assert self._x2 - self._overlap_pad >= 0
+  //     assert width_1 + self._overlap_pad <= self._canvas_info.width
 
   // assert(false);
   //  Load the two images (in color).
