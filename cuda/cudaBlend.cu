@@ -634,6 +634,7 @@ cudaError_t cudaLaplacianBlendWithContext(const float *d_image1,
   return cudaGetLastError();
 }
 
+
 cudaError_t remap_kernel(const float *d_src, int srcW, int srcH, float *d_dest,
                          int destW, int destH, const unsigned short *d_mapX,
                          const unsigned short *d_mapY, float defR, float defG,

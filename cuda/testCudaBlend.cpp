@@ -37,9 +37,9 @@ class CudaMat {
   size_t bytes() const { return size; }
 };
 void test_remapping();
-cudaError_t cudaLaplacianBlend(const float* image1, const float* image2,
-                               const float* mask, float* output, int imageWidth,
-                               int imageHeight, int numLevels);
+// cudaError_t cudaLaplacianBlend(const float* image1, const float* image2,
+//                                const float* mask, float* output, int imageWidth,
+//                                int imageHeight, int numLevels);
 
 int main(int argc, char** argv) {
   // Usage check.
@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
               << std::endl;
     return -1;
   }
-
+  //assert(false);
   // Load the two images (in color).
   cv::Mat img1 = cv::imread(argv[1], cv::IMREAD_COLOR);
   cv::Mat img2 = cv::imread(argv[2], cv::IMREAD_COLOR);
@@ -86,12 +86,12 @@ int main(int argc, char** argv) {
   cv::Mat blended_float(img1.size(), CV_32FC3);
 
   // Configurable parameter: number of pyramid levels.
-  int numLevels = 12;
+  int numLevels = 1;
   int width = img1.cols;
   int height = img1.rows;
 
-  //CudaLaplacianBlendContext context(width, height, numLevels);
-  CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
+  CudaLaplacianBlendContext context(width, height, numLevels);
+  //CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
 
   CudaMat cudaImage1Float(img1_float);
   CudaMat cudaImage2Float(img2_float);
@@ -102,17 +102,18 @@ int main(int argc, char** argv) {
   // It is assumed that blendImages copies data to/from device memory,
   // launches the appropriate kernels, and returns the blended image.
 
-  auto cu_err = cudaBatchedLaplacianBlendWithContext(
-      (const float*)cudaImage1Float.data(),
-      (const float*)cudaImage2Float.data(), (const float*)cudaMask.data(),
-      (float*)cudaBlendedFloat.data(), context);
-
-  // auto cu_err = cudaLaplacianBlendWithContext(
+  // auto cu_err = cudaBatchedLaplacianBlendWithContext(
   //     (const float*)cudaImage1Float.data(),
   //     (const float*)cudaImage2Float.data(), (const float*)cudaMask.data(),
   //     (float*)cudaBlendedFloat.data(), context);
+  auto cu_err = cudaLaplacianBlendWithContext(
+      (const float*)cudaImage1Float.data(),
+      (const float*)cudaImage2Float.data(),
+      // (const float*)cudaImage1Float.data(), 
+      (const float*)cudaMask.data(),
+      (float*)cudaBlendedFloat.data(), context);
 
-#if 1 /* perf test */
+#if 0 /* perf test */
   auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                       std::chrono::system_clock::now().time_since_epoch())
                       .count();
