@@ -243,15 +243,12 @@ __global__ void blendKernelRGB(const float *lap1, const float *lap2,
   if (x >= width || y >= height)
     return;
   int idx = (y * width + x) * 3;
+
   float m = mask[y * width + x];
   float mm1 = 1.0f - m;
-  // m = 0;
-  //m = 0.5;
-  //mm1 = 0.5;
   blended[idx + 0] = m * lap1[idx + 0] + mm1 * lap2[idx + 0];
   blended[idx + 1] = m * lap1[idx + 1] + mm1 * lap2[idx + 1];
   blended[idx + 2] = m * lap1[idx + 2] + mm1 * lap2[idx + 2];
-  //blended[idx + 2] = 0;
 }
 
 // ---------------------------------------------------------------------
@@ -324,6 +321,7 @@ __global__ void reconstructKernelRGB(const float *lowerRes, int lowWidth,
 cudaError_t cudaLaplacianBlend(const float *h_image1, const float *h_image2,
                                const float *h_mask, float *h_output,
                                int imageWidth, int imageHeight, int numLevels) {
+  assert(false);
   // For RGB images (3 channels)
   size_t imageSize = imageWidth * imageHeight * 3 * sizeof(float);
   // For mask (single channel)

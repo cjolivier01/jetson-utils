@@ -71,6 +71,7 @@ class CudaMat {
   CudaMat(const cv::Mat& mat) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
+    assert(mat.isContinuous());
     cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
   }
 
@@ -171,7 +172,7 @@ void test_remapping();
 cv::Mat load_seam_mask(const std::string& filename) {
   cv::Mat seam_mask = cv::imread(filename, cv::IMREAD_ANYDEPTH);
   if (!seam_mask.empty()) {
-    show_image("seam_mask", seam_mask);
+    // show_image("seam_mask", seam_mask);
 
     double minVal, maxVal;
     cv::Point minLoc, maxLoc;
@@ -184,12 +185,37 @@ cv::Mat load_seam_mask(const std::string& filename) {
     cv::Mat maxMask = (seam_mask == maxVal); // Mask for max value
 
     // Set all min values to 0 and max values to 1
-    seam_mask.setTo(0, minMask); // Set min value locations to 0
-    seam_mask.setTo(1, maxMask); // Set max value locations to 1
+    // 1's to left, 0's to right (invert)
+    seam_mask.setTo(0, maxMask); // Set min value locations to 0
+    seam_mask.setTo(1, minMask); // Set max value locations to 1
 
     cv::minMaxLoc(seam_mask, &minVal, &maxVal, &minLoc, &maxLoc);
+    //printf("x=%d, m=%f\n", x, m);show_image("seam_mask", seam_mask * 255);
+    //usleep(0);
   }
   return seam_mask;
+}
+
+std::pair<double, double> get_min_max(const cv::Mat& mat) {
+  double minVal, maxVal;
+  cv::Point minLoc, maxLoc;
+
+  // Get the minimum and maximum values and their locations
+  cv::minMaxLoc(mat, &minVal, &maxVal, &minLoc, &maxLoc);
+  return std::make_pair(minVal, maxVal);
+}
+
+int countUniqueValues(cv::Mat mat) {
+  std::set<int> uniqueValues;
+
+  // Assume the matrix type is CV_32S (32-bit signed integer)
+  for (int i = 0; i < mat.cols; ++i) {
+    for (int j = 0; j < mat.rows; ++j) {
+      uniqueValues.insert(mat.at<float>(i, j));
+    }
+  }
+
+  return uniqueValues.size();
 }
 
 cv::Mat load_position_mask(const std::string& filename, double* minVal, double* maxVal) {
@@ -235,6 +261,8 @@ int main(int argc, char** argv) {
   cv::Mat img2 = cv::imread(argv[2], cv::IMREAD_COLOR);
   cv::Mat seam_mask = load_seam_mask(argv[3]);
 
+  // show_image("left", img1, false);
+  // show_image("right", img2, true);
   // show_image("seam_mask", seam_mask);
 
   if (img1.empty() || img2.empty()) {
@@ -249,11 +277,17 @@ int main(int argc, char** argv) {
   }
 
   // Convert images to float (CV_32FC3) and scale pixel values to [0,1].
-  cv::Mat img1_float, img2_float, mask;
+  cv::Mat img1_float, img2_float;
   img1.convertTo(img1_float, CV_32FC3, 1.0 / 255.0);
   img2.convertTo(img2_float, CV_32FC3, 1.0 / 255.0);
 
-  seam_mask.convertTo(mask, CV_32FC1, 1.0 / 255.0);
+  seam_mask.convertTo(seam_mask, CV_32FC1);
+  auto minmax = get_min_max(seam_mask);
+  std::cout << "min=" << minmax.first << ", max=" << minmax.second
+            << ", unique val count=" << countUniqueValues(seam_mask) << std::endl;
+
+  // float left = seam_mask.at<float>(0,0);
+  // float right = seam_mask.at<float>(0,seam_mask.cols - 1);
 
   // Create a simple seam mask (single–channel, CV_32FC1):
   // Here we use a hard–coded seam: the left half of the image is taken entirely
@@ -266,8 +300,9 @@ int main(int argc, char** argv) {
   //   }
   // }
 
-  // Prepare the output image (as float).
-  cv::Mat blended_float(img1.size(), CV_32FC3);
+  cudaSetDevice(0);
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
 
   // Configurable parameter: number of pyramid levels.
   int numLevels = 1;
@@ -280,12 +315,13 @@ int main(int argc, char** argv) {
 
   CudaMat cudaImage1Float(img1_float);
   CudaMat cudaImage2Float(img2_float);
-  CudaMat cudaMask(mask);
+  CudaMat cudaMask(seam_mask);
+
+  // Prepare the output image (as float).
+  cv::Mat blended_float(img1.size(), CV_32FC3);
   CudaMat cudaBlendedFloat(blended_float);
 
-  cudaSetDevice(0);
-  cudaStream_t stream;
-  cudaStreamCreate(&stream);
+  cudaDeviceSynchronize();
 
   // cv::imshow("img1", img1_float);
   // cv::waitKey(0);
@@ -307,7 +343,6 @@ int main(int argc, char** argv) {
   auto cu_err = cudaLaplacianBlendWithContext(
       (const float*)cudaImage1Float.data(),
       (const float*)cudaImage2Float.data(),
-      // (const float*)cudaImage1Float.data(),
       (const float*)cudaMask.data(),
       (float*)cudaBlendedFloat.data(),
       context);
@@ -341,6 +376,8 @@ int main(int argc, char** argv) {
   cv::waitKey(0);
 
   blended_float.convertTo(blended, CV_8UC3, 255.0);
+
+  show_image("blended_float", blended_float);
 
   // Save the final blended image.
   if (!cv::imwrite(argv[4], blended)) {
