@@ -348,7 +348,7 @@ int main(int argc, char** argv) {
   //     (float*)cudaBlendedFloat.data(),
   //     context);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
@@ -375,8 +375,8 @@ int main(int argc, char** argv) {
   cv::Mat blended;
   blended_float = cudaBlendedFloat.download();
 
-  cv::imshow("blended_float", blended_float);
-  cv::waitKey(0);
+  // cv::imshow("blended_float", blended_float);
+  // cv::waitKey(0);
 
   blended_float.convertTo(blended, CV_8UC3, 255.0);
 
