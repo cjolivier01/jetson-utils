@@ -226,10 +226,12 @@ cuda_library(
     name = "cuda_blend_lib",
     srcs = [
         "cudaBlend.cu",
+        "cudaMakeFull.cu",
         "cudaBlendBatched.cu",
     ],
     hdrs = [
         "cudaBlend.h",
+        "cudaMakeFull.h",
     ],
     copts = [
         "-std=c++17",
