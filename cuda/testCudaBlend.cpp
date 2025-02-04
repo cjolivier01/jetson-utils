@@ -146,14 +146,16 @@ class CudaMat {
   int batch_size_{1};
 
  public:
-  CudaMat(const cv::Mat& mat) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
+  CudaMat(const cv::Mat& mat, bool copy = true) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
     assert(mat.isContinuous());
-    cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
+    if (copy) {
+      cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
+    }
   }
 
-  CudaMat(const std::vector<cv::Mat>& mat_batch) : batch_size_(mat_batch.size()) {
+  CudaMat(const std::vector<cv::Mat>& mat_batch, bool copy = true) : batch_size_(mat_batch.size()) {
     assert(batch_size_);
     const cv::Mat& first = mat_batch.at(0);
     rows_ = first.rows;
@@ -162,11 +164,13 @@ class CudaMat {
     const size_t size_each = first.total() * first.elemSize();
     const size_t size_total = size_each * batch_size_;
     cudaMalloc(&d_data, size_total);
-    uint8_t* p = (uint8_t*)d_data;
-    for (const cv::Mat& mat : mat_batch) {
-      assert(mat.isContinuous());
-      cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
-      p += size_each;
+    if (copy) {
+      uint8_t* p = (uint8_t*)d_data;
+      for (const cv::Mat& mat : mat_batch) {
+        assert(mat.isContinuous());
+        cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
+        p += size_each;
+      }
     }
   }
 
