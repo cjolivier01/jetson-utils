@@ -136,12 +136,12 @@ class CudaMat {
   int channels_{0};
 
  public:
-  CudaMat(int w, int h, int elemsize, int channels, int batch_size)
-      : rows_(h), cols_(w), batch_size_(batch_size), elemsize_(elemsize), channels_(channels) {
-    size_t total_size = rows_ * cols_ * elemsize_ * channels_ * batch_size_;
-    cudaError_t err = cudaMalloc(&d_data, total_size);
-    assert(err == cudaError_t::cudaSuccess);
-  }
+  // CudaMat(int w, int h, int elemsize, int channels, int batch_size)
+  //     : rows_(h), cols_(w), batch_size_(batch_size), elemsize_(elemsize), channels_(channels) {
+  //   size_t total_size = rows_ * cols_ * elemsize_ * channels_ * batch_size_;
+  //   cudaError_t err = cudaMalloc(&d_data, total_size);
+  //   assert(err == cudaError_t::cudaSuccess);
+  // }
   CudaMat(const cv::Mat& mat, bool copy = true) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
@@ -176,8 +176,8 @@ class CudaMat {
     }
   }
 
-  cv::Mat download(int type = -1) const {
-    cv::Mat mat(rows_, cols_, type == -1 ? type_ : type);
+  cv::Mat download() const {
+    cv::Mat mat(rows_, cols_, type_);
     cudaMemcpy(mat.data, d_data, size, cudaMemcpyDeviceToHost);
     return mat;
   }
@@ -623,33 +623,27 @@ int main(int argc, char** argv) {
   // Left side, unblended
   // I think we can just copy from the original instead of this partial stuff
   CudaMat partial_1(
-      mask_converter._x2 + mask_converter._overlap_pad,
-      mask_converter._remapper_1.height,
-      sizeof(float),
-      /*channels=*/3,
-      /*batch_size=*/1);
+      cv::Mat(cv::Size(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height), CV_32FC3));
 
-  cv::Mat blmat_1t(
-      cv::Size{mask_converter._remapper_1.width - (mask_converter._x2 - mask_converter._overlap_pad),
-       mask_converter._remapper_1.height},
-      CV_32FC3);
-  CudaMat blending_1(blmat_1t, /*copy=*/false);
+  CudaMat blending_1(
+      cv::Mat(
+          cv::Size{
+              mask_converter._remapper_1.width - (mask_converter._x2 - mask_converter._overlap_pad),
+              mask_converter._remapper_1.height},
+          CV_32FC3),
+      /*copy=*/false);
 
   // I think we can just copy from the original instead of this partial stuff
   // Right side, unblended
-  CudaMat partial_2(
-      mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
-      mask_converter._remapper_2.height,
-      sizeof(float),
-      /*channels=*/3,
-      /*batch_size=*/1);
+  CudaMat partial_2(cv::Mat(
+      cv::Size{
+          mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
+          mask_converter._remapper_2.height},
+      CV_32FC3));
 
-  CudaMat blending_2(
-      mask_converter._overlapping_width + mask_converter._overlap_pad,
-      mask_converter._remapper_1.height,
-      sizeof(float),
-      /*channels=*/3,
-      /*batch_size=*/1);
+  CudaMat blending_2(cv::Mat(
+      cv::Size{mask_converter._overlapping_width + mask_converter._overlap_pad, mask_converter._remapper_1.height},
+      CV_32FC3));
 
   assert(blending_1.width() == blending_2.width());
   assert(blending_1.height() == blending_2.height());
@@ -740,7 +734,7 @@ int main(int argc, char** argv) {
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
-  auto disp = blending_1.download(CV_32FC3);
+  auto disp = blending_1.download();
   // auto disp = cudaRemapped_1.download();
   //  auto disp = cudaRemapped_2.download();
   //  // auto disp = sampleImage2.download();
