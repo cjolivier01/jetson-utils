@@ -19,9 +19,6 @@
 #include <cuda_runtime.h>
 #include <opencv4/opencv2/highgui.hpp>
 
-#include <gdal/gdal.h>
-#include <gdal/gdal_priv.h>
-
 #include <opencv4/opencv2/imgcodecs.hpp>
 #include <tiffio.h>
 // #include <geotiff/geotiff.h>
@@ -582,7 +579,7 @@ int main(int argc, char** argv) {
   cudaStreamCreate(&stream);
 
 // Configurable parameter: number of pyramid levels.
-#ifdef TEGRA
+#ifdef __aarch64__
   // Lower compute, quick and dirty
   int numLevels = 1;
 #else
