@@ -383,3 +383,100 @@ cudaError_t cudaCrop(
 
   return cudaErrorInvalidValue;
 }
+
+// Kernel: copies a rectangular ROI from each source image to the corresponding destination image.
+// Images are stored in row-major order with 'channels' channels per pixel.
+__global__ void copyRoiKernelBatched(
+    const float* src,
+    int srcWidth,
+    int srcHeight,
+    float* dest,
+    int destWidth,
+    int destHeight,
+    int roiX,
+    int roiY,
+    int roiWidth,
+    int roiHeight,
+    int outputOffsetX,
+    int outputOffsetY,
+    int channels,
+    int batchSize) {
+  // Use blockIdx.z to index into the batch.
+  int b = blockIdx.z;
+  if (b >= batchSize)
+    return;
+
+  // Compute x and y relative to the ROI.
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
+  int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+  // Only process threads that fall within the ROI.
+  if (x >= roiWidth || y >= roiHeight)
+    return;
+
+  // Compute the absolute coordinates in the source image.
+  int srcX = roiX + x;
+  int srcY = roiY + y;
+
+  // Compute the absolute coordinates in the destination image.
+  int destX = outputOffsetX + x;
+  int destY = outputOffsetY + y;
+
+  // Check that the coordinates are valid in both images.
+  if (srcX < srcWidth && srcY < srcHeight && destX < destWidth && destY < destHeight) {
+    // Compute the base offsets for the current batch element.
+    int srcBatchOffset = b * (srcWidth * srcHeight * channels);
+    int destBatchOffset = b * (destWidth * destHeight * channels);
+
+    // Compute the pixel offsets within a single image.
+    int srcPixelIdx = (srcY * srcWidth + srcX) * channels;
+    int destPixelIdx = (destY * destWidth + destX) * channels;
+
+    // Copy all channels.
+    for (int c = 0; c < channels; ++c) {
+      dest[destBatchOffset + destPixelIdx + c] = src[srcBatchOffset + srcPixelIdx + c];
+    }
+  }
+}
+
+// Host wrapper function to launch the batched ROI copy kernel with stream support.
+cudaError_t copyRoiBatched(
+    const float* d_src,
+    int srcWidth,
+    int srcHeight,
+    float* d_dest,
+    int destWidth,
+    int destHeight,
+    int roiX,
+    int roiY,
+    int roiWidth,
+    int roiHeight,
+    int outputOffsetX,
+    int outputOffsetY,
+    int channels,
+    int batchSize,
+    cudaStream_t stream) {
+  // Define a 2D block size. For example, 16x16 threads.
+  dim3 blockDim(16, 16, 1);
+  // Compute grid dimensions for the ROI, and use gridDim.z for the batch.
+  dim3 gridDim((roiWidth + blockDim.x - 1) / blockDim.x, (roiHeight + blockDim.y - 1) / blockDim.y, batchSize);
+
+  // Launch the kernel in the specified stream.
+  copyRoiKernelBatched<<<gridDim, blockDim, 0, stream>>>(
+      d_src,
+      srcWidth,
+      srcHeight,
+      d_dest,
+      destWidth,
+      destHeight,
+      roiX,
+      roiY,
+      roiWidth,
+      roiHeight,
+      outputOffsetX,
+      outputOffsetY,
+      channels,
+      batchSize);
+
+  return cudaGetLastError();
+}

@@ -276,4 +276,21 @@ cudaError_t cudaCutPaste<float3>(
     int outputHeight,
     cudaStream_t stream);
 
+cudaError_t copyRoiBatched(
+    const float* d_src,
+    int srcWidth,
+    int srcHeight,
+    float* d_dest,
+    int destWidth,
+    int destHeight,
+    int roiX,
+    int roiY,
+    int roiWidth,
+    int roiHeight,
+    int outputOffsetX,
+    int outputOffsetY,
+    int channels,
+    int batchSize,
+    cudaStream_t stream);
+
 #endif

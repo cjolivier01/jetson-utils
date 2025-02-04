@@ -486,7 +486,7 @@ class MaskConverter {
       cv::Rect roi(x_start, 0, x_end - x_start, paddedMask.rows);
       return paddedMask(roi);
     }
-    return paddedMask;
+    return paddedMask.clone();
   }
 };
 
@@ -552,6 +552,9 @@ int main(int argc, char** argv) {
   mask_converter._remapper_2.height = img2_col.rows;
 
   mask_converter.updateMinimizeBlend();
+
+  cv::Mat blend_seam = mask_converter.convertMaskMat(whole_seam_mask_image);
+  assert(!blend_seam.empty());
 
   // assert(false);
   //  Load the two images (in color).
@@ -672,6 +675,9 @@ int main(int argc, char** argv) {
   CudaMat sampleImage1(sample_img_left);
   CudaMat sampleImage2(sample_img_right);
 
+  // CudaMat cudaBlendSeam(blend_seam);
+
+  // Old stuff before end-to-end
   CudaMat cudaImage1Float(img1_float);
   CudaMat cudaImage2Float(img2_float);
   CudaMat cudaMask(seam_mask);
