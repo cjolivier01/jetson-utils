@@ -189,7 +189,7 @@ cv::Mat load_seam_mask(const std::string& filename) {
     seam_mask.setTo(0, maxMask); // Set min value locations to 0
     seam_mask.setTo(1, minMask); // Set max value locations to 1
 
-    cv::minMaxLoc(seam_mask, &minVal, &maxVal, &minLoc, &maxLoc);
+    // cv::minMaxLoc(seam_mask, &minVal, &maxVal, &minLoc, &maxLoc);
     //printf("x=%d, m=%f\n", x, m);show_image("seam_mask", seam_mask * 255);
     //usleep(0);
   }
