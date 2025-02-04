@@ -467,25 +467,37 @@ int main(int argc, char** argv) {
   RenderSet display;
 
   std::string game_id = "stitch-fix";
-  std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id;
+  std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id + "/";
 
-  std::string mapping_0_pos = game_dir + "/mapping_0000.tif";
-  std::string mapping_0_x = game_dir + "/mapping_0000_x.tif";
-  std::string mapping_0_y = game_dir + "/mapping_0000_y.tif";
-  std::string mapping_1_pos = game_dir + "/mapping_0001.tif";
-  std::string mapping_1_x = game_dir + "/mapping_0001_x.tif";
-  std::string mapping_1_y = game_dir + "/mapping_0001_y.tif";
-  std::string whole_seam_mask = game_dir + "/seam_file.png";
+  std::string mapping_0_pos = game_dir + "mapping_0000.tif";
+  std::string mapping_0_x = game_dir + "mapping_0000_x.tif";
+  std::string mapping_0_y = game_dir + "mapping_0000_y.tif";
+  std::string mapping_1_pos = game_dir + "mapping_0001.tif";
+  std::string mapping_1_x = game_dir + "mapping_0001_x.tif";
+  std::string mapping_1_y = game_dir + "mapping_0001_y.tif";
+  std::string whole_seam_mask = game_dir + "seam_file.png";
+
+  std::string sample_img_left_path = game_dir + "GX010100.png";
+  std::string sample_img_right_path = game_dir + "GX010019.png";
 
   // Normalize
   std::vector<SpatialTiff> positions{get_geo_tiff(mapping_0_pos), get_geo_tiff(mapping_1_pos)};
   positions = normalize(std::move(positions));
 
   cv::Mat img1_col = cv::imread(mapping_0_x, cv::IMREAD_ANYDEPTH);
+  assert(img1_col.type() == CV_16U);
   cv::Mat img1_row = cv::imread(mapping_0_y, cv::IMREAD_ANYDEPTH);
   cv::Mat img2_col = cv::imread(mapping_1_x, cv::IMREAD_ANYDEPTH);
   cv::Mat img2_row = cv::imread(mapping_1_y, cv::IMREAD_ANYDEPTH);
   cv::Mat whole_seam_mask_image = cv::imread(whole_seam_mask, cv::IMREAD_ANYDEPTH);
+
+  cv::Mat sample_img_left = cv::imread(sample_img_left_path, cv::IMREAD_COLOR);
+  assert(!sample_img_left.empty());
+  cv::Mat sample_img_right = cv::imread(sample_img_right_path, cv::IMREAD_COLOR);
+  assert(!sample_img_right.empty());
+
+  sample_img_left.convertTo(sample_img_left, CV_32FC3, 1.0 / 255.0);
+  sample_img_right.convertTo(sample_img_left, CV_32FC3, 1.0 / 255.0);
 
   // Compute canvas size
   const size_t canvas_width = std::max(positions[0].xpos + img1_col.cols, positions[1].xpos + img2_col.cols);
@@ -585,8 +597,13 @@ int main(int argc, char** argv) {
   CudaMat remap_1_x(img1_col), remap_1_y(img1_row);
   CudaMat remap_2_x(img2_col), remap_2_y(img2_row);
 
-  CudaMat remapped_1(img1_col, /*copy=*/false);
-  CudaMat remapped_2(img2_col, /*copy=*/false);
+  cv::Mat remapped_1(img1_col.size(), CV_32FC3);
+  cv::Mat remapped_2(img1_col.size(), CV_32FC3);
+  CudaMat cudaRemapped_1(remapped_1, /*copy=*/false);
+  CudaMat cudaRemapped_2(remapped_2, /*copy=*/false);
+
+  CudaMat sampleImage1(sample_img_left);
+  CudaMat sampleImage2(sample_img_right);
 
   CudaMat cudaImage1Float(img1_float);
   CudaMat cudaImage2Float(img2_float);
@@ -606,9 +623,9 @@ int main(int argc, char** argv) {
       (float *)cudaImage1Float.data(),
       cudaImage1Float.width(),
       cudaImage1Float.height(),
-      (float *)remapped_1.data(),
-      remapped_1.width(),
-      remapped_1.height(),
+      (float *)cudaRemapped_1.data(),
+      cudaRemapped_1.width(),
+      cudaRemapped_1.height(),
       (uint16_t*)remap_1_x.data(),
       (uint16_t*)remap_1_y.data(),
       defaultR,
@@ -617,7 +634,10 @@ int main(int argc, char** argv) {
 
   cudaDeviceSynchronize();
 
-  cv::imshow("remapped_1", remapped_1.download());
+  // auto disp = cudaRemapped_1.download();
+  auto disp = sampleImage1.download();
+  disp.convertTo(disp, CV_8UC3, 255.0);
+  cv::imshow("remapped_1", disp);
   cv::waitKey(0);
 
 
