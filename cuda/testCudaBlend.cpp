@@ -811,8 +811,9 @@ int main(int argc, char** argv) {
   cudaDeviceSynchronize();
 
   // auto disp = blending_1.download();
-  auto disp = cudaFull1.download();
-  // auto disp = blending_2.download();
+  // auto disp = cudaFull1.download();
+  auto disp = cudaFull2.download();
+  //auto disp = blending_2.download();
   // auto disp = cudaRemapped_1.download();
   //  auto disp = cudaRemapped_2.download();
   //  // auto disp = sampleImage2.download();
