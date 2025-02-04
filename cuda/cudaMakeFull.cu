@@ -8,6 +8,8 @@
 // Simple CUDA kernels for filling a canvas and copying an ROI
 //--------------------------------------------------------
 
+// TODO: faster to use float3, char1, etc instead of channel loops
+
 // Kernel to fill a float image with a constant value.
 __global__ void fillKernelFloat(float* dest, int destWidth, int destHeight, int channels, float value) {
   int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -124,10 +126,14 @@ SimpleFullResult simple_make_full(
     // Canvas dimensions
     int canvas_w,
     int canvas_h,
+    float* d_full_img_1,
+    unsigned char* d_full_mask_1,
+    float* d_full_img_2,
+    unsigned char* d_full_mask_2,
     // If true, adjust the origins so that one image is anchored at (0,0)
     bool adjust_origin,
     // Optional CUDA stream (default stream if not provided)
-    cudaStream_t stream = 0) {
+    cudaStream_t stream) {
   // Retrieve source image dimensions (as in the Python version)
   // (img1_width, img1_height) and (img2_width, img2_height) are assumed to be valid.
   assert(x1 >= 0 && y1 >= 0 && x2 >= 0 && y2 >= 0);
@@ -148,6 +154,9 @@ SimpleFullResult simple_make_full(
       x1 -= x2;
       x2 = 0;
     }
+  } else {
+    assert(x1 == 0 || x2 == 0);
+    assert(y1 == 0 || y2 == 0);
   }
 
   // For now, require that one of x1 or x2 is 0 and one of y1 or y2 is 0.
@@ -161,9 +170,6 @@ SimpleFullResult simple_make_full(
   // ---------------------------
   // Process image 1
   // ---------------------------
-  size_t full_img1_size = canvas_w * canvas_h * img1_channels * sizeof(float);
-  float* d_full_img_1 = nullptr;
-  cudaMalloc(&d_full_img_1, full_img1_size);
   // Fill the entire canvas with 0.0f.
   fillKernelFloat<<<gridDimCanvas, blockDim, 0, stream>>>(d_full_img_1, canvas_w, canvas_h, img1_channels, 0.0f);
 
@@ -173,10 +179,7 @@ SimpleFullResult simple_make_full(
       d_img_1, img1_width, img1_height, d_full_img_1, canvas_w, canvas_h, x1, y1, img1_channels);
 
   // Process mask 1 (if provided)
-  unsigned char* d_full_mask_1 = nullptr;
   if (d_mask_1 != nullptr) {
-    size_t full_mask1_size = canvas_w * canvas_h * mask1_channels * sizeof(unsigned char);
-    cudaMalloc(&d_full_mask_1, full_mask1_size);
     // For masks, pad with constant True (represented as 1).
     fillKernelUChar<<<gridDimCanvas, blockDim, 0, stream>>>(d_full_mask_1, canvas_w, canvas_h, mask1_channels, 1);
     // Copy the source mask into the canvas at offset (x1, y1).
@@ -188,19 +191,13 @@ SimpleFullResult simple_make_full(
   // ---------------------------
   // Process image 2
   // ---------------------------
-  size_t full_img2_size = canvas_w * canvas_h * img2_channels * sizeof(float);
-  float* d_full_img_2 = nullptr;
-  cudaMalloc(&d_full_img_2, full_img2_size);
   fillKernelFloat<<<gridDimCanvas, blockDim, 0, stream>>>(d_full_img_2, canvas_w, canvas_h, img2_channels, 0.0f);
   dim3 gridDimCopy2((img2_width + blockDim.x - 1) / blockDim.x, (img2_height + blockDim.y - 1) / blockDim.y);
   copyRoiKernel<<<gridDimCopy2, blockDim, 0, stream>>>(
       d_img_2, img2_width, img2_height, d_full_img_2, canvas_w, canvas_h, x2, y2, img2_channels);
 
   // Process mask 2 (if provided)
-  unsigned char* d_full_mask_2 = nullptr;
   if (d_mask_2 != nullptr) {
-    size_t full_mask2_size = canvas_w * canvas_h * mask2_channels * sizeof(unsigned char);
-    cudaMalloc(&d_full_mask_2, full_mask2_size);
     fillKernelUChar<<<gridDimCanvas, blockDim, 0, stream>>>(d_full_mask_2, canvas_w, canvas_h, mask2_channels, 1);
     dim3 gridDimCopyMask2((mask2_width + blockDim.x - 1) / blockDim.x, (mask2_height + blockDim.y - 1) / blockDim.y);
     copyRoiKernelUChar<<<gridDimCopyMask2, blockDim, 0, stream>>>(

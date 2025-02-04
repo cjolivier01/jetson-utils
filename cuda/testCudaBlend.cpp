@@ -2,6 +2,7 @@
 
 #include "cudaBlend.h"
 #include "cudaCrop.h"
+#include "cudaMakeFull.h"
 #include "glDisplay.h"
 #include "imageFormat.h"
 #include "videoOutput.h"
@@ -132,8 +133,6 @@ class CudaMat {
   size_t size;
   int rows_, cols_, type_;
   int batch_size_{1};
-  int elemsize_{0};
-  int channels_{0};
 
  public:
   // CudaMat(int w, int h, int elemsize, int channels, int batch_size)
@@ -555,6 +554,7 @@ int main(int argc, char** argv) {
 
   cv::Mat blend_seam = mask_converter.convertMaskMat(whole_seam_mask_image);
   assert(!blend_seam.empty());
+  blend_seam = blend_seam.clone();
 
   // assert(false);
   //  Load the two images (in color).
@@ -675,7 +675,10 @@ int main(int argc, char** argv) {
   CudaMat sampleImage1(sample_img_left);
   CudaMat sampleImage2(sample_img_right);
 
-  // CudaMat cudaBlendSeam(blend_seam);
+  CudaMat cudaBlendSeam(blend_seam);
+
+  CudaMat cudaFull1(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
+  CudaMat cudaFull2(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
 
   // Old stuff before end-to-end
   CudaMat cudaImage1Float(img1_float);
@@ -691,6 +694,19 @@ int main(int argc, char** argv) {
   // Set default color for unmapped pixels.
   float defaultR = 128.0f, defaultG = 128.0f, defaultB = 128.0f;
 
+  const cv::Size partial_size_1(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height);
+  const int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_size_1.height};
+  const int4 roi_blend_1 = {
+      mask_converter._x2 - mask_converter._overlap_pad, 0, cudaRemapped_1.width(), cudaRemapped_1.height()};
+
+  const cv::Size partial_size_2{
+      mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
+      mask_converter._remapper_2.height};
+  const int4 roi_partial_2 = {
+      mask_converter._overlapping_width - mask_converter._overlap_pad, 0, partial_size_2.width, partial_size_2.height};
+  const int4 roi_blend_2 = {
+      0, 0, mask_converter._overlapping_width + mask_converter._overlap_pad, cudaRemapped_2.height()};
+
   // Launch the remap kernel.
   batched_remap_kernel(
       (float*)sampleImage1.data(),
@@ -705,20 +721,6 @@ int main(int argc, char** argv) {
       defaultG,
       defaultB,
       /*batchSize=*/1);
-
-  const cv::Size partial_size_1(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height);
-  const int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_size_1.height};
-  const int4 roi_blend_1 = {
-      mask_converter._x2 - mask_converter._overlap_pad, 0, cudaRemapped_1.width(), cudaRemapped_1.height()};
-
-  const cv::Size partial_size_2{
-      mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
-      mask_converter._remapper_2.height};
-  const int4 roi_partial_2 = {
-      mask_converter._overlapping_width - mask_converter._overlap_pad, 0, partial_size_2.width, partial_size_2.height};
-  const int4 roi_blend_2 = {
-      0, 0, mask_converter._overlapping_width + mask_converter._overlap_pad, cudaRemapped_2.height()};
-
   cudaDeviceSynchronize();
 
   assert((roi_blend_1.z - roi_blend_1.x) == blending_1.width());
@@ -745,6 +747,7 @@ int main(int argc, char** argv) {
       defaultG,
       defaultB,
       /*batchSize=*/1);
+  cudaDeviceSynchronize();
 
   assert((roi_blend_2.z - roi_blend_2.x) == blending_2.width());
   assert((roi_blend_2.w - roi_blend_2.y) == blending_2.height());
@@ -760,8 +763,56 @@ int main(int argc, char** argv) {
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
+  int x1 = positions[0].xpos;
+  int y1 = positions[0].ypos;
+  int x2 = positions[1].xpos;
+  int y2 = positions[1].ypos;
+
+  SimpleFullResult full_result = simple_make_full(
+      // Image 1 (float image)
+      (const float*)blending_1.data(),
+      blending_1.width(),
+      blending_1.height(),
+      3,
+      // Optional mask 1 (1-channel unsigned char; pass nullptr if not provided)
+      /*d_mask_1=*/nullptr,
+      0,
+      0,
+      0,
+      // Offsets for image 1
+      x1,
+      y1,
+      // Image 2 (float image)
+      (const float*)blending_2.data(),
+      blending_2.width(),
+      blending_2.height(),
+      3,
+      // Optional mask 2
+      /*d_mask_2=*/nullptr,
+      0,
+      0,
+      0,
+      // Offsets for image 2
+      x2,
+      y2,
+      // Canvas dimensions
+      cudaBlendSeam.width(),
+      cudaBlendSeam.height(),
+      (float*)cudaFull1.data(),
+      /*d_full_mask_1=*/nullptr,
+      (float*)cudaFull2.data(),
+      /*d_full_mask_2=*/nullptr,
+      // If true, adjust the origins so that one image is anchored at (0,0)
+      /*adjust_origin=*/true,
+      // Optional CUDA stream (default stream if not provided)
+      stream);
+
+  cudaStreamSynchronize(stream);
+  cudaDeviceSynchronize();
+
   // auto disp = blending_1.download();
-  auto disp = blending_2.download();
+  auto disp = cudaFull1.download();
+  // auto disp = blending_2.download();
   // auto disp = cudaRemapped_1.download();
   //  auto disp = cudaRemapped_2.download();
   //  // auto disp = sampleImage2.download();
