@@ -80,12 +80,12 @@ class CudaMat {
     assert(batch_size_);
     const cv::Mat& first = mat_batch.at(0);
     rows_ = first.rows;
-    cols_first.cols;
+    cols_ = first.cols;
     type_ = first.type();
     const size_t size_each = first.total() * first.elemSize();
     const size_t size_total = size_each * batch_size_;
     cudaMalloc(&d_data, size_total);
-    uint8_t *p = (uint8_t *)d_data;
+    uint8_t* p = (uint8_t*)d_data;
     for (const cv::Mat& mat : mat_batch) {
       assert(mat.isContinuous());
       cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
@@ -122,7 +122,7 @@ class CudaMat {
   constexpr int type() const {
     return type_;
   }
-  constexpr int batch_size() cosnt {
+  constexpr int batch_size() const {
     return batch_size_;
   }
 };
@@ -325,13 +325,13 @@ int main(int argc, char** argv) {
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  // Configurable parameter: number of pyramid levels.
-  #ifdef TEGRA
+// Configurable parameter: number of pyramid levels.
+#ifdef TEGRA
   // Lower compute, quick and dirty
   int numLevels = 1;
-  #else
+#else
   int numLevels = 6;
-  #endif
+#endif
   int width = img1.cols;
   int height = img1.rows;
 
@@ -406,7 +406,7 @@ int main(int argc, char** argv) {
 
   blended_float.convertTo(blended, CV_8UC3, 255.0);
 
-  //show_image("blended_float", blended_float);
+  // show_image("blended_float", blended_float);
 
   // Save the final blended image.
   if (!cv::imwrite(argv[4], blended)) {
