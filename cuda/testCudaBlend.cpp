@@ -22,6 +22,7 @@
 #include <gdal/gdal.h>
 #include <gdal/gdal_priv.h>
 
+#include <opencv4/opencv2/imgcodecs.hpp>
 #include <tiffio.h>
 // #include <geotiff/geotiff.h>
 //  #include <xtiffio.h>
@@ -397,9 +398,16 @@ int main(int argc, char** argv) {
   std::string mapping_1_pos = game_dir + "/mapping_0001.tif";
   std::string mapping_1_x = game_dir + "/mapping_0001_x.tif";
   std::string mapping_1_y = game_dir + "/mapping_0001_y.tif";
+  std::string whole_seam_mask = game_dir + "/seam_file.png";
 
   std::vector<SpatialTiff> positions{get_geo_tiff(mapping_0_pos), get_geo_tiff(mapping_1_pos)};
   positions = normalize(std::move(positions));
+
+  cv::Mat img1_col = cv::imread(mapping_0_x, cv::IMREAD_ANYDEPTH);
+  cv::Mat img1_row = cv::imread(mapping_0_y, cv::IMREAD_ANYDEPTH);
+  cv::Mat img2_col = cv::imread(mapping_1_x, cv::IMREAD_ANYDEPTH);
+  cv::Mat img2_row = cv::imread(mapping_1_y, cv::IMREAD_ANYDEPTH);
+  cv::Mat whole_seam_mask_image = cv::imread(whole_seam_mask, cv::IMREAD_ANYDEPTH);
 
   // Normalize
 
