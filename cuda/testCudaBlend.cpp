@@ -305,7 +305,12 @@ int main(int argc, char** argv) {
   cudaStreamCreate(&stream);
 
   // Configurable parameter: number of pyramid levels.
+  #ifdef TEGRA
+  // Lower compute, quick and dirty
+  int numLevels = 1;
+  #else
   int numLevels = 6;
+  #endif
   int width = img1.cols;
   int height = img1.rows;
 
