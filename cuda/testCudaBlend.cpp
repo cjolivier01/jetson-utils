@@ -620,9 +620,9 @@ int main(int argc, char** argv) {
 
   // Launch the remap kernel.
   remap_kernel(
-      (float *)cudaImage1Float.data(),
-      cudaImage1Float.width(),
-      cudaImage1Float.height(),
+      (float *)sampleImage1.data(),
+      sampleImage1.width(),
+      sampleImage1.height(),
       (float *)cudaRemapped_1.data(),
       cudaRemapped_1.width(),
       cudaRemapped_1.height(),
@@ -634,8 +634,8 @@ int main(int argc, char** argv) {
 
   cudaDeviceSynchronize();
 
-  // auto disp = cudaRemapped_1.download();
-  auto disp = sampleImage1.download();
+  auto disp = cudaRemapped_1.download();
+  //auto disp = sampleImage1.download();
   disp.convertTo(disp, CV_8UC3, 255.0);
   cv::imshow("remapped_1", disp);
   cv::waitKey(0);
