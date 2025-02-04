@@ -404,6 +404,7 @@ int main(int argc, char** argv) {
   std::string mapping_1_y = game_dir + "/mapping_0001_y.tif";
   std::string whole_seam_mask = game_dir + "/seam_file.png";
 
+  // Normalize
   std::vector<SpatialTiff> positions{get_geo_tiff(mapping_0_pos), get_geo_tiff(mapping_1_pos)};
   positions = normalize(std::move(positions));
 
@@ -413,7 +414,10 @@ int main(int argc, char** argv) {
   cv::Mat img2_row = cv::imread(mapping_1_y, cv::IMREAD_ANYDEPTH);
   cv::Mat whole_seam_mask_image = cv::imread(whole_seam_mask, cv::IMREAD_ANYDEPTH);
 
-  // Normalize
+  // Compute canvas size
+  const size_t canvas_width = std::max(positions[0].xpos + img1_col.cols, positions[1].xpos + img2_col.cols);
+  const size_t canvas_height = std::max(positions[0].ypos + img1_col.rows, positions[1].ypos + img2_col.rows);
+  std::cout << "Canvas size: " << canvas_width << " x " << canvas_height << std::endl;
 
   // assert(false);
   //  Load the two images (in color).
