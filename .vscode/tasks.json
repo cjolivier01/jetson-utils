@@ -11,7 +11,7 @@
       ],
       "group": {
         "kind": "build",
-        "isDefault": false,
+        "isDefault": true,
       },
       "options": {
         "cwd": "${workspaceRoot}",

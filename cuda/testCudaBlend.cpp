@@ -1,10 +1,57 @@
-#include <cuda_runtime.h>
-
 #include <opencv2/opencv.hpp>
-#include <cassert>
-#include <iostream>
 
 #include "cudaBlend.h"
+#include "glDisplay.h"
+#include "imageFormat.h"
+#include "videoOutput.h"
+
+#include <cassert>
+#include <cmath>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <mutex>
+
+#include <cuda_runtime.h>
+
+struct CudaSurface {
+  CudaSurface(int w, int h, imageFormat format, void* data)
+      : width(w), height(h), image_format(format), dataptr(data) {}
+  int width{0};
+  int height{0};
+  void* dataptr{nullptr};
+  imageFormat image_format;
+};
+
+class RenderSet {
+ public:
+  void render(const std::string& name, CudaSurface& surface, cudaStream_t stream) {
+    get_video_output(name, surface.width, surface.height)
+        ->Render(surface.dataptr, surface.width, surface.height, surface.image_format, stream);
+  }
+
+ private:
+  static std::unique_ptr<glDisplay> create_video_output(const std::string& name, int width, int height) {
+    videoOptions vo;
+    vo.width = width;
+    vo.height = height;
+    auto video_output = std::unique_ptr<glDisplay>(glDisplay::Create(vo));
+    video_output->SetTitle(name.c_str());
+    return video_output;
+  }
+
+  videoOutput* get_video_output(const std::string& name, int width, int height) {
+    std::unique_lock lk(mu_);
+    auto found = video_outputs_.find(name);
+    if (found == video_outputs_.end()) {
+      found = video_outputs_.emplace(name, create_video_output(name, width, height)).first;
+    }
+    return found->second.get();
+  }
+
+  std::mutex mu_;
+  std::map<std::string, std::unique_ptr<glDisplay>> video_outputs_;
+};
 
 class CudaMat {
  private:
@@ -46,6 +93,52 @@ void test_remapping();
 //                                const float* mask, float* output, int imageWidth,
 //                                int imageHeight, int numLevels);
 
+cv::Mat load_seam_mask(const std::string& filename) {
+  cv::Mat seam_mask = cv::imread(filename, cv::IMREAD_ANYDEPTH);
+  if (!seam_mask.empty()) {
+    double minVal, maxVal;
+    cv::Point minLoc, maxLoc;
+
+    // Get the minimum and maximum values and their locations
+    cv::minMaxLoc(seam_mask, &minVal, &maxVal, &minLoc, &maxLoc);
+
+    // Create masks for min and max values
+    cv::Mat minMask = (seam_mask == minVal); // Mask for min value
+    cv::Mat maxMask = (seam_mask == maxVal); // Mask for max value
+
+    // Set all min values to 0 and max values to 1
+    seam_mask.setTo(0, minMask); // Set min value locations to 0
+    seam_mask.setTo(1, maxMask); // Set max value locations to 1
+  }
+  return seam_mask;
+}
+
+cv::Mat load_position_mask(const std::string& filename, double* minVal, double* maxVal) {
+  cv::Mat pos_mask = cv::imread(filename, cv::IMREAD_ANYDEPTH);
+  if (!pos_mask.empty()) {
+    if (minVal || maxVal) {
+      cv::Point minLoc, maxLoc;
+      // Get the minimum and maximum values and their locations
+      double min, max;
+      cv::minMaxLoc(pos_mask, &min, &max, &minLoc, &maxLoc);
+      if (minVal) {
+        *minVal = min;
+      }
+      if (maxVal) {
+        *maxVal = max;
+      }
+    }
+  } else {
+    if (minVal) {
+      *minVal = std::nan("");
+    }
+    if (maxVal) {
+      *maxVal = std::nan("");
+    }
+  }
+  return pos_mask;
+}
+
 int main(int argc, char** argv) {
   // Usage check.
   if (argc < 4) {
@@ -56,21 +149,7 @@ int main(int argc, char** argv) {
   //  Load the two images (in color).
   cv::Mat img1 = cv::imread(argv[1], cv::IMREAD_COLOR);
   cv::Mat img2 = cv::imread(argv[2], cv::IMREAD_COLOR);
-  cv::Mat seam_mask = cv::imread(argv[3], cv::IMREAD_ANYDEPTH);
-
-  double minVal, maxVal;
-  cv::Point minLoc, maxLoc;
-
-  // Get the minimum and maximum values and their locations
-  cv::minMaxLoc(seam_mask, &minVal, &maxVal, &minLoc, &maxLoc);
-
-  // Create masks for min and max values
-  cv::Mat minMask = (seam_mask == minVal); // Mask for min value
-  cv::Mat maxMask = (seam_mask == maxVal); // Mask for max value
-
-  // Set all min values to 0 and max values to 1
-  seam_mask.setTo(0, minMask); // Set min value locations to 0
-  seam_mask.setTo(1, maxMask); // Set max value locations to 1
+  cv::Mat seam_mask = load_seam_mask(argv[3]);
 
   if (img1.empty() || img2.empty()) {
     std::cerr << "Error loading images!" << std::endl;
