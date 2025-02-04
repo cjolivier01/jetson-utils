@@ -66,6 +66,7 @@ class CudaMat {
   void* d_data{nullptr};
   size_t size;
   int rows_, cols_, type_;
+  int batch_size_{1};
 
  public:
   CudaMat(const cv::Mat& mat) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
@@ -73,6 +74,23 @@ class CudaMat {
     cudaMalloc(&d_data, size);
     assert(mat.isContinuous());
     cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
+  }
+
+  CudaMat(const std::vector<cv::Mat>& mat_batch) : batch_size_(mat_batch.size()) {
+    assert(batch_size_);
+    const cv::Mat& first = mat_batch.at(0);
+    rows_ = first.rows;
+    cols_first.cols;
+    type_ = first.type();
+    const size_t size_each = first.total() * first.elemSize();
+    const size_t size_total = size_each * batch_size_;
+    cudaMalloc(&d_data, size_total);
+    uint8_t *p = (uint8_t *)d_data;
+    for (const cv::Mat& mat : mat_batch) {
+      assert(mat.isContinuous());
+      cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
+      p += size_each;
+    }
   }
 
   ~CudaMat() {
@@ -103,6 +121,9 @@ class CudaMat {
   }
   constexpr int type() const {
     return type_;
+  }
+  constexpr int batch_size() cosnt {
+    return batch_size_;
   }
 };
 
