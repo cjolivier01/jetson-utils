@@ -497,7 +497,7 @@ int main(int argc, char** argv) {
   assert(!sample_img_right.empty());
 
   sample_img_left.convertTo(sample_img_left, CV_32FC3, 1.0 / 255.0);
-  sample_img_right.convertTo(sample_img_left, CV_32FC3, 1.0 / 255.0);
+  sample_img_right.convertTo(sample_img_right, CV_32FC3, 1.0 / 255.0);
 
   // Compute canvas size
   const size_t canvas_width = std::max(positions[0].xpos + img1_col.cols, positions[1].xpos + img2_col.cols);
@@ -598,7 +598,7 @@ int main(int argc, char** argv) {
   CudaMat remap_2_x(img2_col), remap_2_y(img2_row);
 
   cv::Mat remapped_1(img1_col.size(), CV_32FC3);
-  cv::Mat remapped_2(img1_col.size(), CV_32FC3);
+  cv::Mat remapped_2(img2_col.size(), CV_32FC3);
   CudaMat cudaRemapped_1(remapped_1, /*copy=*/false);
   CudaMat cudaRemapped_2(remapped_2, /*copy=*/false);
 
@@ -620,10 +620,10 @@ int main(int argc, char** argv) {
 
   // Launch the remap kernel.
   remap_kernel(
-      (float *)sampleImage1.data(),
+      (float*)sampleImage1.data(),
       sampleImage1.width(),
       sampleImage1.height(),
-      (float *)cudaRemapped_1.data(),
+      (float*)cudaRemapped_1.data(),
       cudaRemapped_1.width(),
       cudaRemapped_1.height(),
       (uint16_t*)remap_1_x.data(),
@@ -632,14 +632,27 @@ int main(int argc, char** argv) {
       defaultG,
       defaultB);
 
-  cudaDeviceSynchronize();
+  remap_kernel(
+      (float*)sampleImage2.data(),
+      sampleImage2.width(),
+      sampleImage2.height(),
+      (float*)cudaRemapped_2.data(),
+      cudaRemapped_2.width(),
+      cudaRemapped_2.height(),
+      (uint16_t*)remap_2_x.data(),
+      (uint16_t*)remap_2_y.data(),
+      defaultR,
+      defaultG,
+      defaultB);
 
-  auto disp = cudaRemapped_1.download();
-  //auto disp = sampleImage1.download();
-  disp.convertTo(disp, CV_8UC3, 255.0);
-  cv::imshow("remapped_1", disp);
-  cv::waitKey(0);
+  // cudaDeviceSynchronize();
 
+  // auto disp = cudaRemapped_1.download();
+  // auto disp = cudaRemapped_2.download();
+  // auto disp = sampleImage2.download();
+  // disp.convertTo(disp, CV_8UC3, 255.0);
+  // cv::imshow("remapped", disp);
+  // cv::waitKey(0);
 
   // cv::imshow("img1", img1_float);
   // cv::waitKey(0);
@@ -674,6 +687,33 @@ int main(int argc, char** argv) {
 
   size_t frame_count = 100;
   for (size_t i = 0; i < frame_count; ++i) {
+#if 1
+    remap_kernel(
+        (float*)sampleImage1.data(),
+        sampleImage1.width(),
+        sampleImage1.height(),
+        (float*)cudaRemapped_1.data(),
+        cudaRemapped_1.width(),
+        cudaRemapped_1.height(),
+        (uint16_t*)remap_1_x.data(),
+        (uint16_t*)remap_1_y.data(),
+        defaultR,
+        defaultG,
+        defaultB);
+    remap_kernel(
+        (float*)sampleImage2.data(),
+        sampleImage2.width(),
+        sampleImage2.height(),
+        (float*)cudaRemapped_2.data(),
+        cudaRemapped_2.width(),
+        cudaRemapped_2.height(),
+        (uint16_t*)remap_2_x.data(),
+        (uint16_t*)remap_2_y.data(),
+        defaultR,
+        defaultG,
+        defaultB);
+#endif
+
     cudaBatchedLaplacianBlendWithContext(
         (const float*)cudaImage1Float.data(),
         (const float*)cudaImage2Float.data(),
