@@ -190,8 +190,8 @@ cv::Mat load_seam_mask(const std::string& filename) {
     seam_mask.setTo(1, minMask); // Set max value locations to 1
 
     // cv::minMaxLoc(seam_mask, &minVal, &maxVal, &minLoc, &maxLoc);
-    //printf("x=%d, m=%f\n", x, m);show_image("seam_mask", seam_mask * 255);
-    //usleep(0);
+    // printf("x=%d, m=%f\n", x, m);show_image("seam_mask", seam_mask * 255);
+    // usleep(0);
   }
   return seam_mask;
 }
@@ -305,13 +305,12 @@ int main(int argc, char** argv) {
   cudaStreamCreate(&stream);
 
   // Configurable parameter: number of pyramid levels.
-  int numLevels = 1;
+  int numLevels = 6;
   int width = img1.cols;
   int height = img1.rows;
 
-  CudaLaplacianBlendContext context(width, height, numLevels);
-  // CudaBatchLaplacianBlendContext context(width, height, numLevels,
-  // /*batch_size=*/1);
+  // CudaLaplacianBlendContext context(width, height, numLevels);
+  CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
 
   CudaMat cudaImage1Float(img1_float);
   CudaMat cudaImage2Float(img2_float);
@@ -336,33 +335,37 @@ int main(int argc, char** argv) {
   // It is assumed that blendImages copies data to/from device memory,
   // launches the appropriate kernels, and returns the blended image.
 
-  // auto cu_err = cudaBatchedLaplacianBlendWithContext(
-  //     (const float*)cudaImage1Float.data(),
-  //     (const float*)cudaImage2Float.data(), (const float*)cudaMask.data(),
-  //     (float*)cudaBlendedFloat.data(), context);
-  auto cu_err = cudaLaplacianBlendWithContext(
+  auto cu_err = cudaBatchedLaplacianBlendWithContext(
       (const float*)cudaImage1Float.data(),
       (const float*)cudaImage2Float.data(),
       (const float*)cudaMask.data(),
       (float*)cudaBlendedFloat.data(),
       context);
+  // auto cu_err = cudaLaplacianBlendWithContext(
+  //     (const float*)cudaImage1Float.data(),
+  //     (const float*)cudaImage2Float.data(),
+  //     (const float*)cudaMask.data(),
+  //     (float*)cudaBlendedFloat.data(),
+  //     context);
 
 #if 0 /* perf test */
-  auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                      std::chrono::system_clock::now().time_since_epoch())
-                      .count();
+  auto start_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+          .count();
 
   size_t frame_count = 1000;
   for (size_t i = 0; i < frame_count; ++i) {
-    cudaBatchedLaplacianBlendWithContext((const float*)cudaImage1Float.data(),
-                                  (const float*)cudaImage2Float.data(),
-                                  (const float*)cudaMask.data(),
-                                  (float*)cudaBlendedFloat.data(), context);
+    cudaBatchedLaplacianBlendWithContext(
+        (const float*)cudaImage1Float.data(),
+        (const float*)cudaImage2Float.data(),
+        (const float*)cudaMask.data(),
+        (float*)cudaBlendedFloat.data(),
+        context);
   }
 
-  auto stop_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                     std::chrono::system_clock::now().time_since_epoch())
-                     .count();
+  auto stop_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+          .count();
   float ms = stop_ms - start_ms;
   float sec_per_frame = (ms / 1000) / frame_count;
   std::cout << "Blend speed: " << (1.0 / sec_per_frame) << "fps" << std::endl;
@@ -377,7 +380,7 @@ int main(int argc, char** argv) {
 
   blended_float.convertTo(blended, CV_8UC3, 255.0);
 
-  show_image("blended_float", blended_float);
+  //show_image("blended_float", blended_float);
 
   // Save the final blended image.
   if (!cv::imwrite(argv[4], blended)) {
