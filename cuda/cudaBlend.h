@@ -53,8 +53,7 @@ struct CudaLaplacianBlendContext {
 // batch)
 // =============================================================================
 struct CudaBatchLaplacianBlendContext {
-  CudaBatchLaplacianBlendContext(int image_width, int image_height,
-                                 int num_levels, int batch_size)
+  CudaBatchLaplacianBlendContext(int image_width, int image_height, int num_levels, int batch_size)
       : numLevels(num_levels),
         imageWidth(image_width),
         imageHeight(image_height),
@@ -101,18 +100,28 @@ struct CudaBatchLaplacianBlendContext {
   bool initialized{false};
 };
 
-cudaError_t cudaLaplacianBlend(const float* h_image1, const float* h_image2,
-                               const float* h_mask, float* h_output,
-                               int imageWidth, int imageHeight, int numLevels);
+cudaError_t cudaLaplacianBlend(
+    const float* h_image1,
+    const float* h_image2,
+    const float* h_mask,
+    float* h_output,
+    int imageWidth,
+    int imageHeight,
+    int numLevels);
 
-cudaError_t cudaLaplacianBlendWithContext(const float* d_image1,
-                                          const float* d_image2,
-                                          const float* d_mask, float* d_output,
-                                          CudaLaplacianBlendContext& context);
+cudaError_t cudaLaplacianBlendWithContext(
+    const float* d_image1,
+    const float* d_image2,
+    const float* d_mask,
+    float* d_output,
+    CudaLaplacianBlendContext& context);
 
 cudaError_t cudaBatchedLaplacianBlendWithContext(
-    const float* d_image1, const float* d_image2, const float* d_mask,
-    float* d_output, CudaBatchLaplacianBlendContext& context);
+    const float* d_image1,
+    const float* d_image2,
+    const float* d_mask,
+    float* d_output,
+    CudaBatchLaplacianBlendContext& context);
 
 /**
  * @brief Remaps a source image to a destination image using provided mapping
@@ -144,7 +153,29 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
  * @param defG  Default green channel value for pixels mapped out-of-range.
  * @param defB  Default blue channel value for pixels mapped out-of-range.
  */
-cudaError_t remap_kernel(const float* src, int srcW, int srcH, float* dest,
-                         int destW, int destH, const unsigned short* mapX,
-                         const unsigned short* mapY, float defR, float defG,
-                         float defB);
+cudaError_t remap_kernel(
+    const float* src,
+    int srcW,
+    int srcH,
+    float* dest,
+    int destW,
+    int destH,
+    const unsigned short* mapX,
+    const unsigned short* mapY,
+    float defR,
+    float defG,
+    float defB);
+
+cudaError_t batched_remap_kernel(
+    const float* d_src,
+    int srcW,
+    int srcH,
+    float* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    float defR,
+    float defG,
+    float defB,
+    int batchSize);

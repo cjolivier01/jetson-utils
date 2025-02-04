@@ -616,7 +616,7 @@ int main(int argc, char** argv) {
   float defaultR = 128.0f, defaultG = 128.0f, defaultB = 128.0f;
 
   // Launch the remap kernel.
-  remap_kernel(
+  batched_remap_kernel(
       (float*)sampleImage1.data(),
       sampleImage1.width(),
       sampleImage1.height(),
@@ -627,9 +627,10 @@ int main(int argc, char** argv) {
       (uint16_t*)remap_1_y.data(),
       defaultR,
       defaultG,
-      defaultB);
+      defaultB,
+      /*batchSize=*/1);
 
-  remap_kernel(
+  batched_remap_kernel(
       (float*)sampleImage2.data(),
       sampleImage2.width(),
       sampleImage2.height(),
@@ -640,13 +641,14 @@ int main(int argc, char** argv) {
       (uint16_t*)remap_2_y.data(),
       defaultR,
       defaultG,
-      defaultB);
+      defaultB,
+      /*batchSize=*/1);
 
   // cudaDeviceSynchronize();
 
   // auto disp = cudaRemapped_1.download();
   // auto disp = cudaRemapped_2.download();
-  // auto disp = sampleImage2.download();
+  // // auto disp = sampleImage2.download();
   // disp.convertTo(disp, CV_8UC3, 255.0);
   // cv::imshow("remapped", disp);
   // cv::waitKey(0);
@@ -677,7 +679,7 @@ int main(int argc, char** argv) {
   //     (float*)cudaBlendedFloat.data(),
   //     context);
 
-#if 1 /* perf test */
+#if 0 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
@@ -685,7 +687,7 @@ int main(int argc, char** argv) {
   size_t frame_count = 100;
   for (size_t i = 0; i < frame_count; ++i) {
 #if 1
-    remap_kernel(
+    batched_remap_kernel(
         (float*)sampleImage1.data(),
         sampleImage1.width(),
         sampleImage1.height(),
@@ -696,8 +698,9 @@ int main(int argc, char** argv) {
         (uint16_t*)remap_1_y.data(),
         defaultR,
         defaultG,
-        defaultB);
-    remap_kernel(
+        defaultB,
+        /*batchSize=*/1);
+    batched_remap_kernel(
         (float*)sampleImage2.data(),
         sampleImage2.width(),
         sampleImage2.height(),
@@ -708,7 +711,8 @@ int main(int argc, char** argv) {
         (uint16_t*)remap_2_y.data(),
         defaultR,
         defaultG,
-        defaultB);
+        defaultB,
+        /*batchSize=*/1);
 #endif
 
     cudaBatchedLaplacianBlendWithContext(
