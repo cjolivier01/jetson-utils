@@ -582,6 +582,12 @@ int main(int argc, char** argv) {
   // CudaLaplacianBlendContext context(width, height, numLevels);
   CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
 
+  CudaMat remap_1_x(img1_col), remap_1_y(img1_row);
+  CudaMat remap_2_x(img2_col), remap_2_y(img2_row);
+
+  CudaMat remapped_1(img1_col, /*copy=*/false);
+  CudaMat remapped_2(img2_col, /*copy=*/false);
+
   CudaMat cudaImage1Float(img1_float);
   CudaMat cudaImage2Float(img2_float);
   CudaMat cudaMask(seam_mask);
@@ -591,6 +597,8 @@ int main(int argc, char** argv) {
   CudaMat cudaBlendedFloat(blended_float);
 
   cudaDeviceSynchronize();
+
+
 
   // cv::imshow("img1", img1_float);
   // cv::waitKey(0);
