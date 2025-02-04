@@ -763,9 +763,9 @@ int main(int argc, char** argv) {
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
-  int x1 = positions[0].xpos;
+  //int x1 = positions[0].xpos;
   int y1 = positions[0].ypos;
-  int x2 = positions[1].xpos;
+  //int x2 = positions[1].xpos;
   int y2 = positions[1].ypos;
 
   SimpleFullResult full_result = simple_make_full(
@@ -780,7 +780,7 @@ int main(int argc, char** argv) {
       0,
       0,
       // Offsets for image 1
-      x1,
+      mask_converter._remapper_1.xpos,
       y1,
       // Image 2 (float image)
       (const float*)blending_2.data(),
@@ -793,7 +793,7 @@ int main(int argc, char** argv) {
       0,
       0,
       // Offsets for image 2
-      x2,
+      mask_converter._remapper_2.xpos,
       y2,
       // Canvas dimensions
       cudaBlendSeam.width(),
@@ -803,7 +803,7 @@ int main(int argc, char** argv) {
       (float*)cudaFull2.data(),
       /*d_full_mask_2=*/nullptr,
       // If true, adjust the origins so that one image is anchored at (0,0)
-      /*adjust_origin=*/true,
+      /*adjust_origin=*/false,
       // Optional CUDA stream (default stream if not provided)
       stream);
 
