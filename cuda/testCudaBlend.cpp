@@ -131,8 +131,16 @@ class CudaMat {
   size_t size;
   int rows_, cols_, type_;
   int batch_size_{1};
+  int elemsize_{0};
+  int channels_{0};
 
  public:
+  CudaMat(int w, int h, int elemsize, int channels, int batch_size)
+      : rows_(h), cols_(w), batch_size_(batch_size), elemsize_(elemsize), channels_(channels) {
+    // size = mat.total() * mat.elemSize();
+    size_t total_size = rows_ * cols_ * elemsize_ * channels_ * batch_size_;
+    cudaMalloc(&d_data, total_size);
+  }
   CudaMat(const cv::Mat& mat, bool copy = true) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
@@ -178,9 +186,9 @@ class CudaMat {
   const void* data() const {
     return d_data;
   }
-  size_t bytes() const {
-    return size;
-  }
+  // size_t bytes() const {
+  //   return size;
+  // }
   constexpr int width() const {
     return cols_;
   }
@@ -188,6 +196,7 @@ class CudaMat {
     return rows_;
   }
   constexpr int type() const {
+    assert(type_);
     return type_;
   }
   constexpr int batch_size() const {
@@ -400,7 +409,7 @@ class MaskConverter {
   std::vector<int> _padded_blended_tlbr;
 
   // Constructor (if needed)
-  MaskConverter() : _minimize_blend(false), _overlap_pad(0), _x1(0), _y1(0), _x2(0), _y2(0), _overlapping_width(0) {}
+  MaskConverter() : _minimize_blend(false), _overlap_pad(128), _x1(0), _y1(0), _x2(0), _y2(0), _overlapping_width(0) {}
 
   // This function updates blending parameters if _minimize_blend is true.
   void updateMinimizeBlend() {
@@ -528,33 +537,72 @@ int main(int argc, char** argv) {
   const size_t canvas_height = std::max(positions[0].ypos + img1_col.rows, positions[1].ypos + img2_col.rows);
   std::cout << "Canvas size: " << canvas_width << " x " << canvas_height << std::endl;
 
-  // compute overlap size
-  // if self.minimize_blend_:
-  //     self._x1, self._y1, self._x2, self._y2 = (
-  //         self.canvas_info_.positions[0].x,
-  //         self.canvas_info_.positions[0].y,
-  //         self.canvas_info_.positions[1].x,
-  //         self.canvas_info_.positions[1].y,
-  //     )
+  //
+  // MaskConverter
+  //
+  MaskConverter mask_converter;
+  mask_converter._minimize_blend = true;
+  mask_converter._canvas_info.width = canvas_width;
+  mask_converter._canvas_info.height = canvas_height;
+  mask_converter._canvas_info.positions.emplace_back(cv::Point(positions[0].xpos, positions[0].ypos));
+  mask_converter._canvas_info.positions.emplace_back(cv::Point(positions[1].xpos, positions[1].ypos));
+  mask_converter._remapper_1.width = img1_col.cols;
+  mask_converter._remapper_1.height = img1_col.rows;
+  mask_converter._remapper_2.width = img2_col.cols;
+  mask_converter._remapper_2.height = img2_col.rows;
 
-  //     self._remapper_1.xpos = self._x1
-  //     self._remapper_2.xpos = self._x1 + self._overlap_pad  # start overlapping right away
-  //     width_1 = self._remapper_1.width
-  //     self._overlapping_width = width_1 - self._x2
-  //     assert width_1 > self._x2
-  //     # seam tensor box (box we'll be blending)
-  //     self._padded_blended_tlbr = [
-  //         self._x2 - self._overlap_pad,  # x1
-  //         max(0, min(self._y1, self._y2) - self._overlap_pad),  # y1
-  //         width_1 + self._overlap_pad,  # x2
-  //         min(
-  //             self.canvas_info_.height,
-  //             max(self._y1 + self._remapper_1.height, self._y2 + self._remapper_2.height)
-  //             + self._overlap_pad,
-  //         ),  # y2
-  //     ]
-  //     assert self._x2 - self._overlap_pad >= 0
-  //     assert width_1 + self._overlap_pad <= self.canvas_info_.width
+  mask_converter.updateMinimizeBlend();
+
+  // partial_1 = remapped_image_1[:, :, :, : self._x2 + self._overlap_pad]
+  // partial_2 = remapped_image_2[:, :, :, self._overlapping_width - self._overlap_pad :]
+
+  // assert remapped_image_1.shape[-2:] == alpha_mask_1.shape
+  // remapped_image_1 = remapped_image_1[
+  //     :, :, :, self._x2 - self._overlap_pad : # self._remapper_1.width
+  // ]
+  // alpha_mask_1 = alpha_mask_1[:, self._x2 - self._overlap_pad :
+  //     # self._remapper_1.width
+  // ]
+  // assert remapped_image_1.shape[-2:] == alpha_mask_1.shape
+
+  // assert remapped_image_2.shape[-2:] == alpha_mask_2.shape
+  // remapped_image_2 = remapped_image_2[
+  //     :, :, :, : self._overlapping_width + self._overlap_pad
+  // ]
+  // alpha_mask_2 = alpha_mask_2[:, : self._overlapping_width + self._overlap_pad]
+
+  // Left side, unblended
+  CudaMat partial_1(
+      mask_converter._x2 + mask_converter._overlap_pad,
+      mask_converter._remapper_1.height,
+      sizeof(float),
+      /*channels=*/3,
+      /*batch_size=*/1);
+
+  CudaMat blending_1(
+      mask_converter._remapper_1.width - (mask_converter._x2 - mask_converter._overlap_pad),
+      mask_converter._remapper_1.height,
+      sizeof(float),
+      /*channels=*/3,
+      /*batch_size=*/1);
+
+  // Right side, unblended
+  CudaMat partial_2(
+      mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
+      mask_converter._remapper_2.height,
+      sizeof(float),
+      /*channels=*/3,
+      /*batch_size=*/1);
+
+  CudaMat blending_2(
+      mask_converter._overlapping_width + mask_converter._overlap_pad,
+      mask_converter._remapper_1.height,
+      sizeof(float),
+      /*channels=*/3,
+      /*batch_size=*/1);
+
+  assert(blending_1.width() == blending_2.width());
+  assert(blending_1.height() == blending_2.height());
 
   // assert(false);
   //  Load the two images (in color).
