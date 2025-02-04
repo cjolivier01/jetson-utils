@@ -113,6 +113,10 @@ __global__ void gpuCrop( T* input, T* output, int offsetX, int offsetY,
 
 	const int in_x = out_x + offsetX;
 	const int in_y = out_y + offsetY;
+  
+  // printf("%f\n", input[in_y * inWidth + in_x]);
+
+  auto val = input[in_y * inWidth + in_x];
 
 	output[out_y * outWidth + out_x] = input[in_y * inWidth + in_x];
 }

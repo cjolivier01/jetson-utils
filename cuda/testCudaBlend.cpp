@@ -621,6 +621,7 @@ int main(int argc, char** argv) {
   // alpha_mask_2 = alpha_mask_2[:, : self._overlapping_width + self._overlap_pad]
 
   // Left side, unblended
+  // I think we can just copy from the original instead of this partial stuff
   CudaMat partial_1(
       mask_converter._x2 + mask_converter._overlap_pad,
       mask_converter._remapper_1.height,
@@ -628,13 +629,13 @@ int main(int argc, char** argv) {
       /*channels=*/3,
       /*batch_size=*/1);
 
-  CudaMat blending_1(
-      mask_converter._remapper_1.width - (mask_converter._x2 - mask_converter._overlap_pad),
-      mask_converter._remapper_1.height,
-      sizeof(float),
-      /*channels=*/3,
-      /*batch_size=*/1);
+  cv::Mat blmat_1t(
+      cv::Size{mask_converter._remapper_1.width - (mask_converter._x2 - mask_converter._overlap_pad),
+       mask_converter._remapper_1.height},
+      CV_32FC3);
+  CudaMat blending_1(blmat_1t, /*copy=*/false);
 
+  // I think we can just copy from the original instead of this partial stuff
   // Right side, unblended
   CudaMat partial_2(
       mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
@@ -705,35 +706,44 @@ int main(int argc, char** argv) {
       defaultB,
       /*batchSize=*/1);
 
-  // cudaCrop(
-  //     cudaRemapped_1.data(),
-  //     partial_1.data(),
-  //     {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_1.height()},
-  //     cudaRemapped_1.width(),
-  //     cudaRemapped_1.height(),
-  //     imageFormat::IMAGE_RGBA32F,
-  //     stream);
-
-  batched_remap_kernel(
-      (float*)sampleImage2.data(),
-      sampleImage2.width(),
-      sampleImage2.height(),
-      (float*)cudaRemapped_2.data(),
-      cudaRemapped_2.width(),
-      cudaRemapped_2.height(),
-      (uint16_t*)remap_2_x.data(),
-      (uint16_t*)remap_2_y.data(),
-      defaultR,
-      defaultG,
-      defaultB,
-      /*batchSize=*/1);
+  int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_1.height()};
+  int4 roi_blend_1 = {
+      mask_converter._x2 - mask_converter._overlap_pad, 0, cudaRemapped_1.width(), cudaRemapped_1.height()};
 
   cudaDeviceSynchronize();
 
-  auto disp = partial_1.download(CV_32FC3);
+  assert((roi_blend_1.z - roi_blend_1.x) == blending_1.width());
+  assert((roi_blend_1.w - roi_blend_1.y) == blending_1.height());
+  cudaCrop(
+      cudaRemapped_1.data(),
+      blending_1.data(),
+      roi_blend_1,
+      cudaRemapped_1.width(),
+      cudaRemapped_1.height(),
+      imageFormat::IMAGE_RGB32F,
+      stream);
+
+  // batched_remap_kernel(
+  //     (float*)sampleImage2.data(),
+  //     sampleImage2.width(),
+  //     sampleImage2.height(),
+  //     (float*)cudaRemapped_2.data(),
+  //     cudaRemapped_2.width(),
+  //     cudaRemapped_2.height(),
+  //     (uint16_t*)remap_2_x.data(),
+  //     (uint16_t*)remap_2_y.data(),
+  //     defaultR,
+  //     defaultG,
+  //     defaultB,
+  //     /*batchSize=*/1);
+
+  cudaStreamSynchronize(stream);
+  cudaDeviceSynchronize();
+
+  auto disp = blending_1.download(CV_32FC3);
   // auto disp = cudaRemapped_1.download();
-  // auto disp = cudaRemapped_2.download();
-  // // auto disp = sampleImage2.download();
+  //  auto disp = cudaRemapped_2.download();
+  //  // auto disp = sampleImage2.download();
   disp.convertTo(disp, CV_8UC3, 255.0);
   cv::imshow("remapped", disp);
   cv::waitKey(0);
