@@ -700,9 +700,18 @@ int main(int argc, char** argv) {
       defaultB,
       /*batchSize=*/1);
 
-  int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_1.height()};
-  int4 roi_blend_1 = {
+  const cv::Size partial_size_1(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height);
+  const int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_size_1.height};
+  const int4 roi_blend_1 = {
       mask_converter._x2 - mask_converter._overlap_pad, 0, cudaRemapped_1.width(), cudaRemapped_1.height()};
+
+  const cv::Size partial_size_2{
+      mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
+      mask_converter._remapper_2.height};
+  const int4 roi_partial_2 = {
+      mask_converter._overlapping_width - mask_converter._overlap_pad, 0, partial_size_2.width, partial_size_2.height};
+  const int4 roi_blend_2 = {
+      0, 0, mask_converter._overlapping_width + mask_converter._overlap_pad, cudaRemapped_2.height()};
 
   cudaDeviceSynchronize();
 
@@ -717,24 +726,36 @@ int main(int argc, char** argv) {
       imageFormat::IMAGE_RGB32F,
       stream);
 
-  // batched_remap_kernel(
-  //     (float*)sampleImage2.data(),
-  //     sampleImage2.width(),
-  //     sampleImage2.height(),
-  //     (float*)cudaRemapped_2.data(),
-  //     cudaRemapped_2.width(),
-  //     cudaRemapped_2.height(),
-  //     (uint16_t*)remap_2_x.data(),
-  //     (uint16_t*)remap_2_y.data(),
-  //     defaultR,
-  //     defaultG,
-  //     defaultB,
-  //     /*batchSize=*/1);
+  batched_remap_kernel(
+      (float*)sampleImage2.data(),
+      sampleImage2.width(),
+      sampleImage2.height(),
+      (float*)cudaRemapped_2.data(),
+      cudaRemapped_2.width(),
+      cudaRemapped_2.height(),
+      (uint16_t*)remap_2_x.data(),
+      (uint16_t*)remap_2_y.data(),
+      defaultR,
+      defaultG,
+      defaultB,
+      /*batchSize=*/1);
+
+  assert((roi_blend_2.z - roi_blend_2.x) == blending_2.width());
+  assert((roi_blend_2.w - roi_blend_2.y) == blending_2.height());
+  cudaCrop(
+      cudaRemapped_2.data(),
+      blending_2.data(),
+      roi_blend_2,
+      cudaRemapped_2.width(),
+      cudaRemapped_2.height(),
+      imageFormat::IMAGE_RGB32F,
+      stream);
 
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
-  auto disp = blending_1.download();
+  // auto disp = blending_1.download();
+  auto disp = blending_2.download();
   // auto disp = cudaRemapped_1.download();
   //  auto disp = cudaRemapped_2.download();
   //  // auto disp = sampleImage2.download();
