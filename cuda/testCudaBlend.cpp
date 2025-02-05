@@ -848,19 +848,19 @@ int main(int argc, char** argv) {
         stream);
 #endif
 
-    cudaStreamSynchronize(stream);
-    // auto disp = blending_1.download();
-    // auto disp = cudaBlendSeam.download();
+    // cudaStreamSynchronize(stream);
+    //  auto disp = blending_1.download();
+    //  auto disp = cudaBlendSeam.download();
     auto disp = canvas.download();
-    // auto disp = cudaBlendedFull.download();
-    //  auto disp = cudaFull1.download();
-    //   auto disp = cudaFull2.download();
-    //   auto disp = blending_2.download();
-    //   auto disp = cudaRemapped_1->download();
-    // auto disp = cudaRemapped_2->download();
-    //   auto disp = sampleImage2.download();
-    //   auto disp = cudaBlendedFloat.download();
-    //   disp.convertTo(disp, CV_8UC3, 255.0);
+    //  auto disp = cudaBlendedFull.download();
+    //   auto disp = cudaFull1.download();
+    //    auto disp = cudaFull2.download();
+    //    auto disp = blending_2.download();
+    //    auto disp = cudaRemapped_1->download();
+    //  auto disp = cudaRemapped_2->download();
+    //    auto disp = sampleImage2.download();
+    //    auto disp = cudaBlendedFloat.download();
+    //    disp.convertTo(disp, CV_8UC3, 255.0);
     cv::imshow("image", disp);
     cv::waitKey(0);
 
@@ -870,17 +870,18 @@ int main(int argc, char** argv) {
   auto canvas_result = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
 
   cudaStreamSynchronize(stream);
-  cudaStreamDestroy(stream);
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
 
-  size_t frame_count = 100;
+  size_t frame_count = 1000;
   for (size_t i = 0; i < frame_count; ++i) {
+    canvas_result = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+    cudaStreamSynchronize(stream);
   }
 
   auto stop_ms =
@@ -890,6 +891,8 @@ int main(int argc, char** argv) {
   float sec_per_frame = (ms / 1000) / frame_count;
   std::cout << "Blend speed: " << (1.0 / sec_per_frame) << "fps" << std::endl;
 #endif
+
+  cudaStreamDestroy(stream);
 
   return cudaSuccess;
 }
