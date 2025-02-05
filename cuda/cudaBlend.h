@@ -34,14 +34,14 @@ struct CudaBatchLaplacianBlendContext {
 
   ~CudaBatchLaplacianBlendContext() {
     for (int level = 0; level < numLevels; level++) {
-      maybeCudaFree(d_gauss1[level]);
-      maybeCudaFree(d_gauss2[level]);
       maybeCudaFree(d_lap1[level]);
       maybeCudaFree(d_lap2[level]);
       maybeCudaFree(d_blend[level]);
       maybeCudaFree(d_resonstruct[level]);
       if (level) {
         // Level 0 is owned by user code (passed into the function each time)
+        maybeCudaFree(d_gauss1[level]);
+        maybeCudaFree(d_gauss2[level]);
         maybeCudaFree(d_maskPyr[level]);
       }
     }
