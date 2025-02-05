@@ -2,99 +2,71 @@
 #include <device_launch_parameters.h>
 #include "cudaRemap.h"
 
+// If you wish to support 16‐bit and bfloat16 types:
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
+
 namespace {
 
-/**
- * @brief Remap kernel for a single image.
- *
- * Computes the destination pixel coordinates and, using mapping arrays, copies the corresponding
- * pixel from the source image. If the mapped coordinates are out-of-bounds, a default color is used.
- *
- * @param src Pointer to the source image.
- * @param srcW Width of the source image.
- * @param srcH Height of the source image.
- * @param dest Pointer to the destination image.
- * @param destW Width of the destination image.
- * @param destH Height of the destination image.
- * @param mapX Pointer to the X-coordinate mapping array.
- * @param mapY Pointer to the Y-coordinate mapping array.
- * @param defR Default red component.
- * @param defG Default green component.
- * @param defB Default blue component.
- */
+//--------------------------------------------------------------------------
+// Templated remap kernel for a single image.
+//--------------------------------------------------------------------------
+template <typename T>
 __global__ void remapKernel(
-    const float* src,
+    const T* src,
     int srcW,
     int srcH,
-    float* dest,
+    T* dest,
     int destW,
     int destH,
     const unsigned short* mapX,
     const unsigned short* mapY,
-    float defR,
-    float defG,
-    float defB) {
+    T defR,
+    T defG,
+    T defB) {
   // Compute destination pixel coordinates.
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-  // Check destination bounds.
   if (x >= destW || y >= destH)
     return;
 
   // Compute the linear index for the destination pixel.
   int destIdx = y * destW + x;
 
-  // Retrieve mapping coordinates from unsigned short arrays and cast to int.
+  // Retrieve mapping coordinates (stored as unsigned short) and cast to int.
   int srcX = static_cast<int>(mapX[destIdx]);
   int srcY = static_cast<int>(mapY[destIdx]);
 
-  // Check if the mapping is within the source image bounds.
+  // Check bounds: if the mapped coordinates are in range, copy the pixel.
   if (srcX < srcW && srcY < srcH) {
-    // Compute index into the source array (3 floats per pixel).
     int srcIdx = (srcY * srcW + srcX) * 3;
     dest[destIdx * 3 + 0] = src[srcIdx + 0];
     dest[destIdx * 3 + 1] = src[srcIdx + 1];
     dest[destIdx * 3 + 2] = src[srcIdx + 2];
   } else {
-    // If out-of-range, set the destination pixel to the default color.
+    // Out-of-range: use the default color.
     dest[destIdx * 3 + 0] = defR;
     dest[destIdx * 3 + 1] = defG;
     dest[destIdx * 3 + 2] = defB;
   }
 }
 
-/**
- * @brief Batched remap kernel for RGB images.
- *
- * Processes each image in the batch. For each image, a mapping array is used to determine the
- * corresponding source pixel for each destination pixel. Out-of-bounds mappings use the default color.
- *
- * @param src Pointer to the batch of source images.
- * @param srcW Width of each source image.
- * @param srcH Height of each source image.
- * @param dest Pointer to the batch of destination images.
- * @param destW Width of each destination image.
- * @param destH Height of each destination image.
- * @param mapX Pointer to the batch of X-coordinate mapping arrays.
- * @param mapY Pointer to the batch of Y-coordinate mapping arrays.
- * @param defR Default red component.
- * @param defG Default green component.
- * @param defB Default blue component.
- * @param batchSize Number of images in the batch.
- */
+//--------------------------------------------------------------------------
+// Templated batched remap kernel for RGB images.
+//--------------------------------------------------------------------------
+template <typename T>
 __global__ void BatchedRemapKernel(
-    const float* src,
+    const T* src,
     int srcW,
     int srcH,
-    float* dest,
+    T* dest,
     int destW,
     int destH,
     const unsigned short* mapX,
     const unsigned short* mapY,
-    float defR,
-    float defG,
-    float defB,
+    T defR,
+    T defG,
+    T defB,
     int batchSize) {
   int b = blockIdx.z;
   if (b >= batchSize)
@@ -103,8 +75,10 @@ __global__ void BatchedRemapKernel(
   int srcImageSize = srcW * srcH * 3;
   int destImageSize = destW * destH * 3;
   int mapSize = destW * destH; // mapping arrays match destination size
-  const float* srcImage = src + b * srcImageSize;
-  float* destImage = dest + b * destImageSize;
+
+  // Get pointers to the b-th source image, destination image, and mapping arrays.
+  const T* srcImage = src + b * srcImageSize;
+  T* destImage = dest + b * destImageSize;
   const unsigned short* mapXImage = mapX + b * mapSize;
   const unsigned short* mapYImage = mapY + b * mapSize;
 
@@ -112,6 +86,7 @@ __global__ void BatchedRemapKernel(
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   if (x >= destW || y >= destH)
     return;
+
   int destIdx = y * destW + x;
   int srcX = static_cast<int>(mapXImage[destIdx]);
   int srcY = static_cast<int>(mapYImage[destIdx]);
@@ -129,26 +104,69 @@ __global__ void BatchedRemapKernel(
 
 } // namespace
 
-/**
- * @brief Remap a single image using mapping arrays.
- *
- * This host function launches the remapKernel on the default or specified CUDA stream.
- *
- * @param d_src Device pointer to the source image.
- * @param srcW Width of the source image.
- * @param srcH Height of the source image.
- * @param d_dest Device pointer to the destination image.
- * @param destW Width of the destination image.
- * @param destH Height of the destination image.
- * @param d_mapX Device pointer to the mapping array for X coordinates.
- * @param d_mapY Device pointer to the mapping array for Y coordinates.
- * @param defR Default red component (if mapping is out-of-range).
- * @param defG Default green component.
- * @param defB Default blue component.
- * @param stream CUDA stream to use for the kernel launch (default is 0).
- * @return cudaError_t The status returned by cudaGetLastError.
- */
+//--------------------------------------------------------------------------
+// Templated host functions
+//--------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Single-image remap host function.
+//------------------------------------------------------------------------------
+template <typename T>
 cudaError_t remap_kernel(
+    const T* d_src,
+    int srcW,
+    int srcH,
+    T* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    T defR,
+    T defG,
+    T defB,
+    cudaStream_t stream) {
+  // Define kernel launch configuration.
+  dim3 blockDim(16, 16);
+  dim3 gridDim((destW + blockDim.x - 1) / blockDim.x, (destH + blockDim.y - 1) / blockDim.y);
+
+  // Launch the remap kernel.
+  remapKernel<T>
+      <<<gridDim, blockDim, 0, stream>>>(d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY, defR, defG, defB);
+  return cudaGetLastError();
+}
+
+//------------------------------------------------------------------------------
+// Batched remap host function.
+//------------------------------------------------------------------------------
+template <typename T>
+cudaError_t batched_remap_kernel(
+    const T* d_src,
+    int srcW,
+    int srcH,
+    T* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    T defR,
+    T defG,
+    T defB,
+    int batchSize,
+    cudaStream_t stream) {
+  dim3 blockDim(16, 16, 1);
+  dim3 gridDim((destW + blockDim.x - 1) / blockDim.x, (destH + blockDim.y - 1) / blockDim.y, batchSize);
+
+  // Launch the batched remap kernel.
+  BatchedRemapKernel<T><<<gridDim, blockDim, 0, stream>>>(
+      d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY, defR, defG, defB, batchSize);
+  return cudaGetLastError();
+}
+
+//
+// Explicit instantiation declarations for T = float, __half, and __nv_bfloat16.
+//
+
+template cudaError_t remap_kernel<float>(
     const float* d_src,
     int srcW,
     int srcH,
@@ -160,39 +178,37 @@ cudaError_t remap_kernel(
     float defR,
     float defG,
     float defB,
-    cudaStream_t stream) {
-  // Define kernel launch configuration.
-  dim3 blockDim(16, 16);
-  dim3 gridDim((destW + blockDim.x - 1) / blockDim.x,
-               (destH + blockDim.y - 1) / blockDim.y);
+    cudaStream_t stream);
 
-  // Launch the remap kernel on the specified stream.
-  remapKernel<<<gridDim, blockDim, 0, stream>>>(
-      d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY, defR, defG, defB);
-  return cudaGetLastError();
-}
+template cudaError_t remap_kernel<__half>(
+    const __half* d_src,
+    int srcW,
+    int srcH,
+    __half* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    __half defR,
+    __half defG,
+    __half defB,
+    cudaStream_t stream);
 
-/**
- * @brief Batched remap host function.
- *
- * Launches the BatchedRemapKernel to process a batch of images using mapping arrays.
- *
- * @param d_src Device pointer to the batch of source images.
- * @param srcW Width of each source image.
- * @param srcH Height of each source image.
- * @param d_dest Device pointer to the batch of destination images.
- * @param destW Width of each destination image.
- * @param destH Height of each destination image.
- * @param d_mapX Device pointer to the batch of mapping arrays for X coordinates.
- * @param d_mapY Device pointer to the batch of mapping arrays for Y coordinates.
- * @param defR Default red component.
- * @param defG Default green component.
- * @param defB Default blue component.
- * @param batchSize Number of images in the batch.
- * @param stream CUDA stream to use for the kernel launch (default is 0).
- * @return cudaError_t The status returned by cudaGetLastError.
- */
-cudaError_t batched_remap_kernel(
+template cudaError_t remap_kernel<__nv_bfloat16>(
+    const __nv_bfloat16* d_src,
+    int srcW,
+    int srcH,
+    __nv_bfloat16* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    __nv_bfloat16 defR,
+    __nv_bfloat16 defG,
+    __nv_bfloat16 defB,
+    cudaStream_t stream);
+
+template cudaError_t batched_remap_kernel<float>(
     const float* d_src,
     int srcW,
     int srcH,
@@ -205,13 +221,34 @@ cudaError_t batched_remap_kernel(
     float defG,
     float defB,
     int batchSize,
-    cudaStream_t stream = 0) {
-  dim3 blockDim(16, 16, 1);
-  dim3 gridDim((destW + blockDim.x - 1) / blockDim.x,
-               (destH + blockDim.y - 1) / blockDim.y,
-               batchSize);
-  BatchedRemapKernel<<<gridDim, blockDim, 0, stream>>>(
-      d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY,
-      defR, defG, defB, batchSize);
-  return cudaGetLastError();
-}
+    cudaStream_t stream);
+
+template cudaError_t batched_remap_kernel<__half>(
+    const __half* d_src,
+    int srcW,
+    int srcH,
+    __half* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    __half defR,
+    __half defG,
+    __half defB,
+    int batchSize,
+    cudaStream_t stream);
+
+template cudaError_t batched_remap_kernel<__nv_bfloat16>(
+    const __nv_bfloat16* d_src,
+    int srcW,
+    int srcH,
+    __nv_bfloat16* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    __nv_bfloat16 defR,
+    __nv_bfloat16 defG,
+    __nv_bfloat16 defB,
+    int batchSize,
+    cudaStream_t stream);

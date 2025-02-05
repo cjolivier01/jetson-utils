@@ -21,18 +21,19 @@
  * @param stream CUDA stream to use for the kernel launch (default is 0).
  * @return cudaError_t The status returned by cudaGetLastError.
  */
+template <typename T>
 cudaError_t remap_kernel(
-    const float* d_src,
+    const T* d_src,
     int srcW,
     int srcH,
-    float* d_dest,
+    T* d_dest,
     int destW,
     int destH,
     const unsigned short* d_mapX,
     const unsigned short* d_mapY,
-    float defR,
-    float defG,
-    float defB,
+    T defR,
+    T defG,
+    T defB,
     cudaStream_t stream = 0);
 
 /**
@@ -55,17 +56,18 @@ cudaError_t remap_kernel(
  * @param stream CUDA stream to use for the kernel launch (default is 0).
  * @return cudaError_t The status returned by cudaGetLastError.
  */
+template <typename T>
 cudaError_t batched_remap_kernel(
-    const float* d_src,
+    const T* d_src,
     int srcW,
     int srcH,
-    float* d_dest,
+    T* d_dest,
     int destW,
     int destH,
     const unsigned short* d_mapX,
     const unsigned short* d_mapY,
-    float defR,
-    float defG,
-    float defB,
+    T defR,
+    T defG,
+    T defB,
     int batchSize,
-    cudaStream_t stream);
+    cudaStream_t stream = 0);
