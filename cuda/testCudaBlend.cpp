@@ -135,14 +135,18 @@ template <typename T = float3>
 class CudaMat {
  private:
   T* d_data{nullptr};
-  size_t size;
+  size_t size;          // total size (in bytes) allocated on the device
   int rows_, cols_, type_;
   int batch_size_{1};
 
  public:
+  // Delete copy and move constructors
   CudaMat(const CudaMat&) = delete;
   CudaMat(CudaMat&&) = delete;
-  CudaMat(const cv::Mat& mat, bool copy = true) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
+
+  // Single image constructor
+  CudaMat(const cv::Mat& mat, bool copy = true)
+      : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
     assert(mat.isContinuous());
@@ -151,17 +155,19 @@ class CudaMat {
     }
   }
 
-  CudaMat(const std::vector<cv::Mat>& mat_batch, bool copy = true) : batch_size_(mat_batch.size()) {
-    assert(batch_size_);
+  // Batch of images constructor
+  CudaMat(const std::vector<cv::Mat>& mat_batch, bool copy = true)
+      : batch_size_(static_cast<int>(mat_batch.size())) {
+    assert(batch_size_ > 0);
     const cv::Mat& first = mat_batch.at(0);
     rows_ = first.rows;
     cols_ = first.cols;
     type_ = first.type();
     const size_t size_each = first.total() * first.elemSize();
-    const size_t size_total = size_each * batch_size_;
-    cudaMalloc(&d_data, size_total);
+    size = size_each * batch_size_;
+    cudaMalloc(&d_data, size);
     if (copy) {
-      uint8_t* p = (uint8_t*)d_data;
+      uint8_t* p = reinterpret_cast<uint8_t*>(d_data);
       for (const cv::Mat& mat : mat_batch) {
         assert(mat.isContinuous());
         cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
@@ -176,29 +182,25 @@ class CudaMat {
     }
   }
 
-  cv::Mat download() const {
+  // Download the image corresponding to the given batch index
+  cv::Mat download(int batch_item = 0) const {
+    assert(batch_item >= 0 && batch_item < batch_size_);
     cv::Mat mat(rows_, cols_, type_);
-    cudaMemcpy(mat.data, d_data, size, cudaMemcpyDeviceToHost);
+    // Calculate the number of bytes in one image
+    size_t size_each = mat.total() * mat.elemSize();
+    // Compute the pointer offset for the selected batch item
+    const uint8_t* src_ptr = reinterpret_cast<const uint8_t*>(d_data) + batch_item * size_each;
+    cudaMemcpy(mat.data, src_ptr, size_each, cudaMemcpyDeviceToHost);
     return mat;
   }
-  T* data() {
-    return d_data;
-  }
-  const T* data() const {
-    return d_data;
-  }
-  constexpr int width() const {
-    return cols_;
-  }
-  constexpr int height() const {
-    return rows_;
-  }
-  constexpr int type() const {
-    return type_;
-  }
-  constexpr int batch_size() const {
-    return batch_size_;
-  }
+
+  // Accessor functions
+  T* data() { return d_data; }
+  const T* data() const { return d_data; }
+  constexpr int width() const { return cols_; }
+  constexpr int height() const { return rows_; }
+  constexpr int type() const { return type_; }
+  constexpr int batch_size() const { return batch_size_; }
 };
 
 // imageFormat get_image_format(const int cv_type) {
@@ -609,7 +611,7 @@ class CudaStitchPano {
 
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
-#if 0
+#if 1
     cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
         stitch_context.cudaRemapped_1->data(),
@@ -666,7 +668,7 @@ class CudaStitchPano {
 #endif
 
     CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
-#if 0
+#if 1
     cuerr = cudaBatchedLaplacianBlendWithContext(
         stitch_context.cudaFull1->data(),
         stitch_context.cudaFull2->data(),
@@ -749,23 +751,28 @@ class CudaStitchPano {
     // auto disp = blending_1.download();
     //  auto disp = cudaBlendSeam.download();
     // auto disp = canvas->download();
-    // auto disp = sampleImage2.download();
+    // auto disp = sampleImage1.download(1);
     // auto disp = cudaBlendedFull.download();
     // auto disp = cudaFull1.download();
+    auto disp = cudaBlendedFull.download(0);
+    //auto disp = stitch_context.cudaFull2->download(1);
     //    auto disp = cudaFull2.download();
     //    auto disp = blending_2.download();
-    //    auto disp = cudaRemapped_1->download();
+    // auto disp = stitch_context.cudaRemapped_1->download(1);
     //  auto disp = cudaRemapped_2->download();
     //    auto disp = sampleImage2.download();
     //    auto disp = cudaBlendedFloat.download();
     //    disp.convertTo(disp, CV_8UC3, 255.0);
-    // cv::imshow("image", disp);
-    // cv::imshow("image", disp);
-    // cv::waitKey(0);
+    cv::imshow("image", disp);
+    cv::waitKey(0);
 
     return std::move(canvas);
   };
 };
+
+std::vector<cv::Mat> as_batch(const cv::Mat& mat, int batch_size) {
+  return std::vector<cv::Mat>(batch_size, mat);
+}
 
 int main(int argc, char** argv) {
   // Usage check.
@@ -864,7 +871,10 @@ int main(int argc, char** argv) {
 #define CV_T_COMPUTE3 CV_16FC3
 #endif
 
-  StitchingContext<T, T_compute> stitch_context(/*batch_size=*/1);
+  // constexpr int kBatchSize = 1;
+  constexpr int kBatchSize = 2;
+
+  StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize);
 
   assert(img1_col.type() == CV_16U);
   stitch_context.remap_1_x = std::make_unique<CudaMat<uint16_t>>(img1_col);
@@ -872,18 +882,18 @@ int main(int argc, char** argv) {
   stitch_context.remap_2_x = std::make_unique<CudaMat<uint16_t>>(img2_col);
   stitch_context.remap_2_y = std::make_unique<CudaMat<uint16_t>>(img2_row);
 
-  stitch_context.cudaRemapped_1 =
-      std::make_unique<CudaMat<T_compute>>(cv::Mat(img1_col.size(), CV_T_COMPUTE3), /*copy=*/false);
-  stitch_context.cudaRemapped_2 =
-      std::make_unique<CudaMat<T_compute>>(cv::Mat(img2_col.size(), CV_T_COMPUTE3), /*copy=*/false);
+  stitch_context.cudaRemapped_1 = std::make_unique<CudaMat<T_compute>>(
+      as_batch(cv::Mat(img1_col.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
+  stitch_context.cudaRemapped_2 = std::make_unique<CudaMat<T_compute>>(
+      as_batch(cv::Mat(img2_col.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
 
   blend_seam.convertTo(blend_seam, CV_T_COMPUTE3);
   stitch_context.cudaBlendSeam = std::make_unique<CudaMat<T_compute>>(blend_seam);
 
-  stitch_context.cudaFull1 =
-      std::make_unique<CudaMat<T_compute>>(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), /*copy=*/false);
-  stitch_context.cudaFull2 =
-      std::make_unique<CudaMat<T_compute>>(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), /*copy=*/false);
+  stitch_context.cudaFull1 = std::make_unique<CudaMat<T_compute>>(
+      as_batch(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
+  stitch_context.cudaFull2 = std::make_unique<CudaMat<T_compute>>(
+      as_batch(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
 
   stitch_context.laplacian_blend_context = std::make_unique<CudaBatchLaplacianBlendContext<T_compute>>(
       stitch_context.cudaBlendSeam->width(),
@@ -894,8 +904,8 @@ int main(int argc, char** argv) {
   //
   // The actual incoming imaged
   //
-  CudaMat<T> sampleImage1(sample_img_left);
-  CudaMat<T> sampleImage2(sample_img_right);
+  CudaMat<T> sampleImage1(as_batch(sample_img_left, kBatchSize));
+  CudaMat<T> sampleImage2(as_batch(sample_img_right, kBatchSize));
 
   auto blendedCanvas =
       CudaStitchPano<T, T_compute>::process(
