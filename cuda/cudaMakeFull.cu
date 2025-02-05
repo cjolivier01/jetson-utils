@@ -99,6 +99,8 @@ __global__ void copyRoiKernelUChar(
 SimpleFullResult simple_make_full(
     // Image 1 (float image)
     const float* d_img_1,
+    int srcOffsetX1,
+    int srcOffsetY1,
     int img1_width,
     int img1_height,
     int img1_channels,
@@ -112,6 +114,8 @@ SimpleFullResult simple_make_full(
     int& y1,
     // Image 2 (float image)
     const float* d_img_2,
+    int srcOffsetX2,
+    int srcOffsetY2,
     int img2_width,
     int img2_height,
     int img2_channels,
