@@ -1,25 +1,29 @@
 #include <cuda_runtime.h>
 #include <cassert>
 
+// If you want to support 16‐bit and bfloat16 types:
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
+
+////////////////////////////////////////////////////////////////////////////////
+// Templated Device Kernels
+////////////////////////////////////////////////////////////////////////////////
+
 /**
- * @brief Batched kernel to fill a float image (or a batch of images) with a constant value.
+ * @brief Templated batched kernel to fill an image (or batch of images) with a constant value.
  *
- * Each image in the batch is assumed to be stored in row‐major order.
+ * Each image in the batch is assumed to be stored in row–major order.
  *
- * @param dest Pointer to the destination images in device memory.
+ * @tparam T Numeric type (e.g. float, __half, __nv_bfloat16, unsigned char, etc.)
+ * @param dest Pointer to destination images in device memory.
  * @param destWidth Width of each destination image.
  * @param destHeight Height of each destination image.
  * @param channels Number of channels per pixel.
  * @param value Constant value to fill.
  * @param batchSize Number of images in the batch.
  */
-__global__ void fillKernelFloatBatched(
-    float* dest,
-    int destWidth,
-    int destHeight,
-    int channels,
-    float value,
-    int batchSize) {
+template <typename T>
+__global__ void fillKernelBatched(T* dest, int destWidth, int destHeight, int channels, T value, int batchSize) {
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   int b = blockIdx.z;
@@ -33,43 +37,13 @@ __global__ void fillKernelFloatBatched(
 }
 
 /**
- * @brief Batched kernel to fill an unsigned char image (mask) with a constant value.
+ * @brief Templated batched kernel to copy a region of interest (ROI) from a source image
+ *        to a destination canvas.
  *
- * Each mask in the batch is assumed to be stored in row‐major order.
+ * For each image in the batch, the kernel copies a rectangular region defined by a source ROI
+ * into the destination image.
  *
- * @param dest Pointer to the destination masks in device memory.
- * @param destWidth Width of each destination mask.
- * @param destHeight Height of each destination mask.
- * @param channels Number of channels per pixel.
- * @param value Constant value to fill.
- * @param batchSize Number of masks in the batch.
- */
-__global__ void fillKernelUCharBatched(
-    unsigned char* dest,
-    int destWidth,
-    int destHeight,
-    int channels,
-    unsigned char value,
-    int batchSize) {
-  int x = blockIdx.x * blockDim.x + threadIdx.x;
-  int y = blockIdx.y * blockDim.y + threadIdx.y;
-  int b = blockIdx.z;
-  if (b < batchSize && x < destWidth && y < destHeight) {
-    int offset = b * (destWidth * destHeight * channels);
-    int idx = (y * destWidth + x) * channels;
-    for (int c = 0; c < channels; ++c) {
-      dest[offset + idx + c] = value;
-    }
-  }
-}
-
-/**
- * @brief Batched kernel to copy a region of interest (ROI) from a float source image to a destination canvas.
- *
- * For each image in the batch, this kernel copies a rectangular region defined by a source ROI—starting at
- * (srcROI_x, srcROI_y) with dimensions regionWidth x regionHeight—from the source image into the destination
- * canvas at position (offsetX, offsetY).
- *
+ * @tparam T Numeric type.
  * @param src Pointer to the batch of source images in device memory.
  * @param full_src_width Full width of each source image.
  * @param full_src_height Full height of each source image.
@@ -77,23 +51,24 @@ __global__ void fillKernelUCharBatched(
  * @param regionHeight Height of the ROI to copy.
  * @param srcROI_x X-coordinate of the top-left corner of the ROI in the source images.
  * @param srcROI_y Y-coordinate of the top-left corner of the ROI in the source images.
- * @param dest Pointer to the batch of destination canvases in device memory.
- * @param destWidth Width of each destination canvas.
- * @param destHeight Height of each destination canvas.
- * @param offsetX X-coordinate in the destination canvas where the ROI is pasted.
- * @param offsetY Y-coordinate in the destination canvas where the ROI is pasted.
+ * @param dest Pointer to the batch of destination images in device memory.
+ * @param destWidth Width of each destination image.
+ * @param destHeight Height of each destination image.
+ * @param offsetX X-coordinate in the destination image where the ROI is pasted.
+ * @param offsetY Y-coordinate in the destination image where the ROI is pasted.
  * @param channels Number of channels per pixel.
  * @param batchSize Number of images in the batch.
  */
+template <typename T>
 __global__ void copyRoiKernelBatched(
-    const float* src,
+    const T* src,
     int full_src_width,
     int full_src_height,
     int regionWidth,
     int regionHeight,
     int srcROI_x,
     int srcROI_y,
-    float* dest,
+    T* dest,
     int destWidth,
     int destHeight,
     int offsetX,
@@ -126,116 +101,53 @@ __global__ void copyRoiKernelBatched(
   }
 }
 
-/**
- * @brief Batched kernel to copy a region of interest (ROI) from an unsigned char source mask to a destination canvas.
- *
- * For each mask in the batch, this kernel copies a rectangular region defined by a source ROI from the source mask
- * into the destination canvas at position (offsetX, offsetY).
- *
- * @param src Pointer to the batch of source masks in device memory.
- * @param full_src_width Full width of each source mask.
- * @param full_src_height Full height of each source mask.
- * @param regionWidth Width of the ROI to copy.
- * @param regionHeight Height of the ROI to copy.
- * @param srcROI_x X-coordinate of the top-left corner of the ROI in the source masks.
- * @param srcROI_y Y-coordinate of the top-left corner of the ROI in the source masks.
- * @param dest Pointer to the batch of destination canvases in device memory.
- * @param destWidth Width of each destination canvas.
- * @param destHeight Height of each destination canvas.
- * @param offsetX X-coordinate in the destination canvas where the ROI is pasted.
- * @param offsetY Y-coordinate in the destination canvas where the ROI is pasted.
- * @param channels Number of channels per pixel.
- * @param batchSize Number of masks in the batch.
- */
-__global__ void copyRoiKernelUCharBatched(
-    const unsigned char* src,
-    int full_src_width,
-    int full_src_height,
-    int regionWidth,
-    int regionHeight,
-    int srcROI_x,
-    int srcROI_y,
-    unsigned char* dest,
-    int destWidth,
-    int destHeight,
-    int offsetX,
-    int offsetY,
-    int channels,
-    int batchSize) {
-  int b = blockIdx.z;
-  if (b >= batchSize)
-    return;
-
-  int x = blockIdx.x * blockDim.x + threadIdx.x;
-  int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-  if (x < regionWidth && y < regionHeight) {
-    int srcX = srcROI_x + x;
-    int srcY = srcROI_y + y;
-    if (srcX < full_src_width && srcY < full_src_height) {
-      int srcOffset = b * (full_src_width * full_src_height * channels);
-      int srcIdx = (srcY * full_src_width + srcX) * channels;
-      int destX = offsetX + x;
-      int destY = offsetY + y;
-      if (destX < destWidth && destY < destHeight) {
-        int destOffset = b * (destWidth * destHeight * channels);
-        int destIdx = (destY * destWidth + destX) * channels;
-        for (int c = 0; c < channels; ++c) {
-          dest[destOffset + destIdx + c] = src[srcOffset + srcIdx + c];
-        }
-      }
-    }
-  }
-}
+////////////////////////////////////////////////////////////////////////////////
+// Templated Host Functions
+////////////////////////////////////////////////////////////////////////////////
 
 /**
- * @brief Creates full canvas images by copying specified source ROIs from a batch of images (and optional masks)
+ * @brief Creates full canvas images by copying specified source ROIs from a batch of images (and masks)
  *        into preallocated destination canvases.
  *
- * This function takes a batch of source images (and their optional masks) in device memory along with ROI
- * specifications (source offsets and region sizes) and destination offsets. It fills the preallocated destination
- * canvases with default values (0.0f for images and 1 for masks) and copies the specified ROIs from each source image
- * (or mask) into the corresponding destination canvas at the given destination offsets.
+ * This function fills the destination canvases with default values (for images, 0; for masks, 1)
+ * and then copies the ROI from each source image (and source mask) into the corresponding destination canvas.
  *
- * Optionally, if adjust_origin is true, the destination offsets (x and y) are adjusted so that one image in the batch
- * is anchored at (0,0). In that case, it is required that one of the offsets becomes 0.
- *
- * @param d_imgs Pointer to the batch of source images (float) in device memory.
+ * @tparam T Numeric type for images (e.g., float, __half, __nv_bfloat16).
+ * @tparam U Numeric type for masks (typically unsigned char).
+ * @param d_imgs Pointer to the batch of source images in device memory.
  * @param src_full_width Full width of each source image.
  * @param src_full_height Full height of each source image.
  * @param region_width Width of the ROI to copy from each source image.
  * @param region_height Height of the ROI to copy from each source image.
  * @param channels Number of channels in the source images.
- * @param d_masks Pointer to the batch of source masks (unsigned char) in device memory (or nullptr if not provided).
+ * @param d_masks Pointer to the batch of source masks in device memory (or nullptr if not provided).
  * @param mask_width Width of each source mask.
  * @param mask_height Height of each source mask.
  * @param mask_channels Number of channels in the source masks.
  * @param src_roi_x X-coordinate of the top-left corner of the ROI in the source images/masks.
  * @param src_roi_y Y-coordinate of the top-left corner of the ROI in the source images/masks.
- * @param x Reference to destination X-offset for the ROI in the destination canvases (may be adjusted if adjust_origin
- * is true).
- * @param y Reference to destination Y-offset for the ROI in the destination canvases (may be adjusted if adjust_origin
- * is true).
+ * @param x Reference to destination X-offset for the ROI in the destination canvases (may be adjusted).
+ * @param y Reference to destination Y-offset for the ROI in the destination canvases (may be adjusted).
  * @param canvas_w Width of the destination canvases.
  * @param canvas_h Height of the destination canvases.
  * @param adjust_origin If true, adjusts destination offsets so that one image is anchored at (0,0).
  * @param batchSize Number of images (and masks) in the batch.
  * @param d_full_imgs Preallocated pointer to the destination canvases for images in device memory.
- *                      Expected size: batchSize x canvas_w x canvas_h x channels.
- * @param d_full_masks Preallocated pointer to the destination canvases for masks in device memory (or nullptr if not
- * provided). Expected size: batchSize x canvas_w x canvas_h x mask_channels.
- * @param stream CUDA stream to use for kernel launches (default: stream 0).
+ * @param d_full_masks Preallocated pointer to the destination canvases for masks in device memory (or nullptr).
+ * @param stream CUDA stream to use for kernel launches.
+ * @return cudaError_t The CUDA error code after kernel launches.
  */
+template <typename T, typename U>
 cudaError_t simple_make_full_batch(
     // Batch of images:
-    const float* d_imgs,
+    const T* d_imgs,
     int src_full_width,
     int src_full_height,
     int region_width,
     int region_height,
     int channels,
     // Batch of masks (optional):
-    const unsigned char* d_masks,
+    const U* d_masks,
     int mask_width,
     int mask_height,
     int mask_channels,
@@ -252,15 +164,14 @@ cudaError_t simple_make_full_batch(
     // Batch size:
     int batchSize,
     // Preallocated destination canvases:
-    float* d_full_imgs,
-    unsigned char* d_full_masks,
+    T* d_full_imgs,
+    U* d_full_masks,
     cudaStream_t stream) {
   // Ensure the destination offsets are nonnegative.
   assert(x >= 0 && y >= 0);
 
   // Optionally adjust origins so that one image is anchored at (0,0).
   if (adjust_origin) {
-    // Here we use the same logic as before.
     if (x <= y) {
       y -= x;
       x = 0;
@@ -272,20 +183,20 @@ cudaError_t simple_make_full_batch(
   // For now, require that either x or y is 0.
   assert(x == 0 || y == 0);
 
-  // Define kernel launch parameters for filling the destination canvases.
+  // Define kernel launch parameters.
   dim3 blockDim(16, 16, 1);
   dim3 gridDimCanvas((canvas_w + blockDim.x - 1) / blockDim.x, (canvas_h + blockDim.y - 1) / blockDim.y, batchSize);
 
   // -------------------------------------------------------
   // Fill the destination canvases with default values.
   // -------------------------------------------------------
-  // For images: fill with 0.0f.
-  fillKernelFloatBatched<<<gridDimCanvas, blockDim, 0, stream>>>(
-      d_full_imgs, canvas_w, canvas_h, channels, 0.0f, batchSize);
+  // For images: fill with 0.
+  fillKernelBatched<T>
+      <<<gridDimCanvas, blockDim, 0, stream>>>(d_full_imgs, canvas_w, canvas_h, channels, static_cast<T>(0), batchSize);
   // For masks (if provided): fill with 1.
   if (d_masks && d_full_masks) {
-    fillKernelUCharBatched<<<gridDimCanvas, blockDim, 0, stream>>>(
-        d_full_masks, canvas_w, canvas_h, mask_channels, 1, batchSize);
+    fillKernelBatched<U><<<gridDimCanvas, blockDim, 0, stream>>>(
+        d_full_masks, canvas_w, canvas_h, mask_channels, static_cast<U>(1), batchSize);
   }
 
   // -------------------------------------------------------
@@ -295,7 +206,7 @@ cudaError_t simple_make_full_batch(
       (region_width + blockDim.x - 1) / blockDim.x, (region_height + blockDim.y - 1) / blockDim.y, batchSize);
 
   // Copy the ROI for the images.
-  copyRoiKernelBatched<<<gridDimCopy, blockDim, 0, stream>>>(
+  copyRoiKernelBatched<T><<<gridDimCopy, blockDim, 0, stream>>>(
       d_imgs,
       src_full_width,
       src_full_height,
@@ -313,7 +224,7 @@ cudaError_t simple_make_full_batch(
 
   // Copy the ROI for the masks (if provided).
   if (d_masks && d_full_masks) {
-    copyRoiKernelUCharBatched<<<gridDimCopy, blockDim, 0, stream>>>(
+    copyRoiKernelBatched<U><<<gridDimCopy, blockDim, 0, stream>>>(
         d_masks,
         mask_width,
         mask_height,
@@ -333,12 +244,11 @@ cudaError_t simple_make_full_batch(
 }
 
 /**
- * @brief Interface function for launching the batched ROI copy kernel for float images.
+ * @brief Interface function for launching the batched ROI copy kernel for images.
  *
- * This function sets up the grid and block dimensions and launches the copyRoiKernelBatched kernel,
- * which copies a rectangular region (ROI) from each source image in a batch into its corresponding
- * destination image.
+ * This function sets up grid and block dimensions and launches the copyRoiKernelBatched kernel.
  *
+ * @tparam T Numeric type for images.
  * @param d_src Pointer to the batch of source images in device memory.
  * @param full_src_width Full width of each source image.
  * @param full_src_height Full height of each source image.
@@ -349,23 +259,23 @@ cudaError_t simple_make_full_batch(
  * @param d_dest Pointer to the batch of destination images in device memory.
  * @param destWidth Width of each destination image.
  * @param destHeight Height of each destination image.
- * @param offsetX X-coordinate in the destination image where the ROI should be pasted.
- * @param offsetY Y-coordinate in the destination image where the ROI should be pasted.
+ * @param offsetX X-coordinate in the destination image where the ROI is pasted.
+ * @param offsetY Y-coordinate in the destination image where the ROI is pasted.
  * @param channels Number of channels per pixel.
  * @param batchSize Number of images in the batch.
- * @param stream CUDA stream to use for kernel launch (default is stream 0).
- *
- * @return cudaError_t The status of the kernel launch.
+ * @param stream CUDA stream to use for the kernel launch.
+ * @return cudaError_t The CUDA error code after kernel launch.
  */
+template <typename T>
 cudaError_t copyRoiBatchedInterface(
-    const float* d_src,
+    const T* d_src,
     int full_src_width,
     int full_src_height,
     int regionWidth,
     int regionHeight,
     int srcROI_x,
     int srcROI_y,
-    float* d_dest,
+    T* d_dest,
     int destWidth,
     int destHeight,
     int offsetX,
@@ -373,14 +283,9 @@ cudaError_t copyRoiBatchedInterface(
     int channels,
     int batchSize,
     cudaStream_t stream) {
-  // Define a 2D block size; for example, 16x16 threads per block.
   dim3 blockDim(16, 16, 1);
-
-  // Calculate grid dimensions to cover the ROI in x and y, and use the z-dimension for batch indexing.
   dim3 gridDim((regionWidth + blockDim.x - 1) / blockDim.x, (regionHeight + blockDim.y - 1) / blockDim.y, batchSize);
-
-  // Launch the kernel on the provided CUDA stream.
-  copyRoiKernelBatched<<<gridDim, blockDim, 0, stream>>>(
+  copyRoiKernelBatched<T><<<gridDim, blockDim, 0, stream>>>(
       d_src,
       full_src_width,
       full_src_height,
@@ -397,3 +302,128 @@ cudaError_t copyRoiBatchedInterface(
       batchSize);
   return cudaGetLastError();
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Explicit Template Instantiations
+////////////////////////////////////////////////////////////////////////////////
+
+// For image kernels and functions (T); instantiate for float, __half, and __nv_bfloat16.
+template __global__ void fillKernelBatched<float>(float*, int, int, int, float, int);
+template __global__ void fillKernelBatched<__half>(__half*, int, int, int, __half, int);
+template __global__ void fillKernelBatched<__nv_bfloat16>(__nv_bfloat16*, int, int, int, __nv_bfloat16, int);
+
+template __global__ void copyRoiKernelBatched<
+    float>(const float*, int, int, int, int, int, int, float*, int, int, int, int, int, int);
+template __global__ void copyRoiKernelBatched<
+    __half>(const __half*, int, int, int, int, int, int, __half*, int, int, int, int, int, int);
+template __global__ void copyRoiKernelBatched<
+    __nv_bfloat16>(const __nv_bfloat16*, int, int, int, int, int, int, __nv_bfloat16*, int, int, int, int, int, int);
+
+// For the host function simple_make_full_batch: image type T and mask type U.
+// Instantiate for T = float, __half, __nv_bfloat16 and U = unsigned char.
+template cudaError_t simple_make_full_batch<float, unsigned char>(
+    const float* d_imgs,
+    int,
+    int,
+    int,
+    int,
+    int,
+    const unsigned char* d_masks,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int&,
+    int&,
+    int,
+    int,
+    bool,
+    int,
+    float* d_full_imgs,
+    unsigned char* d_full_masks,
+    cudaStream_t);
+
+template cudaError_t simple_make_full_batch<__half, unsigned char>(
+    const __half* d_imgs,
+    int,
+    int,
+    int,
+    int,
+    int,
+    const unsigned char* d_masks,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int&,
+    int&,
+    int,
+    int,
+    bool,
+    int,
+    __half* d_full_imgs,
+    unsigned char* d_full_masks,
+    cudaStream_t);
+
+template cudaError_t simple_make_full_batch<__nv_bfloat16, unsigned char>(
+    const __nv_bfloat16* d_imgs,
+    int,
+    int,
+    int,
+    int,
+    int,
+    const unsigned char* d_masks,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int&,
+    int&,
+    int,
+    int,
+    bool,
+    int,
+    __nv_bfloat16* d_full_imgs,
+    unsigned char* d_full_masks,
+    cudaStream_t);
+
+// For the interface function copyRoiBatchedInterface: instantiate for T = float, __half, and __nv_bfloat16.
+template cudaError_t copyRoiBatchedInterface<
+    float>(const float* d_src, int, int, int, int, int, int, float* d_dest, int, int, int, int, int, int, cudaStream_t);
+
+template cudaError_t copyRoiBatchedInterface<__half>(
+    const __half* d_src,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    __half* d_dest,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    cudaStream_t);
+
+template cudaError_t copyRoiBatchedInterface<__nv_bfloat16>(
+    const __nv_bfloat16* d_src,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    __nv_bfloat16* d_dest,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    cudaStream_t);

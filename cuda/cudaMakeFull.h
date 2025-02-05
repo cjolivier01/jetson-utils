@@ -27,15 +27,16 @@
  *
  * @return cudaError_t The status of the kernel launch.
  */
+template <typename T>
 cudaError_t copyRoiBatchedInterface(
-    const float* d_src,
+    const T* d_src,
     int full_src_width,
     int full_src_height,
     int regionWidth,
     int regionHeight,
     int srcROI_x,
     int srcROI_y,
-    float* d_dest,
+    T* d_dest,
     int destWidth,
     int destHeight,
     int offsetX,
@@ -82,16 +83,17 @@ cudaError_t copyRoiBatchedInterface(
  * provided). Expected size: batchSize x canvas_w x canvas_h x mask_channels.
  * @param stream CUDA stream to use for kernel launches (default: stream 0).
  */
+template <typename T, typename U>
 cudaError_t simple_make_full_batch(
     // Batch of images:
-    const float* d_imgs,
+    const T* d_imgs,
     int src_full_width,
     int src_full_height,
     int region_width,
     int region_height,
     int channels,
     // Batch of masks (optional):
-    const unsigned char* d_masks,
+    const U* d_masks,
     int mask_width,
     int mask_height,
     int mask_channels,
@@ -108,6 +110,6 @@ cudaError_t simple_make_full_batch(
     // Batch size:
     int batchSize,
     // Preallocated destination canvases:
-    float* d_full_imgs,
-    unsigned char* d_full_masks,
+    T* d_full_imgs,
+    U* d_full_masks,
     cudaStream_t stream = 0);

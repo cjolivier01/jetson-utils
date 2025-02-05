@@ -127,7 +127,7 @@ TiffInfo getTiffInfo(const std::string& filename) {
 
 namespace {
 
-template<typename T = float3>
+template <typename T = float3>
 class CudaMat {
  private:
   T* d_data{nullptr};
@@ -226,7 +226,7 @@ struct CudaSurface {
 
 class RenderSet {
  public:
- template <typename T>
+  template <typename T>
   void render(const std::string& name, const CudaSurface<T>& surface, cudaStream_t stream = 0) {
     get_video_output(name, surface.width, surface.height)
         ->Render((void*)surface.dataptr, surface.width, surface.height, surface.image_format, stream);
@@ -712,7 +712,7 @@ int main(int argc, char** argv) {
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
 
-    cuerr = simple_make_full_batch(
+    cuerr = simple_make_full_batch<T, unsigned char>(
         // Image 1 (float image)
         (const float*)stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
@@ -733,12 +733,12 @@ int main(int argc, char** argv) {
         stitch_context.cudaBlendSeam->height(),
         /*adjust_origin=*/false,
         /*batchSize=*/stitch_context.batch_size(),
-        (float*)stitch_context.cudaFull1->data(),
+        stitch_context.cudaFull1->data(),
         /*d_full_masks=*/nullptr,
         stream);
     assert(cuerr == cudaError_t::cudaSuccess);
 
-    cuerr = simple_make_full_batch(
+    cuerr = simple_make_full_batch<T, unsigned char>(
         // Image 1 (float image)
         (const float*)stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
