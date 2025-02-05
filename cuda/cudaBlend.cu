@@ -566,10 +566,15 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
       size_t sizeMask = context.widths[level] * context.heights[level] * sizeof(T);
       cudaMalloc((void**)&context.d_gauss1[level], sizeRGB);
       cudaMalloc((void**)&context.d_gauss2[level], sizeRGB);
-      cudaMalloc((void**)&context.d_maskPyr[level], sizeMask);
       cudaMalloc((void**)&context.d_lap1[level], sizeRGB);
       cudaMalloc((void**)&context.d_lap2[level], sizeRGB);
       cudaMalloc((void**)&context.d_blend[level], sizeRGB);
+      //if (level) {
+        cudaMalloc((void**)&context.d_maskPyr[level], sizeMask);
+      //} else {
+        // These won't atually be modified
+        //context.d_maskPyr[0] = const_cast<T*>(d_mask);
+      //}
     }
     // Copy level 0 mask (shared) from d_mask.
     cudaMemcpyAsync(context.d_maskPyr[0], d_mask, maskSize, cudaMemcpyDeviceToDevice, stream);
