@@ -560,19 +560,6 @@ int main(int argc, char** argv) {
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  // Left side, unblended
-  // I think we can just copy from the original instead of this partial stuff
-  CudaMat partial_1(
-      cv::Mat(cv::Size(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height), CV_32FC3));
-
-  // I think we can just copy from the original instead of this partial stuff
-  // Right side, unblended
-  CudaMat partial_2(cv::Mat(
-      cv::Size{
-          mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
-          mask_converter._remapper_2.height},
-      CV_32FC3));
-
 // Configurable parameter: number of pyramid levels.
 #ifdef __aarch64__
   // Lower compute, quick and dirty
@@ -585,18 +572,14 @@ int main(int argc, char** argv) {
   CudaMat remap_1_x(img1_col), remap_1_y(img1_row);
   CudaMat remap_2_x(img2_col), remap_2_y(img2_row);
 
-  cv::Mat remapped_1(img1_col.size(), CV_32FC3);
-  cv::Mat remapped_2(img2_col.size(), CV_32FC3);
-  CudaMat cudaRemapped_1(remapped_1, /*copy=*/false);
-  CudaMat cudaRemapped_2(remapped_2, /*copy=*/false);
-
-  CudaMat sampleImage1(sample_img_left);
-  CudaMat sampleImage2(sample_img_right);
+  CudaMat cudaRemapped_1(cv::Mat(img1_col.size(), CV_32FC3), /*copy=*/false);
+  CudaMat cudaRemapped_2(cv::Mat(img2_col.size(), CV_32FC3), /*copy=*/false);
 
   CudaMat cudaBlendSeam(blend_seam);
 
   CudaMat cudaFull1(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
   CudaMat cudaFull2(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
+
   cudaError_t cuerr = cudaError_t::cudaSuccess;
 
   // Set default color for unmapped pixels.
@@ -617,6 +600,12 @@ int main(int argc, char** argv) {
       partial_size_2.height};
   const int4 roi_blend_2 = {
       0, 0, mask_converter._overlapping_width + mask_converter._overlap_pad, cudaRemapped_2.height()};
+
+  //
+  // The actual incoming imaged
+  //
+  CudaMat sampleImage1(sample_img_left);
+  CudaMat sampleImage2(sample_img_right);
 
   // Launch the remap kernel.
   batched_remap_kernel(
@@ -653,7 +642,6 @@ int main(int argc, char** argv) {
   int y2 = positions[1].ypos;
 
   auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
-
   auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
 
   simple_make_full_batch(
@@ -786,6 +774,7 @@ int main(int argc, char** argv) {
 #endif
 
   cudaStreamSynchronize(stream);
+  cudaStreamDestroy(stream);
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
