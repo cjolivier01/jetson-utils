@@ -856,7 +856,11 @@ int main(int argc, char** argv) {
   int numLevels = 1;
 #else
   int numLevels = 6;
+<<<<<<< HEAD
   // int numLevels = 2;
+=======
+  // int numLevels = 6;
+>>>>>>> b547b7d3d9265f048155fb952028ae89ccc1b1e4
 #endif
 
 #if 1
