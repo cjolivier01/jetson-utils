@@ -898,7 +898,7 @@ int main(int argc, char** argv) {
   auto blendedCanvas = CudaStitchPano<T, T_compute>::process(
                            sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::move(canvas))
                            .ConsumeValueOrDie();
-  SHOW_IMAGE(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
   //  blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
@@ -908,7 +908,7 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
