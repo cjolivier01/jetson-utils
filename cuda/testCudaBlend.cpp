@@ -702,7 +702,7 @@ int main(int argc, char** argv) {
   CudaMat cudaFull2(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
 
   // TODO: this can be just cudaFull2
-  CudaMat cudaBlendedFull(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
+  // CudaMat cudaBlendedFull(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
 
   // Old stuff before end-to-end
   CudaMat cudaImage1Float(img1_float);
@@ -841,6 +841,7 @@ int main(int argc, char** argv) {
   // launches the appropriate kernels, and returns the blended image.
 #if 1
 #if 1
+  CudaMat& cudaBlendedFull = cudaFull1;
   CudaBatchLaplacianBlendContext context(cudaBlendSeam.width(), cudaBlendSeam.height(), numLevels, /*batch_size=*/1);
   auto cu_err = cudaBatchedLaplacianBlendWithContext(
       (const float*)cudaFull1.data(),
