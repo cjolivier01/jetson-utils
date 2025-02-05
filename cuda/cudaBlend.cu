@@ -562,7 +562,7 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     }
     // Allocate device memory for each level.
     for (int level = 0; level < context.numLevels; level++) {
-      size_t sizeRGB = context.widths[level] * context.heights[level] * 3 * sizeof(T);
+      size_t sizeRGB = context.widths[level] * context.heights[level] * 3 * context.batchSize * sizeof(T);
       size_t sizeMask = context.widths[level] * context.heights[level] * sizeof(T);
       cudaMalloc((void**)&context.d_gauss1[level], sizeRGB);
       cudaMalloc((void**)&context.d_gauss2[level], sizeRGB);
@@ -614,11 +614,11 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     }
   }
   // 2. Build Laplacian pyramids.
-  for (int level = 0; level < context.numLevels; level++) {
-    size_t sizeRGB = context.widths[level] * context.heights[level] * 3 * context.batchSize * sizeof(T);
-    cudaMalloc((void**)&context.d_lap1[level], sizeRGB);
-    cudaMalloc((void**)&context.d_lap2[level], sizeRGB);
-  }
+  // for (int level = 0; level < context.numLevels; level++) {
+  //   size_t sizeRGB = context.widths[level] * context.heights[level] * 3 * context.batchSize * sizeof(T);
+  //   cudaMalloc((void**)&context.d_lap1[level], sizeRGB);
+  //   cudaMalloc((void**)&context.d_lap2[level], sizeRGB);
+  // }
   for (int level = 0; level < context.numLevels - 1; level++) {
     dim3 grid(
         (context.widths[level] + block.x - 1) / block.x,
@@ -673,7 +673,13 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
   }
   // 4. Reconstruct final image.
   T* d_reconstruct = nullptr;
-  cudaMalloc((void**)&d_reconstruct, context.widths[last] * context.heights[last] * 3 * sizeof(T) * context.batchSize);
+  if (!context.initialized) {
+    cudaMalloc(
+        (void**)&d_reconstruct, context.widths[last] * context.heights[last] * 3 * sizeof(T) * context.batchSize);
+    context.d_resonstruct[last] = d_reconstruct;
+  } else {
+    d_reconstruct = context.d_resonstruct[last];
+  }
   cudaMemcpyAsync(
       d_reconstruct,
       context.d_blend[last],
@@ -682,8 +688,13 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
       stream);
   for (int level = context.numLevels - 2; level >= 0; level--) {
     T* d_temp = nullptr;
-    size_t highSize = context.widths[level] * context.heights[level] * 3 * sizeof(T) * context.batchSize;
-    cudaMalloc((void**)&d_temp, highSize);
+    if (!context.initialized) {
+      size_t highSize = context.widths[level] * context.heights[level] * 3 * sizeof(T) * context.batchSize;
+      cudaMalloc((void**)&d_temp, highSize);
+      context.d_resonstruct[level] = d_temp;
+    } else {
+      d_temp = context.d_resonstruct[level];
+    }
     dim3 grid(
         (context.widths[level] + block.x - 1) / block.x,
         (context.heights[level] + block.y - 1) / block.y,
@@ -697,11 +708,11 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
         context.heights[level],
         d_temp,
         context.batchSize);
-    cudaFree(d_reconstruct);
+    // cudaFree(d_reconstruct);
     d_reconstruct = d_temp;
   }
   cudaMemcpyAsync(d_output, d_reconstruct, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
-  cudaFree(d_reconstruct);
+  // cudaFree(d_reconstruct);
   context.initialized = true;
   return cudaGetLastError();
 }

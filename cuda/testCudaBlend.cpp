@@ -665,7 +665,7 @@ class CudaStitchPano {
 #endif
 
     CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
-#if 0
+#if 1
     cuerr = cudaBatchedLaplacianBlendWithContext(
         stitch_context.cudaFull1->data(),
         stitch_context.cudaFull2->data(),
@@ -905,11 +905,13 @@ int main(int argc, char** argv) {
       CudaStitchPano<T, T_compute>::process(
           sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
           .ConsumeValueOrDie();
-  // SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
   // blendedCanvas.reset();
 
-  // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
-  // SHOW_IMAGE(blendedCanvas);
+  blendedCanvas = CudaStitchPano<T, T_compute>::process(
+                      sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
+                      .ConsumeValueOrDie();
+  SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 

@@ -22,7 +22,8 @@ struct CudaBatchLaplacianBlendContext {
         d_maskPyr(num_levels, nullptr),
         d_lap1(num_levels, nullptr),
         d_lap2(num_levels, nullptr),
-        d_blend(num_levels, nullptr) {}
+        d_blend(num_levels, nullptr),
+        d_resonstruct(num_levels, nullptr) {}
 
   // Helper: free pointer if non-null.
   static constexpr void maybeCudaFree(void* p) {
@@ -39,8 +40,10 @@ struct CudaBatchLaplacianBlendContext {
       maybeCudaFree(d_lap1[level]);
       maybeCudaFree(d_lap2[level]);
       maybeCudaFree(d_blend[level]);
+      maybeCudaFree(d_resonstruct[level]);
     }
   }
+
   const int numLevels;
   const int imageWidth;
   const int imageHeight;
@@ -54,6 +57,7 @@ struct CudaBatchLaplacianBlendContext {
   std::vector<T*> d_lap1;
   std::vector<T*> d_lap2;
   std::vector<T*> d_blend;
+  std::vector<T*> d_resonstruct;
   bool initialized{false};
 };
 
