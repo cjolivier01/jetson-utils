@@ -875,6 +875,8 @@ int main(int argc, char** argv) {
   // ] = partial_2
 #if 1
   // Unblended Left Side
+  assert(partial_size_1.width == roi_width(roi_partial_1));
+  assert(partial_size_1.height == roi_height(roi_partial_1));
   cuerr = copyRoiBatchedInterface(
     (const float*)cudaRemapped_1.data(),
     cudaRemapped_1.width(),
@@ -898,12 +900,17 @@ int main(int argc, char** argv) {
       mask_converter._overlapping_width - mask_converter._overlap_pad, 0, partial_size_2.width, partial_size_2.height};
 
   // Unblended Right Side
+  auto roi2_w = roi_width(roi_partial_2);
+  auto roi2_h = roi_height(roi_partial_2);
+  (void)partial_size_2;
   cuerr = copyRoiBatchedInterface(
       (const float*)cudaRemapped_2.data(),
       cudaRemapped_2.width(),
       cudaRemapped_2.height(),
-      roi_width(roi_partial_2),
-      roi_height(roi_partial_2),
+      partial_size_2.width,
+      partial_size_2.height,
+      // roi_width(roi_partial_2),
+      // roi_height(roi_partial_2),
       roi_partial_2.x,
       roi_partial_2.y,
       (float*)canvas.data(),
