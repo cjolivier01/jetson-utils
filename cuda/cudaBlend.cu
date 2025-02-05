@@ -550,7 +550,7 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     CudaBatchLaplacianBlendContext<T>& context,
     cudaStream_t stream) {
   size_t imageSize = context.imageWidth * context.imageHeight * 3 * sizeof(T);
-  size_t maskSize = context.imageWidth * context.imageHeight * sizeof(T);
+  // size_t maskSize = context.imageWidth * context.imageHeight * sizeof(T);
 
   if (!context.initialized) {
     context.widths[0] = context.imageWidth;
@@ -564,24 +564,26 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     for (int level = 0; level < context.numLevels; level++) {
       size_t sizeRGB = context.widths[level] * context.heights[level] * 3 * context.batchSize * sizeof(T);
       size_t sizeMask = context.widths[level] * context.heights[level] * sizeof(T);
-      cudaMalloc((void**)&context.d_gauss1[level], sizeRGB);
-      cudaMalloc((void**)&context.d_gauss2[level], sizeRGB);
       cudaMalloc((void**)&context.d_lap1[level], sizeRGB);
       cudaMalloc((void**)&context.d_lap2[level], sizeRGB);
       cudaMalloc((void**)&context.d_blend[level], sizeRGB);
-      //if (level) {
+      if (level) {
         cudaMalloc((void**)&context.d_maskPyr[level], sizeMask);
-      //} else {
+        cudaMalloc((void**)&context.d_gauss1[level], sizeRGB);
+        cudaMalloc((void**)&context.d_gauss2[level], sizeRGB);
+      } else {
         // These won't atually be modified
-        //context.d_maskPyr[0] = const_cast<T*>(d_mask);
-      //}
+        context.d_maskPyr[0] = const_cast<T*>(d_mask);
+        context.d_gauss1[0] = const_cast<T*>(d_image1);
+        context.d_gauss2[0] = const_cast<T*>(d_image2);
+      }
     }
     // Copy level 0 mask (shared) from d_mask.
-    cudaMemcpyAsync(context.d_maskPyr[0], d_mask, maskSize, cudaMemcpyDeviceToDevice, stream);
+    // cudaMemcpyAsync(context.d_maskPyr[0], d_mask, maskSize, cudaMemcpyDeviceToDevice, stream);
   }
   // Set level 0 images.
-  cudaMemcpyAsync(context.d_gauss1[0], d_image1, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
-  cudaMemcpyAsync(context.d_gauss2[0], d_image2, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
+  // cudaMemcpyAsync(context.d_gauss1[0], d_image1, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
+  // cudaMemcpyAsync(context.d_gauss2[0], d_image2, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
 
   dim3 block(16, 16, 1);
   // 1. Build Gaussian pyramid for images and mask.
