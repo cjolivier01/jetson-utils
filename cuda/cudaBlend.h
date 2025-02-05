@@ -122,4 +122,3 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     const float* d_mask,
     float* d_output,
     CudaBatchLaplacianBlendContext& context);
-

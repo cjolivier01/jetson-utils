@@ -1,19 +1,27 @@
 // laplacian_blend_pyramid_rgb.cu
-#include "cudaBlend.h"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "cudaBlend.h"
 
 #include <cassert>
 #include <vector>
 
 namespace {
-__global__ void remapKernel(const float *src, int srcW, int srcH, float *dest,
-                            int destW, int destH, const unsigned short *mapX,
-                            const unsigned short *mapY, float defR, float defG,
-                            float defB) {
+__global__ void remapKernel(
+    const float* src,
+    int srcW,
+    int srcH,
+    float* dest,
+    int destW,
+    int destH,
+    const unsigned short* mapX,
+    const unsigned short* mapY,
+    float defR,
+    float defG,
+    float defB) {
   // Compute destination pixel coordinates.
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -49,9 +57,13 @@ __global__ void remapKernel(const float *src, int srcW, int srcH, float *dest,
 // For each output pixel (x,y), a 2x2 block of the input image is averaged.
 // The image is assumed to be stored in interleaved RGB order.
 // ---------------------------------------------------------------------
-__global__ void downsampleKernelRGB(const float *input, int inWidth,
-                                    int inHeight, float *output, int outWidth,
-                                    int outHeight) {
+__global__ void downsampleKernelRGB(
+    const float* input,
+    int inWidth,
+    int inHeight,
+    float* output,
+    int outWidth,
+    int outHeight) {
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   if (x >= outWidth || y >= outHeight)
@@ -82,9 +94,13 @@ __global__ void downsampleKernelRGB(const float *input, int inWidth,
 // ---------------------------------------------------------------------
 // Downsample kernel for a single–channel mask.
 // ---------------------------------------------------------------------
-__global__ void downsampleKernelMask(const float *input, int inWidth,
-                                     int inHeight, float *output, int outWidth,
-                                     int outHeight) {
+__global__ void downsampleKernelMask(
+    const float* input,
+    int inWidth,
+    int inHeight,
+    float* output,
+    int outWidth,
+    int outHeight) {
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   if (x >= outWidth || y >= outHeight)
@@ -174,10 +190,14 @@ __global__ void downsampleKernelMask(const float *input, int inWidth,
 // For each pixel in the higher–resolution Gaussian level (level L),
 // compute Laplacian = Gaussian[L] – upsample(Gaussian[L+1]).
 // ---------------------------------------------------------------------
-__global__ void computeLaplacianKernelRGB(const float *gaussHigh, int highWidth,
-                                          int highHeight, const float *gaussLow,
-                                          int lowWidth, int lowHeight,
-                                          float *laplacian) {
+__global__ void computeLaplacianKernelRGB(
+    const float* gaussHigh,
+    int highWidth,
+    int highHeight,
+    const float* gaussLow,
+    int lowWidth,
+    int lowHeight,
+    float* laplacian) {
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   if (x >= highWidth || y >= highHeight)
@@ -235,9 +255,13 @@ __global__ void computeLaplacianKernelRGB(const float *gaussHigh, int highWidth,
 // Blend kernel for RGB images.
 // Blends two Laplacian images using a single–channel mask.
 // ---------------------------------------------------------------------
-__global__ void blendKernelRGB(const float *lap1, const float *lap2,
-                               const float *mask, float *blended, int width,
-                               int height) {
+__global__ void blendKernelRGB(
+    const float* lap1,
+    const float* lap2,
+    const float* mask,
+    float* blended,
+    int width,
+    int height) {
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   if (x >= width || y >= height)
@@ -256,10 +280,14 @@ __global__ void blendKernelRGB(const float *lap1, const float *lap2,
 // For a given level, reconstruct the higher–resolution image by upsampling
 // the lower–resolution reconstruction and adding the blended Laplacian.
 // ---------------------------------------------------------------------
-__global__ void reconstructKernelRGB(const float *lowerRes, int lowWidth,
-                                     int lowHeight, const float *lap,
-                                     int highWidth, int highHeight,
-                                     float *reconstruction) {
+__global__ void reconstructKernelRGB(
+    const float* lowerRes,
+    int lowWidth,
+    int lowHeight,
+    const float* lap,
+    int highWidth,
+    int highHeight,
+    float* reconstruction) {
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
   if (x >= highWidth || y >= highHeight)
@@ -318,9 +346,14 @@ __global__ void reconstructKernelRGB(const float *lowerRes, int lowWidth,
 // Host code: main blending pipeline.
 // ---------------------------------------------------------------------
 
-cudaError_t cudaLaplacianBlend(const float *h_image1, const float *h_image2,
-                               const float *h_mask, float *h_output,
-                               int imageWidth, int imageHeight, int numLevels) {
+cudaError_t cudaLaplacianBlend(
+    const float* h_image1,
+    const float* h_image2,
+    const float* h_mask,
+    float* h_output,
+    int imageWidth,
+    int imageHeight,
+    int numLevels) {
   assert(false);
   // For RGB images (3 channels)
   size_t imageSize = imageWidth * imageHeight * 3 * sizeof(float);
@@ -335,12 +368,12 @@ cudaError_t cudaLaplacianBlend(const float *h_image1, const float *h_image2,
   //   - Laplacian pyramid for image1 and image2 (RGB)
   //   - Blended Laplacian pyramid (RGB)
   // -----------------------------------------------------------------
-  float *d_gauss1[numLevels];
-  float *d_gauss2[numLevels];
-  float *d_maskPyr[numLevels];
-  float *d_lap1[numLevels];
-  float *d_lap2[numLevels];
-  float *d_blend[numLevels];
+  float* d_gauss1[numLevels];
+  float* d_gauss2[numLevels];
+  float* d_maskPyr[numLevels];
+  float* d_lap1[numLevels];
+  float* d_lap2[numLevels];
+  float* d_blend[numLevels];
 
   // Store dimensions for each pyramid level.
   int widths[numLevels];
@@ -357,12 +390,12 @@ cudaError_t cudaLaplacianBlend(const float *h_image1, const float *h_image2,
   for (int level = 0; level < numLevels; level++) {
     size_t sizeRGB = widths[level] * heights[level] * 3 * sizeof(float);
     size_t sizeMask = widths[level] * heights[level] * sizeof(float);
-    cudaMalloc((void **)&d_gauss1[level], sizeRGB);
-    cudaMalloc((void **)&d_gauss2[level], sizeRGB);
-    cudaMalloc((void **)&d_maskPyr[level], sizeMask);
-    cudaMalloc((void **)&d_lap1[level], sizeRGB);
-    cudaMalloc((void **)&d_lap2[level], sizeRGB);
-    cudaMalloc((void **)&d_blend[level], sizeRGB);
+    cudaMalloc((void**)&d_gauss1[level], sizeRGB);
+    cudaMalloc((void**)&d_gauss2[level], sizeRGB);
+    cudaMalloc((void**)&d_maskPyr[level], sizeMask);
+    cudaMalloc((void**)&d_lap1[level], sizeRGB);
+    cudaMalloc((void**)&d_lap2[level], sizeRGB);
+    cudaMalloc((void**)&d_blend[level], sizeRGB);
   }
 
   // Copy full–resolution images and mask to level 0 of the Gaussian pyramids.
@@ -377,20 +410,16 @@ cudaError_t cudaLaplacianBlend(const float *h_image1, const float *h_image2,
   // 1. Build Gaussian pyramids by downsampling each level.
   // -----------------------------------------------------------------
   for (int level = 0; level < numLevels - 1; level++) {
-    dim3 gridRGB((widths[level + 1] + block.x - 1) / block.x,
-                 (heights[level + 1] + block.y - 1) / block.y);
+    dim3 gridRGB((widths[level + 1] + block.x - 1) / block.x, (heights[level + 1] + block.y - 1) / block.y);
     // Downsample image1.
     downsampleKernelRGB<<<gridRGB, block>>>(
-        d_gauss1[level], widths[level], heights[level], d_gauss1[level + 1],
-        widths[level + 1], heights[level + 1]);
+        d_gauss1[level], widths[level], heights[level], d_gauss1[level + 1], widths[level + 1], heights[level + 1]);
     // Downsample image2.
     downsampleKernelRGB<<<gridRGB, block>>>(
-        d_gauss2[level], widths[level], heights[level], d_gauss2[level + 1],
-        widths[level + 1], heights[level + 1]);
+        d_gauss2[level], widths[level], heights[level], d_gauss2[level + 1], widths[level + 1], heights[level + 1]);
     // Downsample mask.
     downsampleKernelMask<<<gridRGB, block>>>(
-        d_maskPyr[level], widths[level], heights[level], d_maskPyr[level + 1],
-        widths[level + 1], heights[level + 1]);
+        d_maskPyr[level], widths[level], heights[level], d_maskPyr[level + 1], widths[level + 1], heights[level + 1]);
   }
 
   // -----------------------------------------------------------------
@@ -400,55 +429,53 @@ cudaError_t cudaLaplacianBlend(const float *h_image1, const float *h_image2,
   // image.
   // -----------------------------------------------------------------
   for (int level = 0; level < numLevels - 1; level++) {
-    dim3 grid((widths[level] + block.x - 1) / block.x,
-              (heights[level] + block.y - 1) / block.y);
+    dim3 grid((widths[level] + block.x - 1) / block.x, (heights[level] + block.y - 1) / block.y);
     computeLaplacianKernelRGB<<<grid, block>>>(
-        d_gauss1[level], widths[level], heights[level], d_gauss1[level + 1],
-        widths[level + 1], heights[level + 1], d_lap1[level]);
+        d_gauss1[level],
+        widths[level],
+        heights[level],
+        d_gauss1[level + 1],
+        widths[level + 1],
+        heights[level + 1],
+        d_lap1[level]);
     computeLaplacianKernelRGB<<<grid, block>>>(
-        d_gauss2[level], widths[level], heights[level], d_gauss2[level + 1],
-        widths[level + 1], heights[level + 1], d_lap2[level]);
+        d_gauss2[level],
+        widths[level],
+        heights[level],
+        d_gauss2[level + 1],
+        widths[level + 1],
+        heights[level + 1],
+        d_lap2[level]);
   }
   int last = numLevels - 1;
-  cudaMemcpy(d_lap1[last], d_gauss1[last],
-             widths[last] * heights[last] * 3 * sizeof(float),
-             cudaMemcpyDeviceToDevice);
-  cudaMemcpy(d_lap2[last], d_gauss2[last],
-             widths[last] * heights[last] * 3 * sizeof(float),
-             cudaMemcpyDeviceToDevice);
+  cudaMemcpy(d_lap1[last], d_gauss1[last], widths[last] * heights[last] * 3 * sizeof(float), cudaMemcpyDeviceToDevice);
+  cudaMemcpy(d_lap2[last], d_gauss2[last], widths[last] * heights[last] * 3 * sizeof(float), cudaMemcpyDeviceToDevice);
 
   // -----------------------------------------------------------------
   // 3. Blend the Laplacian pyramids at each level using the corresponding mask
   // pyramid.
   // -----------------------------------------------------------------
   for (int level = 0; level < numLevels; level++) {
-    dim3 grid((widths[level] + block.x - 1) / block.x,
-              (heights[level] + block.y - 1) / block.y);
-    blendKernelRGB<<<grid, block>>>(d_lap1[level], d_lap2[level],
-                                    d_maskPyr[level], d_blend[level],
-                                    widths[level], heights[level]);
+    dim3 grid((widths[level] + block.x - 1) / block.x, (heights[level] + block.y - 1) / block.y);
+    blendKernelRGB<<<grid, block>>>(
+        d_lap1[level], d_lap2[level], d_maskPyr[level], d_blend[level], widths[level], heights[level]);
   }
 
   // -----------------------------------------------------------------
   // 4. Reconstruct the final blended image from the blended pyramid.
   // Start from the smallest level and iteratively upsample and add.
   // -----------------------------------------------------------------
-  float *d_reconstruct;
-  cudaMalloc((void **)&d_reconstruct,
-             widths[last] * heights[last] * 3 * sizeof(float));
-  cudaMemcpy(d_reconstruct, d_blend[last],
-             widths[last] * heights[last] * 3 * sizeof(float),
-             cudaMemcpyDeviceToDevice);
+  float* d_reconstruct;
+  cudaMalloc((void**)&d_reconstruct, widths[last] * heights[last] * 3 * sizeof(float));
+  cudaMemcpy(d_reconstruct, d_blend[last], widths[last] * heights[last] * 3 * sizeof(float), cudaMemcpyDeviceToDevice);
 
-  float *d_temp = nullptr;
+  float* d_temp = nullptr;
   for (int level = numLevels - 2; level >= 0; level--) {
     size_t highSize = widths[level] * heights[level] * 3 * sizeof(float);
-    cudaMalloc((void **)&d_temp, highSize);
-    dim3 grid((widths[level] + block.x - 1) / block.x,
-              (heights[level] + block.y - 1) / block.y);
+    cudaMalloc((void**)&d_temp, highSize);
+    dim3 grid((widths[level] + block.x - 1) / block.x, (heights[level] + block.y - 1) / block.y);
     reconstructKernelRGB<<<grid, block>>>(
-        d_reconstruct, widths[level + 1], heights[level + 1], d_blend[level],
-        widths[level], heights[level], d_temp);
+        d_reconstruct, widths[level + 1], heights[level + 1], d_blend[level], widths[level], heights[level], d_temp);
     cudaFree(d_reconstruct);
     d_reconstruct = d_temp;
   }
@@ -481,14 +508,14 @@ cudaError_t cudaLaplacianBlend(const float *h_image1, const float *h_image2,
 //
 //
 
-cudaError_t cudaLaplacianBlendWithContext(const float *d_image1,
-                                          const float *d_image2,
-                                          const float *d_mask, float *d_output,
-                                          CudaLaplacianBlendContext &context) {
-
+cudaError_t cudaLaplacianBlendWithContext(
+    const float* d_image1,
+    const float* d_image2,
+    const float* d_mask,
+    float* d_output,
+    CudaLaplacianBlendContext& context) {
   // For RGB images (3 channels)
-  size_t imageSize =
-      context.imageWidth * context.imageHeight * 3 * sizeof(float);
+  size_t imageSize = context.imageWidth * context.imageHeight * 3 * sizeof(float);
   // For mask (single channel)
   size_t maskSize = context.imageWidth * context.imageHeight * sizeof(float);
 
@@ -506,29 +533,24 @@ cudaError_t cudaLaplacianBlendWithContext(const float *d_image1,
 
     // Allocate device memory for each pyramid level.
     for (int level = 0; level < context.numLevels; level++) {
-      size_t sizeRGB =
-          context.widths[level] * context.heights[level] * 3 * sizeof(float);
-      size_t sizeMask =
-          context.widths[level] * context.heights[level] * sizeof(float);
+      size_t sizeRGB = context.widths[level] * context.heights[level] * 3 * sizeof(float);
+      size_t sizeMask = context.widths[level] * context.heights[level] * sizeof(float);
       // TODO: won't need to allocate 0-level gauss when we just reassign the
       // pointer to incoming image
-      cudaMalloc((void **)&context.d_gauss1[level], sizeRGB);
-      cudaMalloc((void **)&context.d_gauss2[level], sizeRGB);
-      cudaMalloc((void **)&context.d_maskPyr[level], sizeMask);
-      cudaMalloc((void **)&context.d_lap1[level], sizeRGB);
-      cudaMalloc((void **)&context.d_lap2[level], sizeRGB);
-      cudaMalloc((void **)&context.d_blend[level], sizeRGB);
+      cudaMalloc((void**)&context.d_gauss1[level], sizeRGB);
+      cudaMalloc((void**)&context.d_gauss2[level], sizeRGB);
+      cudaMalloc((void**)&context.d_maskPyr[level], sizeMask);
+      cudaMalloc((void**)&context.d_lap1[level], sizeRGB);
+      cudaMalloc((void**)&context.d_lap2[level], sizeRGB);
+      cudaMalloc((void**)&context.d_blend[level], sizeRGB);
     }
-    cudaMemcpy(context.d_maskPyr[0], d_mask, maskSize,
-               cudaMemcpyDeviceToDevice);
+    cudaMemcpy(context.d_maskPyr[0], d_mask, maskSize, cudaMemcpyDeviceToDevice);
   }
 
   // Copy full–resolution images and mask to level 0 of the Gaussian pyramids.
   // TODO: Just set the pointer instead and don;t allocate this level
-  cudaMemcpy(context.d_gauss1[0], d_image1, imageSize,
-             cudaMemcpyDeviceToDevice);
-  cudaMemcpy(context.d_gauss2[0], d_image2, imageSize,
-             cudaMemcpyDeviceToDevice);
+  cudaMemcpy(context.d_gauss1[0], d_image1, imageSize, cudaMemcpyDeviceToDevice);
+  cudaMemcpy(context.d_gauss2[0], d_image2, imageSize, cudaMemcpyDeviceToDevice);
 
   // Kernel launch parameters.
   dim3 block(16, 16);
@@ -537,24 +559,33 @@ cudaError_t cudaLaplacianBlendWithContext(const float *d_image1,
   // 1. Build Gaussian pyramids by downsampling each level.
   // -----------------------------------------------------------------
   for (int level = 0; level < context.numLevels - 1; level++) {
-    dim3 gridRGB((context.widths[level + 1] + block.x - 1) / block.x,
-                 (context.heights[level + 1] + block.y - 1) / block.y);
+    dim3 gridRGB(
+        (context.widths[level + 1] + block.x - 1) / block.x, (context.heights[level + 1] + block.y - 1) / block.y);
     // Downsample image1.
     downsampleKernelRGB<<<gridRGB, block>>>(
-        context.d_gauss1[level], context.widths[level], context.heights[level],
-        context.d_gauss1[level + 1], context.widths[level + 1],
+        context.d_gauss1[level],
+        context.widths[level],
+        context.heights[level],
+        context.d_gauss1[level + 1],
+        context.widths[level + 1],
         context.heights[level + 1]);
     // Downsample image2.
     downsampleKernelRGB<<<gridRGB, block>>>(
-        context.d_gauss2[level], context.widths[level], context.heights[level],
-        context.d_gauss2[level + 1], context.widths[level + 1],
+        context.d_gauss2[level],
+        context.widths[level],
+        context.heights[level],
+        context.d_gauss2[level + 1],
+        context.widths[level + 1],
         context.heights[level + 1]);
     if (!context.initialized) {
       // Downsample mask. (only needs to hbe done the first time)
       downsampleKernelMask<<<gridRGB, block>>>(
-          context.d_maskPyr[level], context.widths[level],
-          context.heights[level], context.d_maskPyr[level + 1],
-          context.widths[level + 1], context.heights[level + 1]);
+          context.d_maskPyr[level],
+          context.widths[level],
+          context.heights[level],
+          context.d_maskPyr[level + 1],
+          context.widths[level + 1],
+          context.heights[level + 1]);
     }
   }
 
@@ -565,59 +596,76 @@ cudaError_t cudaLaplacianBlendWithContext(const float *d_image1,
   // image.
   // -----------------------------------------------------------------
   for (int level = 0; level < context.numLevels - 1; level++) {
-    dim3 grid((context.widths[level] + block.x - 1) / block.x,
-              (context.heights[level] + block.y - 1) / block.y);
+    dim3 grid((context.widths[level] + block.x - 1) / block.x, (context.heights[level] + block.y - 1) / block.y);
     computeLaplacianKernelRGB<<<grid, block>>>(
-        context.d_gauss1[level], context.widths[level], context.heights[level],
-        context.d_gauss1[level + 1], context.widths[level + 1],
-        context.heights[level + 1], context.d_lap1[level]);
+        context.d_gauss1[level],
+        context.widths[level],
+        context.heights[level],
+        context.d_gauss1[level + 1],
+        context.widths[level + 1],
+        context.heights[level + 1],
+        context.d_lap1[level]);
     computeLaplacianKernelRGB<<<grid, block>>>(
-        context.d_gauss2[level], context.widths[level], context.heights[level],
-        context.d_gauss2[level + 1], context.widths[level + 1],
-        context.heights[level + 1], context.d_lap2[level]);
+        context.d_gauss2[level],
+        context.widths[level],
+        context.heights[level],
+        context.d_gauss2[level + 1],
+        context.widths[level + 1],
+        context.heights[level + 1],
+        context.d_lap2[level]);
   }
   int last = context.numLevels - 1;
-  cudaMemcpy(context.d_lap1[last], context.d_gauss1[last],
-             context.widths[last] * context.heights[last] * 3 * sizeof(float),
-             cudaMemcpyDeviceToDevice);
-  cudaMemcpy(context.d_lap2[last], context.d_gauss2[last],
-             context.widths[last] * context.heights[last] * 3 * sizeof(float),
-             cudaMemcpyDeviceToDevice);
+  cudaMemcpy(
+      context.d_lap1[last],
+      context.d_gauss1[last],
+      context.widths[last] * context.heights[last] * 3 * sizeof(float),
+      cudaMemcpyDeviceToDevice);
+  cudaMemcpy(
+      context.d_lap2[last],
+      context.d_gauss2[last],
+      context.widths[last] * context.heights[last] * 3 * sizeof(float),
+      cudaMemcpyDeviceToDevice);
 
   // -----------------------------------------------------------------
   // 3. Blend the Laplacian pyramids at each level using the corresponding mask
   // pyramid.
   // -----------------------------------------------------------------
   for (int level = 0; level < context.numLevels; level++) {
-    dim3 grid((context.widths[level] + block.x - 1) / block.x,
-              (context.heights[level] + block.y - 1) / block.y);
+    dim3 grid((context.widths[level] + block.x - 1) / block.x, (context.heights[level] + block.y - 1) / block.y);
     blendKernelRGB<<<grid, block>>>(
-        context.d_lap1[level], context.d_lap2[level], context.d_maskPyr[level],
-        context.d_blend[level], context.widths[level], context.heights[level]);
+        context.d_lap1[level],
+        context.d_lap2[level],
+        context.d_maskPyr[level],
+        context.d_blend[level],
+        context.widths[level],
+        context.heights[level]);
   }
 
   // -----------------------------------------------------------------
   // 4. Reconstruct the final blended image from the blended pyramid.
   // Start from the smallest level and iteratively upsample and add.
   // -----------------------------------------------------------------
-  float *d_reconstruct;
-  cudaMalloc((void **)&d_reconstruct,
-             context.widths[last] * context.heights[last] * 3 * sizeof(float));
-  cudaMemcpy(d_reconstruct, context.d_blend[last],
-             context.widths[last] * context.heights[last] * 3 * sizeof(float),
-             cudaMemcpyDeviceToDevice);
+  float* d_reconstruct;
+  cudaMalloc((void**)&d_reconstruct, context.widths[last] * context.heights[last] * 3 * sizeof(float));
+  cudaMemcpy(
+      d_reconstruct,
+      context.d_blend[last],
+      context.widths[last] * context.heights[last] * 3 * sizeof(float),
+      cudaMemcpyDeviceToDevice);
 
   // TODO: cache these allocations/frees for reconstruct?
-  float *d_temp = nullptr;
+  float* d_temp = nullptr;
   for (int level = context.numLevels - 2; level >= 0; level--) {
-    size_t highSize =
-        context.widths[level] * context.heights[level] * 3 * sizeof(float);
-    cudaMalloc((void **)&d_temp, highSize);
-    dim3 grid((context.widths[level] + block.x - 1) / block.x,
-              (context.heights[level] + block.y - 1) / block.y);
+    size_t highSize = context.widths[level] * context.heights[level] * 3 * sizeof(float);
+    cudaMalloc((void**)&d_temp, highSize);
+    dim3 grid((context.widths[level] + block.x - 1) / block.x, (context.heights[level] + block.y - 1) / block.y);
     reconstructKernelRGB<<<grid, block>>>(
-        d_reconstruct, context.widths[level + 1], context.heights[level + 1],
-        context.d_blend[level], context.widths[level], context.heights[level],
+        d_reconstruct,
+        context.widths[level + 1],
+        context.heights[level + 1],
+        context.d_blend[level],
+        context.widths[level],
+        context.heights[level],
         d_temp);
     cudaFree(d_reconstruct);
     d_reconstruct = d_temp;
@@ -635,4 +683,3 @@ cudaError_t cudaLaplacianBlendWithContext(const float *d_image1,
   context.initialized = true;
   return cudaGetLastError();
 }
-
