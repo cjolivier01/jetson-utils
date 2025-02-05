@@ -714,7 +714,7 @@ int main(int argc, char** argv) {
 
     cuerr = simple_make_full_batch<T, unsigned char>(
         // Image 1 (float image)
-        (const float*)stitch_context.cudaRemapped_1->data(),
+        stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
         stitch_context.cudaRemapped_1->height(),
         /*region_width=*/roi_width(mask_converter.roi_blend_1),
@@ -740,7 +740,7 @@ int main(int argc, char** argv) {
 
     cuerr = simple_make_full_batch<T, unsigned char>(
         // Image 1 (float image)
-        (const float*)stitch_context.cudaRemapped_2->data(),
+        stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
         stitch_context.cudaRemapped_2->height(),
         /*region_width=*/roi_width(mask_converter.roi_blend_2),
@@ -768,9 +768,9 @@ int main(int argc, char** argv) {
 
     CudaMat<T>& cudaBlendedFull = *stitch_context.cudaFull1;
     cuerr = cudaBatchedLaplacianBlendWithContext(
-        (const float*)stitch_context.cudaFull1->data(),
-        (const float*)stitch_context.cudaFull2->data(),
-        (const float*)stitch_context.cudaBlendSeam->data(),
+        stitch_context.cudaFull1->data(),
+        stitch_context.cudaFull2->data(),
+        stitch_context.cudaBlendSeam->data(),
         // Put output in full-1 memory
         (float*)cudaBlendedFull.data(),
         *stitch_context.laplacian_blend_context,
@@ -785,7 +785,7 @@ int main(int argc, char** argv) {
     assert(mask_converter.partial_size_1.width == roi_width(mask_converter.roi_partial_1));
     assert(mask_converter.partial_size_1.height == roi_height(mask_converter.roi_partial_1));
     cuerr = copyRoiBatchedInterface(
-        (const float*)stitch_context.cudaRemapped_1->data(),
+        stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
         stitch_context.cudaRemapped_1->height(),
         roi_width(mask_converter.roi_partial_1),
@@ -807,7 +807,7 @@ int main(int argc, char** argv) {
     assert(mask_converter.partial_size_2.width == roi_width(mask_converter.roi_partial_2));
     assert(mask_converter.partial_size_2.height == roi_height(mask_converter.roi_partial_2));
     cuerr = copyRoiBatchedInterface(
-        (const float*)stitch_context.cudaRemapped_2->data(),
+        stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
         stitch_context.cudaRemapped_2->height(),
         mask_converter.partial_size_2.width,
@@ -828,7 +828,7 @@ int main(int argc, char** argv) {
 #if 1
     // Blended middle
     cuerr = copyRoiBatchedInterface(
-        (const float*)cudaBlendedFull.data(),
+        cudaBlendedFull.data(),
         cudaBlendedFull.width(),
         cudaBlendedFull.height(),
         cudaBlendedFull.width(),
