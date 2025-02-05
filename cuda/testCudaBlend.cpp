@@ -612,7 +612,7 @@ class CudaStitchPano {
 
 #if 1
     //
-    // Now copy the blending portion of image 1 from the canvas onto the blend image
+    // Now copy the blending portion of remapped image 1 from the canvas onto the blend image
     //
     cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
@@ -666,7 +666,7 @@ class CudaStitchPano {
 
 #if 1
     //
-    // Now copy the blending portion of image 2 from the canvas onto the blend image
+    // Now copy the blending portion of remapped image 2 from the canvas onto the blend image
     //
     cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
@@ -698,7 +698,7 @@ class CudaStitchPano {
     CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
 #if 1
     //
-    // BLEND THE IMAGES
+    // BLEND THE IMAGES (overlapping portions + some padding)
     //
     cuerr = cudaBatchedLaplacianBlendWithContext(
         stitch_context.cudaFull1->data(),
