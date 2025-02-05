@@ -855,12 +855,12 @@ int main(int argc, char** argv) {
     assert(cuerr == cudaError_t::cudaSuccess);
 #endif
 
-    cudaStreamSynchronize(stream);
+    //cudaStreamSynchronize(stream);
 
     // cudaStreamSynchronize(stream);
     // auto disp = blending_1.download();
     //  auto disp = cudaBlendSeam.download();
-    auto disp = canvas->download();
+    //auto disp = canvas->download();
     //auto disp = sampleImage2.download();
     // auto disp = cudaBlendedFull.download();
     // auto disp = cudaFull1.download();
@@ -872,8 +872,8 @@ int main(int argc, char** argv) {
     //    auto disp = cudaBlendedFloat.download();
     //    disp.convertTo(disp, CV_8UC3, 255.0);
     //cv::imshow("image", disp);
-    cv::imshow("image", disp);
-    cv::waitKey(0);
+    //cv::imshow("image", disp);
+    //cv::waitKey(0);
 
     return canvas;
   };
@@ -889,14 +889,14 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
 
-  size_t frame_count = 1000;
+  size_t frame_count = 100;
   for (size_t i = 0; i < frame_count; ++i) {
-    canvas_result = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+    auto canvas_result = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
     cudaStreamSynchronize(stream);
   }
 
