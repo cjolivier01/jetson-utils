@@ -265,11 +265,6 @@ class RenderSet {
 
 } // namespace
 
-void test_remapping();
-// cudaError_t cudaLaplacianBlend(const float* image1, const float* image2,
-//                                const float* mask, float* output, int
-//                                imageWidth, int imageHeight, int numLevels);
-
 cv::Mat load_seam_mask(const std::string& filename) {
   cv::Mat seam_mask = cv::imread(filename, cv::IMREAD_ANYDEPTH);
   if (!seam_mask.empty()) {
@@ -715,6 +710,8 @@ int main(int argc, char** argv) {
   // cv::Mat blended_float(img1.size(), CV_32FC3);
   // CudaMat cudaBlendedFloat(blended_float);
 
+  cudaError_t cuerr = cudaError_t::cudaSuccess;
+
   cudaDeviceSynchronize();
 
   // Set default color for unmapped pixels.
@@ -858,11 +855,46 @@ int main(int argc, char** argv) {
   // Destination canvas
   CudaMat canvas(canvas_mat, /*copy=*/false);
 
+  cuerr = copyRoiBatchedInterface(
+    (const float*)cudaRemapped_1.data(),
+    cudaRemapped_1.width(),
+    cudaRemapped_1.height(),
+    roi_width(roi_partial_1),
+    roi_height(roi_partial_1),
+    roi_partial_1.x,
+    roi_partial_1.y,
+    (float*) canvas.data(),
+    canvas.width(),
+    canvas.height(),
+    /*offsetX=*/positions[0].xpos + roi_partial_1.x,
+    /*offsetY=*/positions[0].ypos + roi_partial_1.y,
+    /*channels=*/3,
+    /*batchSize=*/1,
+    stream);
+
+  cuerr = copyRoiBatchedInterface(
+    (const float*)cudaRemapped_2.data(),
+    cudaRemapped_2.width(),
+    cudaRemapped_2.height(),
+    roi_width(roi_partial_2),
+    roi_height(roi_partial_2),
+    roi_partial_2.x,
+    roi_partial_2.y,
+    (float*) canvas.data(),
+    canvas.width(),
+    canvas.height(),
+    /*offsetX=*/positions[1].xpos + roi_partial_2.x,
+    /*offsetY=*/positions[1].ypos + roi_partial_2.y,
+    /*channels=*/3,
+    /*batchSize=*/1,
+    stream);
+
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
   // auto disp = blending_1.download();
   // auto disp = cudaBlendSeam.download();
-  auto disp = cudaBlendedFull.download();
+  auto disp = canvas.download();
+  //auto disp = cudaBlendedFull.download();
   // auto disp = cudaFull1.download();
   //  auto disp = cudaFull2.download();
   //  auto disp = blending_2.download();
@@ -944,96 +976,6 @@ int main(int argc, char** argv) {
   // }
 
   std::cout << "Blended image saved as: " << argv[4] << std::endl;
-  test_remapping();
   return cu_err;
 }
 
-void test_remapping() {
-  // Define image dimensions.
-  const int srcW = 4, srcH = 4; // Source image dimensions.
-  const int destW = 4, destH = 4; // Destination image dimensions.
-
-  // Allocate and initialize the host source image.
-  // Each pixel has 3 channels (RGB) stored as floats.
-  float h_src[srcW * srcH * 3];
-  for (int y = 0; y < srcH; y++) {
-    for (int x = 0; x < srcW; x++) {
-      int idx = (y * srcW + x) * 3;
-      // Set the pixel to (x, y, x+y)
-      h_src[idx + 0] = static_cast<float>(x);
-      h_src[idx + 1] = static_cast<float>(y);
-      h_src[idx + 2] = static_cast<float>(x + y);
-    }
-  }
-
-  // Allocate and initialize the host destination image.
-  float h_dest[destW * destH * 3] = {0};
-
-  // Allocate and initialize the host mapping arrays (unsigned short).
-  // For each destination pixel (x, y), we want to map to source pixel (x-1,
-  // y-1). If (x-1) or (y-1) is negative, we set the mapping to an out-of-range
-  // value.
-  unsigned short h_mapX[destW * destH];
-  unsigned short h_mapY[destW * destH];
-  for (int y = 0; y < destH; y++) {
-    for (int x = 0; x < destW; x++) {
-      int idx = y * destW + x;
-      int mapXVal = x - 1;
-      int mapYVal = y - 1;
-      // If the mapping is negative, assign an out-of-range value.
-      h_mapX[idx] = (mapXVal < 0) ? static_cast<unsigned short>(srcW) : static_cast<unsigned short>(mapXVal);
-      h_mapY[idx] = (mapYVal < 0) ? static_cast<unsigned short>(srcH) : static_cast<unsigned short>(mapYVal);
-    }
-  }
-
-  // Allocate device memory.
-  float *d_src = nullptr, *d_dest = nullptr;
-  unsigned short *d_mapX = nullptr, *d_mapY = nullptr;
-  cudaMalloc(&d_src, sizeof(float) * srcW * srcH * 3);
-  cudaMalloc(&d_dest, sizeof(float) * destW * destH * 3);
-  cudaMalloc(&d_mapX, sizeof(unsigned short) * destW * destH);
-  cudaMalloc(&d_mapY, sizeof(unsigned short) * destW * destH);
-
-  // Copy data from host to device.
-  cudaMemcpy(d_src, h_src, sizeof(float) * srcW * srcH * 3, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_mapX, h_mapX, sizeof(unsigned short) * destW * destH, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_mapY, h_mapY, sizeof(unsigned short) * destW * destH, cudaMemcpyHostToDevice);
-
-  // Define kernel launch configuration.
-  // dim3 blockDim(16, 16);
-  // dim3 gridDim((destW + blockDim.x - 1) / blockDim.x, (destH + blockDim.y -
-  // 1) / blockDim.y);
-
-  // Set default color for unmapped pixels.
-  float defaultR = 100.0f, defaultG = 100.0f, defaultB = 100.0f;
-
-  // Launch the remap kernel.
-  remap_kernel(d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY, defaultR, defaultG, defaultB);
-
-  // Wait for the kernel to finish.
-  cudaDeviceSynchronize();
-
-  // Copy the destination image back to host memory.
-  cudaMemcpy(h_dest, d_dest, sizeof(float) * destW * destH * 3, cudaMemcpyDeviceToHost);
-
-  // Print out the destination image.
-  // Each pixel is printed as (R, G, B).
-  std::cout << "Destination image:" << std::endl;
-  for (int y = 0; y < destH; y++) {
-    for (int x = 0; x < destW; x++) {
-      int idx = (y * destW + x) * 3;
-      std::cout << "(" << h_dest[idx + 0] << ", " << h_dest[idx + 1] << ", " << h_dest[idx + 2] << ") ";
-    }
-    std::cout << std::endl;
-  }
-
-  // Clean up device memory.
-  cudaFree(d_src);
-  cudaFree(d_dest);
-  cudaFree(d_mapX);
-  cudaFree(d_mapY);
-  // std::cout << "Done. Press a key." << std::endl;
-  // char c;
-  // std::cin >> c;
-  // std::cout << "Exiting..." << std::endl;
-}

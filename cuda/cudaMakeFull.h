@@ -3,6 +3,48 @@
 #include <cuda_runtime.h>
 
 /**
+ * @brief Interface function for launching the batched ROI copy kernel for float images.
+ *
+ * This function sets up the grid and block dimensions and launches the copyRoiKernelBatched kernel,
+ * which copies a rectangular region (ROI) from each source image in a batch into its corresponding
+ * destination image.
+ *
+ * @param d_src Pointer to the batch of source images in device memory.
+ * @param full_src_width Full width of each source image.
+ * @param full_src_height Full height of each source image.
+ * @param regionWidth Width of the ROI to copy.
+ * @param regionHeight Height of the ROI to copy.
+ * @param srcROI_x X-coordinate of the top-left corner of the ROI in the source images.
+ * @param srcROI_y Y-coordinate of the top-left corner of the ROI in the source images.
+ * @param d_dest Pointer to the batch of destination images in device memory.
+ * @param destWidth Width of each destination image.
+ * @param destHeight Height of each destination image.
+ * @param offsetX X-coordinate in the destination image where the ROI should be pasted.
+ * @param offsetY Y-coordinate in the destination image where the ROI should be pasted.
+ * @param channels Number of channels per pixel.
+ * @param batchSize Number of images in the batch.
+ * @param stream CUDA stream to use for kernel launch (default is stream 0).
+ *
+ * @return cudaError_t The status of the kernel launch.
+ */
+cudaError_t copyRoiBatchedInterface(
+    const float* d_src,
+    int full_src_width,
+    int full_src_height,
+    int regionWidth,
+    int regionHeight,
+    int srcROI_x,
+    int srcROI_y,
+    float* d_dest,
+    int destWidth,
+    int destHeight,
+    int offsetX,
+    int offsetY,
+    int channels,
+    int batchSize,
+    cudaStream_t stream = 0);
+
+/**
  * @brief Creates full canvas images by copying specified source ROIs from a batch of images (and optional masks)
  *        into preallocated destination canvases.
  *
@@ -40,7 +82,7 @@
  * provided). Expected size: batchSize x canvas_w x canvas_h x mask_channels.
  * @param stream CUDA stream to use for kernel launches (default: stream 0).
  */
-void simple_make_full_batch(
+cudaError_t simple_make_full_batch(
     // Batch of images:
     const float* d_imgs,
     int src_full_width,
