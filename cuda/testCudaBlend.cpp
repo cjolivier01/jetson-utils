@@ -882,7 +882,7 @@ int main(int argc, char** argv) {
   CudaMat<T> sampleImage2(sample_img_right);
 
   auto blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
-  SHOW_IMAGE(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
   blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
