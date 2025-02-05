@@ -615,11 +615,6 @@ int main(int argc, char** argv) {
       numLevels,
       /*batch_size=*/stitch_context.batch_size());
 
-  cudaError_t cuerr = cudaError_t::cudaSuccess;
-
-  // Set default color for unmapped pixels.
-  float defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
-
   const cv::Size partial_size_1(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height);
   const int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_size_1.height};
   const int4 roi_blend_1 = {
@@ -645,190 +640,206 @@ int main(int argc, char** argv) {
   CudaMat sampleImage1(sample_img_left);
   CudaMat sampleImage2(sample_img_right);
 
-  // Launch the remap kernel.
-  batched_remap_kernel(
-      (float*)sampleImage1.data(),
-      sampleImage1.width(),
-      sampleImage1.height(),
-      (float*)stitch_context.cudaRemapped_1->data(),
-      stitch_context.cudaRemapped_1->width(),
-      stitch_context.cudaRemapped_1->height(),
-      (uint16_t*)stitch_context.remap_1_x->data(),
-      (uint16_t*)stitch_context.remap_1_y->data(),
-      defaultR,
-      defaultG,
-      defaultB,
-      /*batchSize=*/stitch_context.batch_size(),
-      stream);
+  auto process = [&](const CudaMat& sampleImage1,
+                     const CudaMat sampleImage2,
+                     StitchingContext& stitch_context,
+                     MaskConverter& mask_converter,
+                     cudaStream_t stream) -> CudaMat {
+    cudaError_t cuerr = cudaError_t::cudaSuccess;
 
-  batched_remap_kernel(
-      (float*)sampleImage2.data(),
-      sampleImage2.width(),
-      sampleImage2.height(),
-      (float*)stitch_context.cudaRemapped_2->data(),
-      stitch_context.cudaRemapped_2->width(),
-      stitch_context.cudaRemapped_2->height(),
-      (uint16_t*)stitch_context.remap_2_x->data(),
-      (uint16_t*)stitch_context.remap_2_y->data(),
-      defaultR,
-      defaultG,
-      defaultB,
-      /*batchSize=*/stitch_context.batch_size(),
-      stream);
+    // Set default color for unmapped pixels.
+    constexpr float defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
 
-  int y1 = positions[0].ypos;
-  int y2 = positions[1].ypos;
+    // Launch the remap kernel.
+    batched_remap_kernel(
+        (float*)sampleImage1.data(),
+        sampleImage1.width(),
+        sampleImage1.height(),
+        (float*)stitch_context.cudaRemapped_1->data(),
+        stitch_context.cudaRemapped_1->width(),
+        stitch_context.cudaRemapped_1->height(),
+        (uint16_t*)stitch_context.remap_1_x->data(),
+        (uint16_t*)stitch_context.remap_1_y->data(),
+        defaultR,
+        defaultG,
+        defaultB,
+        /*batchSize=*/stitch_context.batch_size(),
+        stream);
 
-  auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
-  auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
+    batched_remap_kernel(
+        (float*)sampleImage2.data(),
+        sampleImage2.width(),
+        sampleImage2.height(),
+        (float*)stitch_context.cudaRemapped_2->data(),
+        stitch_context.cudaRemapped_2->width(),
+        stitch_context.cudaRemapped_2->height(),
+        (uint16_t*)stitch_context.remap_2_x->data(),
+        (uint16_t*)stitch_context.remap_2_y->data(),
+        defaultR,
+        defaultG,
+        defaultB,
+        /*batchSize=*/stitch_context.batch_size(),
+        stream);
 
-  simple_make_full_batch(
-      // Image 1 (float image)
-      (const float*)stitch_context.cudaRemapped_1->data(),
-      stitch_context.cudaRemapped_1->width(),
-      stitch_context.cudaRemapped_1->height(),
-      /*region_width=*/roi_width(roi_blend_1),
-      /*region_height=*/roi_height(roi_blend_1),
-      /*channels=*/3,
-      // Batch of masks (optional)
-      nullptr,
-      0,
-      0,
-      0,
-      roi_blend_1.x,
-      roi_blend_1.y,
-      mask_converter._remapper_1.xpos,
-      y1,
-      stitch_context.cudaBlendSeam->width(),
-      stitch_context.cudaBlendSeam->height(),
-      /*adjust_origin=*/false,
-      /*batchSize=*/stitch_context.batch_size(),
-      (float*)stitch_context.cudaFull1->data(),
-      /*d_full_masks=*/nullptr,
-      stream);
+    int y1 = positions[0].ypos;
+    int y2 = positions[1].ypos;
 
-  simple_make_full_batch(
-      // Image 1 (float image)
-      (const float*)stitch_context.cudaRemapped_2->data(),
-      stitch_context.cudaRemapped_2->width(),
-      stitch_context.cudaRemapped_2->height(),
-      /*region_width=*/roi_width(roi_blend_2),
-      /*region_height=*/roi_height(roi_blend_2),
-      /*channels=*/3,
-      // Batch of masks (optional)
-      nullptr,
-      0,
-      0,
-      0,
-      // Src ROI x, y offset
-      roi_blend_2.x,
-      roi_blend_2.y,
-      // Dest ROI x, y offset
-      mask_converter._remapper_2.xpos,
-      y2,
-      stitch_context.cudaBlendSeam->width(),
-      stitch_context.cudaBlendSeam->height(),
-      /*adjust_origin=*/false,
-      /*batchSize=*/stitch_context.batch_size(),
-      (float*)stitch_context.cudaFull2->data(),
-      /*d_full_masks=*/nullptr,
-      stream);
+    auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
+    auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
 
-  CudaMat& cudaBlendedFull = *stitch_context.cudaFull1;
-  cuerr = cudaBatchedLaplacianBlendWithContext(
-      (const float*)stitch_context.cudaFull1->data(),
-      (const float*)stitch_context.cudaFull2->data(),
-      (const float*)stitch_context.cudaBlendSeam->data(),
-      // Put output in full-1 memory
-      (float*)cudaBlendedFull.data(),
-      *stitch_context.laplacian_blend_context,
-      stream);
+    simple_make_full_batch(
+        // Image 1 (float image)
+        (const float*)stitch_context.cudaRemapped_1->data(),
+        stitch_context.cudaRemapped_1->width(),
+        stitch_context.cudaRemapped_1->height(),
+        /*region_width=*/roi_width(roi_blend_1),
+        /*region_height=*/roi_height(roi_blend_1),
+        /*channels=*/3,
+        // Batch of masks (optional)
+        nullptr,
+        0,
+        0,
+        0,
+        roi_blend_1.x,
+        roi_blend_1.y,
+        mask_converter._remapper_1.xpos,
+        y1,
+        stitch_context.cudaBlendSeam->width(),
+        stitch_context.cudaBlendSeam->height(),
+        /*adjust_origin=*/false,
+        /*batchSize=*/stitch_context.batch_size(),
+        (float*)stitch_context.cudaFull1->data(),
+        /*d_full_masks=*/nullptr,
+        stream);
 
-  // Destination canvas
-  CudaMat canvas(canvas_mat, /*copy=*/false);
+    simple_make_full_batch(
+        // Image 1 (float image)
+        (const float*)stitch_context.cudaRemapped_2->data(),
+        stitch_context.cudaRemapped_2->width(),
+        stitch_context.cudaRemapped_2->height(),
+        /*region_width=*/roi_width(roi_blend_2),
+        /*region_height=*/roi_height(roi_blend_2),
+        /*channels=*/3,
+        // Batch of masks (optional)
+        nullptr,
+        0,
+        0,
+        0,
+        // Src ROI x, y offset
+        roi_blend_2.x,
+        roi_blend_2.y,
+        // Dest ROI x, y offset
+        mask_converter._remapper_2.xpos,
+        y2,
+        stitch_context.cudaBlendSeam->width(),
+        stitch_context.cudaBlendSeam->height(),
+        /*adjust_origin=*/false,
+        /*batchSize=*/stitch_context.batch_size(),
+        (float*)stitch_context.cudaFull2->data(),
+        /*d_full_masks=*/nullptr,
+        stream);
+
+    CudaMat& cudaBlendedFull = *stitch_context.cudaFull1;
+    cuerr = cudaBatchedLaplacianBlendWithContext(
+        (const float*)stitch_context.cudaFull1->data(),
+        (const float*)stitch_context.cudaFull2->data(),
+        (const float*)stitch_context.cudaBlendSeam->data(),
+        // Put output in full-1 memory
+        (float*)cudaBlendedFull.data(),
+        *stitch_context.laplacian_blend_context,
+        stream);
+
+    // Destination canvas
+    CudaMat canvas(canvas_mat, /*copy=*/false);
 
 #if 1
-  // Unblended Left Side
-  assert(partial_size_1.width == roi_width(roi_partial_1));
-  assert(partial_size_1.height == roi_height(roi_partial_1));
-  cuerr = copyRoiBatchedInterface(
-      (const float*)stitch_context.cudaRemapped_1->data(),
-      stitch_context.cudaRemapped_1->width(),
-      stitch_context.cudaRemapped_1->height(),
-      roi_width(roi_partial_1),
-      roi_height(roi_partial_1),
-      roi_partial_1.x,
-      roi_partial_1.y,
-      (float*)canvas.data(),
-      canvas.width(),
-      canvas.height(),
-      /*offsetX=*/positions[0].xpos,
-      /*offsetY=*/positions[0].ypos,
-      /*channels=*/3,
-      /*batchSize=*/stitch_context.batch_size(),
-      stream);
+    // Unblended Left Side
+    assert(partial_size_1.width == roi_width(roi_partial_1));
+    assert(partial_size_1.height == roi_height(roi_partial_1));
+    cuerr = copyRoiBatchedInterface(
+        (const float*)stitch_context.cudaRemapped_1->data(),
+        stitch_context.cudaRemapped_1->width(),
+        stitch_context.cudaRemapped_1->height(),
+        roi_width(roi_partial_1),
+        roi_height(roi_partial_1),
+        roi_partial_1.x,
+        roi_partial_1.y,
+        (float*)canvas.data(),
+        canvas.width(),
+        canvas.height(),
+        /*offsetX=*/positions[0].xpos,
+        /*offsetY=*/positions[0].ypos,
+        /*channels=*/3,
+        /*batchSize=*/stitch_context.batch_size(),
+        stream);
 #endif
 
 #if 1
-  assert(partial_size_2.width == roi_width(roi_partial_2));
-  assert(partial_size_2.height == roi_height(roi_partial_2));
-  cuerr = copyRoiBatchedInterface(
-      (const float*)stitch_context.cudaRemapped_2->data(),
-      stitch_context.cudaRemapped_2->width(),
-      stitch_context.cudaRemapped_2->height(),
-      partial_size_2.width,
-      partial_size_2.height,
-      roi_partial_2.x,
-      roi_partial_2.y,
-      (float*)canvas.data(),
-      canvas.width(),
-      canvas.height(),
-      /*offsetX=*/positions[1].xpos + mask_converter._overlapping_width - mask_converter._overlap_pad,
-      /*offsetY=*/positions[1].ypos,
-      /*channels=*/3,
-      /*batchSize=*/stitch_context.batch_size(),
-      stream);
+    assert(partial_size_2.width == roi_width(roi_partial_2));
+    assert(partial_size_2.height == roi_height(roi_partial_2));
+    cuerr = copyRoiBatchedInterface(
+        (const float*)stitch_context.cudaRemapped_2->data(),
+        stitch_context.cudaRemapped_2->width(),
+        stitch_context.cudaRemapped_2->height(),
+        partial_size_2.width,
+        partial_size_2.height,
+        roi_partial_2.x,
+        roi_partial_2.y,
+        (float*)canvas.data(),
+        canvas.width(),
+        canvas.height(),
+        /*offsetX=*/positions[1].xpos + mask_converter._overlapping_width - mask_converter._overlap_pad,
+        /*offsetY=*/positions[1].ypos,
+        /*channels=*/3,
+        /*batchSize=*/stitch_context.batch_size(),
+        stream);
 #endif
 
 #if 1
-  // Blended middle
-  cuerr = copyRoiBatchedInterface(
-      (const float*)cudaBlendedFull.data(),
-      cudaBlendedFull.width(),
-      cudaBlendedFull.height(),
-      cudaBlendedFull.width(),
-      cudaBlendedFull.height(),
-      0,
-      0,
-      (float*)canvas.data(),
-      canvas.width(),
-      canvas.height(),
-      /*offsetX=*/positions[1].xpos - mask_converter._overlap_pad,
-      /*offsetY=*/0,
-      /*channels=*/3,
-      /*batchSize=*/stitch_context.batch_size(),
-      stream);
+    // Blended middle
+    cuerr = copyRoiBatchedInterface(
+        (const float*)cudaBlendedFull.data(),
+        cudaBlendedFull.width(),
+        cudaBlendedFull.height(),
+        cudaBlendedFull.width(),
+        cudaBlendedFull.height(),
+        0,
+        0,
+        (float*)canvas.data(),
+        canvas.width(),
+        canvas.height(),
+        /*offsetX=*/positions[1].xpos - mask_converter._overlap_pad,
+        /*offsetY=*/0,
+        /*channels=*/3,
+        /*batchSize=*/stitch_context.batch_size(),
+        stream);
 #endif
+
+    cudaStreamSynchronize(stream);
+    // auto disp = blending_1.download();
+    // auto disp = cudaBlendSeam.download();
+    auto disp = canvas.download();
+    // auto disp = cudaBlendedFull.download();
+    //  auto disp = cudaFull1.download();
+    //   auto disp = cudaFull2.download();
+    //   auto disp = blending_2.download();
+    //   auto disp = cudaRemapped_1->download();
+    // auto disp = cudaRemapped_2->download();
+    //   auto disp = sampleImage2.download();
+    //   auto disp = cudaBlendedFloat.download();
+    //   disp.convertTo(disp, CV_8UC3, 255.0);
+    cv::imshow("image", disp);
+    cv::waitKey(0);
+
+    return canvas;
+  };
+
+  auto canvas_result = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
 
   cudaStreamSynchronize(stream);
   cudaStreamDestroy(stream);
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
-
-  // auto disp = blending_1.download();
-  // auto disp = cudaBlendSeam.download();
-  auto disp = canvas.download();
-  // auto disp = cudaBlendedFull.download();
-  //  auto disp = cudaFull1.download();
-  //   auto disp = cudaFull2.download();
-  //   auto disp = blending_2.download();
-  //   auto disp = cudaRemapped_1->download();
-  // auto disp = cudaRemapped_2->download();
-  //   auto disp = sampleImage2.download();
-  //   auto disp = cudaBlendedFloat.download();
-  //   disp.convertTo(disp, CV_8UC3, 255.0);
-  cv::imshow("image", disp);
-  cv::waitKey(0);
 
 #if 0 /* perf test */
   auto start_ms =
@@ -847,5 +858,5 @@ int main(int argc, char** argv) {
   std::cout << "Blend speed: " << (1.0 / sec_per_frame) << "fps" << std::endl;
 #endif
 
-  return cuerr;
+  return cudaSuccess;
 }
