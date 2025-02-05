@@ -143,9 +143,9 @@ cudaError_t batched_remap_kernel(
     int destH,
     const unsigned short* d_mapX,
     const unsigned short* d_mapY,
-    T_out defR,
-    T_out defG,
-    T_out defB,
+    T_in defR,
+    T_in defG,
+    T_in defB,
     int batchSize,
     cudaStream_t stream)
 {
@@ -164,20 +164,6 @@ cudaError_t batched_remap_kernel(
 // Explicit Template Instantiations
 //
 
-// 1. Input type = float, Output type = float.
-template cudaError_t remap_kernel<float, float>(
-    const float* d_src,
-    int srcW,
-    int srcH,
-    float* d_dest,
-    int destW,
-    int destH,
-    const unsigned short* d_mapX,
-    const unsigned short* d_mapY,
-    float defR,
-    float defG,
-    float defB,
-    cudaStream_t stream);
 
 template cudaError_t batched_remap_kernel<float, float>(
     const float* d_src,
@@ -194,21 +180,6 @@ template cudaError_t batched_remap_kernel<float, float>(
     int batchSize,
     cudaStream_t stream);
 
-// 2. Input type = float, Output type = __half.
-template cudaError_t remap_kernel<float, __half>(
-    const float* d_src,
-    int srcW,
-    int srcH,
-    __half* d_dest,
-    int destW,
-    int destH,
-    const unsigned short* d_mapX,
-    const unsigned short* d_mapY,
-    __half defR,
-    __half defG,
-    __half defB,
-    cudaStream_t stream);
-
 template cudaError_t batched_remap_kernel<float, __half>(
     const float* d_src,
     int srcW,
@@ -218,25 +189,10 @@ template cudaError_t batched_remap_kernel<float, __half>(
     int destH,
     const unsigned short* d_mapX,
     const unsigned short* d_mapY,
-    __half defR,
-    __half defG,
-    __half defB,
-    int batchSize,
-    cudaStream_t stream);
-
-// 3. Input type = __half, Output type = float.
-template cudaError_t remap_kernel<__half, float>(
-    const __half* d_src,
-    int srcW,
-    int srcH,
-    float* d_dest,
-    int destW,
-    int destH,
-    const unsigned short* d_mapX,
-    const unsigned short* d_mapY,
     float defR,
     float defG,
     float defB,
+    int batchSize,
     cudaStream_t stream);
 
 template cudaError_t batched_remap_kernel<__half, float>(
@@ -248,25 +204,10 @@ template cudaError_t batched_remap_kernel<__half, float>(
     int destH,
     const unsigned short* d_mapX,
     const unsigned short* d_mapY,
-    float defR,
-    float defG,
-    float defB,
-    int batchSize,
-    cudaStream_t stream);
-
-// 4. Input type = __half, Output type = __half.
-template cudaError_t remap_kernel<__half, __half>(
-    const __half* d_src,
-    int srcW,
-    int srcH,
-    __half* d_dest,
-    int destW,
-    int destH,
-    const unsigned short* d_mapX,
-    const unsigned short* d_mapY,
     __half defR,
     __half defG,
     __half defB,
+    int batchSize,
     cudaStream_t stream);
 
 template cudaError_t batched_remap_kernel<__half, __half>(

@@ -3,40 +3,6 @@
 #include <cuda_runtime.h>
 
 /**
- * @brief Remap a single image using mapping arrays.
- *
- * This host function launches the remapKernel on the default or specified CUDA stream.
- *
- * @param d_src Device pointer to the source image.
- * @param srcW Width of the source image.
- * @param srcH Height of the source image.
- * @param d_dest Device pointer to the destination image.
- * @param destW Width of the destination image.
- * @param destH Height of the destination image.
- * @param d_mapX Device pointer to the mapping array for X coordinates.
- * @param d_mapY Device pointer to the mapping array for Y coordinates.
- * @param defR Default red component (if mapping is out-of-range).
- * @param defG Default green component.
- * @param defB Default blue component.
- * @param stream CUDA stream to use for the kernel launch (default is 0).
- * @return cudaError_t The status returned by cudaGetLastError.
- */
-template <typename T_in, typename T_out>
-cudaError_t remap_kernel(
-    const T_in* d_src,
-    int srcW,
-    int srcH,
-    T_out* d_dest,
-    int destW,
-    int destH,
-    const unsigned short* d_mapX,
-    const unsigned short* d_mapY,
-    T_out defR,
-    T_out defG,
-    T_out defB,
-    cudaStream_t stream = 0);
-
-/**
  * @brief Batched remap host function.
  *
  * Launches the BatchedRemapKernel to process a batch of images using mapping arrays.
@@ -66,8 +32,8 @@ cudaError_t batched_remap_kernel(
     int destH,
     const unsigned short* d_mapX,
     const unsigned short* d_mapY,
-    T_out defR,
-    T_out defG,
-    T_out defB,
+    T_in defR,
+    T_in defG,
+    T_in defB,
     int batchSize,
     cudaStream_t stream = 0);

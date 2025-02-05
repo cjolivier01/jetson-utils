@@ -16,6 +16,9 @@
 #include <mutex>
 
 #include <cuda_runtime.h>
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
+
 #include <opencv4/opencv2/highgui.hpp>
 
 #include <opencv4/opencv2/imgcodecs.hpp>
@@ -197,20 +200,20 @@ class CudaMat {
   }
 };
 
-imageFormat get_image_format(const int cv_type) {
-  switch (cv_type) {
-    case CV_8UC3:
-      return imageFormat::IMAGE_RGB8;
-    case CV_8UC4:
-      return imageFormat::IMAGE_RGBA8;
-    case CV_32FC3:
-      return imageFormat::IMAGE_RGB32F;
-    case CV_32FC4:
-      return imageFormat::IMAGE_RGBA32F;
-    default:
-      assert(false);
-  }
-}
+// imageFormat get_image_format(const int cv_type) {
+//   switch (cv_type) {
+//     case CV_8UC3:
+//       return imageFormat::IMAGE_RGB8;
+//     case CV_8UC4:
+//       return imageFormat::IMAGE_RGBA8;
+//     case CV_32FC3:
+//       return imageFormat::IMAGE_RGB32F;
+//     case CV_32FC4:
+//       return imageFormat::IMAGE_RGBA32F;
+//     default:
+//       assert(false);
+//   }
+// }
 
 template <typename T>
 struct CudaSurface {
@@ -523,24 +526,24 @@ cv::Mat make_fake_mask_like(const cv::Mat& mask) {
   return img;
 }
 
-template <typename T>
+template <typename T, typename T_compute>
 struct StitchingContext {
   StitchingContext(int batch_size) : batch_size_(batch_size) {}
   // Static buffers
-  std::unique_ptr<CudaMat<T>> remap_1_x;
-  std::unique_ptr<CudaMat<T>> remap_1_y;
-  std::unique_ptr<CudaMat<T>> remap_2_x;
-  std::unique_ptr<CudaMat<T>> remap_2_y;
-  std::unique_ptr<CudaMat<T>> cudaBlendSeam;
+  std::unique_ptr<CudaMat<uint16_t>> remap_1_x;
+  std::unique_ptr<CudaMat<uint16_t>> remap_1_y;
+  std::unique_ptr<CudaMat<uint16_t>> remap_2_x;
+  std::unique_ptr<CudaMat<uint16_t>> remap_2_y;
+  std::unique_ptr<CudaMat<T_compute>> cudaBlendSeam;
 
   // Scratch buffers
-  std::unique_ptr<CudaMat<T>> cudaRemapped_1;
-  std::unique_ptr<CudaMat<T>> cudaRemapped_2;
-  std::unique_ptr<CudaMat<T>> cudaFull1;
-  std::unique_ptr<CudaMat<T>> cudaFull2;
+  std::unique_ptr<CudaMat<T_compute>> cudaRemapped_1;
+  std::unique_ptr<CudaMat<T_compute>> cudaRemapped_2;
+  std::unique_ptr<CudaMat<T_compute>> cudaFull1;
+  std::unique_ptr<CudaMat<T_compute>> cudaFull2;
 
   // Laplacian Blend Scratch context
-  std::unique_ptr<CudaBatchLaplacianBlendContext<T>> laplacian_blend_context;
+  std::unique_ptr<CudaBatchLaplacianBlendContext<T_compute>> laplacian_blend_context;
 
   constexpr int batch_size() const {
     return batch_size_;
@@ -638,23 +641,29 @@ int main(int argc, char** argv) {
 #endif
 
   using T = float;
+  using T_compute = __half;
+  
+  #define CV_T_COMPUTE3   CV_16FC3
+  // #define CV_T_COMPUTE3   CV_32FC3
 
-  StitchingContext<T> stitch_context(/*batch_size=*/1);
+  StitchingContext<T, T_compute> stitch_context(/*batch_size=*/1);
 
-  stitch_context.remap_1_x = std::make_unique<CudaMat<T>>(img1_col);
-  stitch_context.remap_1_y = std::make_unique<CudaMat<T>>(img1_row);
-  stitch_context.remap_2_x = std::make_unique<CudaMat<T>>(img2_col);
-  stitch_context.remap_2_y = std::make_unique<CudaMat<T>>(img2_row);
+  assert(img1_col.type() == CV_16U);
+  stitch_context.remap_1_x = std::make_unique<CudaMat<uint16_t>>(img1_col);
+  stitch_context.remap_1_y = std::make_unique<CudaMat<uint16_t>>(img1_row);
+  stitch_context.remap_2_x = std::make_unique<CudaMat<uint16_t>>(img2_col);
+  stitch_context.remap_2_y = std::make_unique<CudaMat<uint16_t>>(img2_row);
 
-  stitch_context.cudaRemapped_1 = std::make_unique<CudaMat<T>>(cv::Mat(img1_col.size(), CV_32FC3), /*copy=*/false);
-  stitch_context.cudaRemapped_2 = std::make_unique<CudaMat<T>>(cv::Mat(img2_col.size(), CV_32FC3), /*copy=*/false);
+  stitch_context.cudaRemapped_1 = std::make_unique<CudaMat<T_compute>>(cv::Mat(img1_col.size(), CV_T_COMPUTE3), /*copy=*/false);
+  stitch_context.cudaRemapped_2 = std::make_unique<CudaMat<T_compute>>(cv::Mat(img2_col.size(), CV_T_COMPUTE3), /*copy=*/false);
 
-  stitch_context.cudaBlendSeam = std::make_unique<CudaMat<T>>(blend_seam);
+  blend_seam.convertTo(blend_seam, CV_T_COMPUTE3);
+  stitch_context.cudaBlendSeam = std::make_unique<CudaMat<T_compute>>(blend_seam);
 
-  stitch_context.cudaFull1 = std::make_unique<CudaMat<T>>(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
-  stitch_context.cudaFull2 = std::make_unique<CudaMat<T>>(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
+  stitch_context.cudaFull1 = std::make_unique<CudaMat<T_compute>>(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), /*copy=*/false);
+  stitch_context.cudaFull2 = std::make_unique<CudaMat<T_compute>>(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), /*copy=*/false);
 
-  stitch_context.laplacian_blend_context = std::make_unique<CudaBatchLaplacianBlendContext<T>>(
+  stitch_context.laplacian_blend_context = std::make_unique<CudaBatchLaplacianBlendContext<T_compute>>(
       stitch_context.cudaBlendSeam->width(),
       stitch_context.cudaBlendSeam->height(),
       numLevels,
@@ -665,20 +674,20 @@ int main(int argc, char** argv) {
   //
   auto process = [](const CudaMat<T>& sampleImage1,
                     const CudaMat<T>& sampleImage2,
-                    StitchingContext<T>& stitch_context,
+                    StitchingContext<T, T_compute>& stitch_context,
                     MaskConverter& mask_converter,
                     cudaStream_t stream) -> std::unique_ptr<CudaMat<T>> {
     cudaError_t cuerr = cudaError_t::cudaSuccess;
 
     // Set default color for unmapped pixels.
-    constexpr float defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
+    constexpr T defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
 
     // Launch the remap kernel.
     cuerr = batched_remap_kernel(
-        (float*)sampleImage1.data(),
+        sampleImage1.data(),
         sampleImage1.width(),
         sampleImage1.height(),
-        (float*)stitch_context.cudaRemapped_1->data(),
+        stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
         stitch_context.cudaRemapped_1->height(),
         (uint16_t*)stitch_context.remap_1_x->data(),
@@ -691,10 +700,10 @@ int main(int argc, char** argv) {
     assert(cuerr == cudaError_t::cudaSuccess);
 
     cuerr = batched_remap_kernel(
-        (float*)sampleImage2.data(),
+        sampleImage2.data(),
         sampleImage2.width(),
         sampleImage2.height(),
-        (float*)stitch_context.cudaRemapped_2->data(),
+        stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
         stitch_context.cudaRemapped_2->height(),
         (uint16_t*)stitch_context.remap_2_x->data(),
@@ -712,7 +721,7 @@ int main(int argc, char** argv) {
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
 
-    cuerr = simple_make_full_batch<T, T, unsigned char>(
+    cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
         stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
@@ -738,7 +747,7 @@ int main(int argc, char** argv) {
         stream);
     assert(cuerr == cudaError_t::cudaSuccess);
 
-    cuerr = simple_make_full_batch<T, T, unsigned char>(
+    cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
         stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
@@ -761,18 +770,18 @@ int main(int argc, char** argv) {
         stitch_context.cudaBlendSeam->height(),
         /*adjust_origin=*/false,
         /*batchSize=*/stitch_context.batch_size(),
-        (float*)stitch_context.cudaFull2->data(),
+        stitch_context.cudaFull2->data(),
         /*d_full_masks=*/nullptr,
         stream);
     assert(cuerr == cudaError_t::cudaSuccess);
 
-    CudaMat<T>& cudaBlendedFull = *stitch_context.cudaFull1;
+    CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
     cuerr = cudaBatchedLaplacianBlendWithContext(
         stitch_context.cudaFull1->data(),
         stitch_context.cudaFull2->data(),
         stitch_context.cudaBlendSeam->data(),
         // Put output in full-1 memory
-        (float*)cudaBlendedFull.data(),
+        cudaBlendedFull.data(),
         *stitch_context.laplacian_blend_context,
         stream);
     assert(cuerr == cudaError_t::cudaSuccess);
@@ -792,7 +801,7 @@ int main(int argc, char** argv) {
         roi_height(mask_converter.roi_partial_1),
         mask_converter.roi_partial_1.x,
         mask_converter.roi_partial_1.y,
-        (float*)canvas->data(),
+        canvas->data(),
         canvas->width(),
         canvas->height(),
         /*offsetX=*/mask_converter._x1,
@@ -814,7 +823,7 @@ int main(int argc, char** argv) {
         mask_converter.partial_size_2.height,
         mask_converter.roi_partial_2.x,
         mask_converter.roi_partial_2.y,
-        (float*)canvas->data(),
+        canvas->data(),
         canvas->width(),
         canvas->height(),
         /*offsetX=*/mask_converter._x2 + mask_converter._overlapping_width - mask_converter._overlap_pad,
@@ -835,7 +844,7 @@ int main(int argc, char** argv) {
         cudaBlendedFull.height(),
         0,
         0,
-        (float*)canvas->data(),
+        canvas->data(),
         canvas->width(),
         canvas->height(),
         /*offsetX=*/mask_converter._x2 - mask_converter._overlap_pad,
@@ -873,7 +882,7 @@ int main(int argc, char** argv) {
   CudaMat<T> sampleImage2(sample_img_right);
 
   auto blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
-  // SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
   blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
