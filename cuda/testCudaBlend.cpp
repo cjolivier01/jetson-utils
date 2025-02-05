@@ -455,23 +455,6 @@ class MaskConverter {
     }
   }
 
-  cv::Size partial_size_1;
-  cv::Size partial_size_2;
-  int4 roi_partial_1{
-      0,
-  };
-  int4 roi_partial_2{
-      0,
-  };
-  int4 roi_blend_1{
-      0,
-  };
-  int4 roi_blend_2{
-      0,
-  };
-
-  cv::Mat canvas_mat;
-
   // Example conversion function that returns a cv::Mat with the same size as the canvas.
   // If _minimize_blend is true, it also updates the blend parameters and returns a cropped region.
   cv::Mat convertMaskMat(const cv::Mat& mask) {
@@ -514,6 +497,23 @@ class MaskConverter {
     }
     return paddedMask.clone();
   }
+
+  cv::Size partial_size_1;
+  cv::Size partial_size_2;
+  int4 roi_partial_1{
+      0,
+  };
+  int4 roi_partial_2{
+      0,
+  };
+  int4 roi_blend_1{
+      0,
+  };
+  int4 roi_blend_2{
+      0,
+  };
+
+  cv::Mat canvas_mat;
 };
 
 cv::Mat make_fake_mask_like(const cv::Mat& mask) {
@@ -609,7 +609,7 @@ class CudaStitchPano {
 
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
-#if 1
+#if 0
     cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
         stitch_context.cudaRemapped_1->data(),
@@ -666,7 +666,7 @@ class CudaStitchPano {
 #endif
 
     CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
-#if 1
+#if 0
     cuerr = cudaBatchedLaplacianBlendWithContext(
         stitch_context.cudaFull1->data(),
         stitch_context.cudaFull2->data(),
@@ -677,7 +677,7 @@ class CudaStitchPano {
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
-#if 1
+#if 0
     // Unblended Left Side
     assert(mask_converter.partial_size_1.width == roi_width(mask_converter.roi_partial_1));
     assert(mask_converter.partial_size_1.height == roi_height(mask_converter.roi_partial_1));
@@ -700,7 +700,7 @@ class CudaStitchPano {
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
 
-#if 1
+#if 0
     assert(mask_converter.partial_size_2.width == roi_width(mask_converter.roi_partial_2));
     assert(mask_converter.partial_size_2.height == roi_height(mask_converter.roi_partial_2));
     cuerr = copyRoiBatchedInterface(
@@ -722,7 +722,7 @@ class CudaStitchPano {
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
 
-#if 1
+#if 0
     // Blended middle
     cuerr = copyRoiBatchedInterface(
         cudaBlendedFull.data(),
@@ -901,11 +901,11 @@ int main(int argc, char** argv) {
       CudaStitchPano<T, T_compute>::process(
           sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
           .ConsumeValueOrDie();
-  SHOW_IMAGE(blendedCanvas);
-  // blendedCanvas.reset();
+  // SHOW_IMAGE(blendedCanvas);
+  //  blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
-  SHOW_IMAGE(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 

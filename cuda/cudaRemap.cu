@@ -217,7 +217,7 @@ cudaError_t batched_remap_kernel_ex(
     int batchSize,
     cudaStream_t stream)
 {
-  dim3 blockDim(10, 10, 1);
+  dim3 blockDim(16, 16, 1);
   dim3 gridDim((destW + blockDim.x - 1) / blockDim.x,
                (destH + blockDim.y - 1) / blockDim.y,
                batchSize);
