@@ -344,44 +344,6 @@ cv::Mat load_position_mask(const std::string& filename, double* minVal, double* 
   return pos_mask;
 }
 
-struct SpatialTiff {
-  // position in pixels
-  float xpos;
-  float ypos;
-};
-
-std::vector<SpatialTiff> normalize(std::vector<SpatialTiff>&& positions) {
-  float min_x = std::numeric_limits<float>::max();
-  float min_y = std::numeric_limits<float>::max();
-  std::for_each(positions.begin(), positions.end(), [&](const SpatialTiff& sp) {
-    min_x = std::min(min_x, sp.xpos);
-    min_y = std::min(min_y, sp.ypos);
-  });
-  std::for_each(positions.begin(), positions.end(), [&](SpatialTiff& sp) {
-    sp.xpos -= min_x;
-    sp.ypos -= min_y;
-  });
-  return positions;
-}
-
-std::tuple<float, float> get_canvas_size(const std::vector<SpatialTiff>& positions) {
-  float max_x = 0;
-  float max_y = 0;
-  std::for_each(positions.begin(), positions.end(), [&](const SpatialTiff& sp) {
-    assert(sp.xpos >= 0);
-    assert(sp.ypos >= 0);
-    max_x = std::max(max_x, sp.xpos);
-    assert(sp.xpos >= 0);
-    max_y = std::max(max_y, sp.ypos);
-  });
-  return {max_x, max_y};
-}
-
-SpatialTiff get_geo_tiff(const std::string& filename) {
-  TiffInfo info = getTiffInfo(filename);
-  return SpatialTiff{.xpos = info.xPosition * info.xResolution, .ypos = info.yPosition * info.yResolution};
-}
-
 // Structure to hold canvas information.
 struct CanvasInfo {
   int width{0};
@@ -449,8 +411,6 @@ class MaskConverter {
       // Validate the computed coordinates.
       assert(box_x1 >= 0);
       assert(box_x2 <= _canvas_info.width);
-
-      // canvas_mat = cv::Mat(cv::Size(_canvas_info.width, _canvas_info.height), CV_32FC3);
 
       // Compute ROIs
       partial_size_1 = cv::Size(_x2 + _overlap_pad, _remapper_1.height);
@@ -742,6 +702,84 @@ std::vector<cv::Mat> as_batch(const cv::Mat& mat, int batch_size) {
   return std::vector<cv::Mat>(batch_size, mat);
 }
 
+struct ControlMasks {
+  bool load(std::string game_dir) {
+    if (!game_dir.empty() && game_dir.back() != '/') {
+      game_dir += '/';
+    }
+    std::string mapping_0_pos = game_dir + "mapping_0000.tif";
+    std::string mapping_0_x = game_dir + "mapping_0000_x.tif";
+    std::string mapping_0_y = game_dir + "mapping_0000_y.tif";
+    std::string mapping_1_pos = game_dir + "mapping_0001.tif";
+    std::string mapping_1_x = game_dir + "mapping_0001_x.tif";
+    std::string mapping_1_y = game_dir + "mapping_0001_y.tif";
+    std::string whole_seam_mask = game_dir + "seam_file.png";
+
+    img1_col = cv::imread(mapping_0_x, cv::IMREAD_ANYDEPTH);
+    assert(img1_col.type() == CV_16U);
+    if (img1_col.empty()) {
+      return false;
+    }
+    img1_row = cv::imread(mapping_0_y, cv::IMREAD_ANYDEPTH);
+    if (img1_row.empty()) {
+      return false;
+    }
+    img2_col = cv::imread(mapping_1_x, cv::IMREAD_ANYDEPTH);
+    if (img2_col.empty()) {
+      return false;
+    }
+    img2_row = cv::imread(mapping_1_y, cv::IMREAD_ANYDEPTH);
+    if (img2_row.empty()) {
+      return false;
+    }
+
+    whole_seam_mask_image = load_seam_mask(whole_seam_mask);
+    if (whole_seam_mask_image.empty()) {
+      return false;
+    }
+    whole_seam_mask_image.convertTo(whole_seam_mask_image, CV_32FC1);
+#if 0
+      whole_seam_mask_image = make_fake_mask_like(whole_seam_mask_image);
+#endif
+    positions = normalize_positions(std::vector<SpatialTiff>{get_geo_tiff(mapping_0_pos), get_geo_tiff(mapping_1_pos)});
+    return true;
+  }
+
+ private:
+  struct SpatialTiff {
+    // position in pixels
+    float xpos;
+    float ypos;
+  };
+
+  static std::vector<SpatialTiff> normalize_positions(std::vector<SpatialTiff>&& positions) {
+    float min_x = std::numeric_limits<float>::max();
+    float min_y = std::numeric_limits<float>::max();
+    std::for_each(positions.begin(), positions.end(), [&](const SpatialTiff& sp) {
+      min_x = std::min(min_x, sp.xpos);
+      min_y = std::min(min_y, sp.ypos);
+    });
+    std::for_each(positions.begin(), positions.end(), [&](SpatialTiff& sp) {
+      sp.xpos -= min_x;
+      sp.ypos -= min_y;
+    });
+    return positions;
+  }
+
+  static SpatialTiff get_geo_tiff(const std::string& filename) {
+    TiffInfo info = getTiffInfo(filename);
+    return SpatialTiff{.xpos = info.xPosition * info.xResolution, .ypos = info.yPosition * info.yResolution};
+  }
+
+ public:
+  cv::Mat img1_col;
+  cv::Mat img1_row;
+  cv::Mat img2_col;
+  cv::Mat img2_row;
+  cv::Mat whole_seam_mask_image;
+  std::vector<SpatialTiff> positions;
+};
+
 int main(int argc, char** argv) {
   // Usage check.
   // if (argc < 2) {
@@ -754,33 +792,8 @@ int main(int argc, char** argv) {
   std::string game_id = "stitch-fix";
   std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id + "/";
 
-  std::string mapping_0_pos = game_dir + "mapping_0000.tif";
-  std::string mapping_0_x = game_dir + "mapping_0000_x.tif";
-  std::string mapping_0_y = game_dir + "mapping_0000_y.tif";
-  std::string mapping_1_pos = game_dir + "mapping_0001.tif";
-  std::string mapping_1_x = game_dir + "mapping_0001_x.tif";
-  std::string mapping_1_y = game_dir + "mapping_0001_y.tif";
-  std::string whole_seam_mask = game_dir + "seam_file.png";
-
   std::string sample_img_left_path = game_dir + "GX010100.png";
   std::string sample_img_right_path = game_dir + "GX010019.png";
-
-  // Normalize
-  std::vector<SpatialTiff> positions{get_geo_tiff(mapping_0_pos), get_geo_tiff(mapping_1_pos)};
-  positions = normalize(std::move(positions));
-
-  cv::Mat img1_col = cv::imread(mapping_0_x, cv::IMREAD_ANYDEPTH);
-  assert(img1_col.type() == CV_16U);
-  cv::Mat img1_row = cv::imread(mapping_0_y, cv::IMREAD_ANYDEPTH);
-  cv::Mat img2_col = cv::imread(mapping_1_x, cv::IMREAD_ANYDEPTH);
-  cv::Mat img2_row = cv::imread(mapping_1_y, cv::IMREAD_ANYDEPTH);
-
-  cv::Mat whole_seam_mask_image = load_seam_mask(whole_seam_mask);
-  whole_seam_mask_image.convertTo(whole_seam_mask_image, CV_32FC1);
-
-#if 0
-  whole_seam_mask_image = make_fake_mask_like(whole_seam_mask_image);
-#endif
 
   cv::Mat sample_img_left = cv::imread(sample_img_left_path, cv::IMREAD_COLOR);
   assert(!sample_img_left.empty());
@@ -790,9 +803,16 @@ int main(int argc, char** argv) {
   sample_img_left.convertTo(sample_img_left, CV_32FC3, 1.0 / 255.0);
   sample_img_right.convertTo(sample_img_right, CV_32FC3, 1.0 / 255.0);
 
+  ControlMasks control_masks;
+  control_masks.load(game_dir);
+
   // Compute canvas size
-  const size_t canvas_width = std::max(positions[0].xpos + img1_col.cols, positions[1].xpos + img2_col.cols);
-  const size_t canvas_height = std::max(positions[0].ypos + img1_col.rows, positions[1].ypos + img2_col.rows);
+  const size_t canvas_width = std::max(
+      control_masks.positions[0].xpos + control_masks.img1_col.cols,
+      control_masks.positions[1].xpos + control_masks.img2_col.cols);
+  const size_t canvas_height = std::max(
+      control_masks.positions[0].ypos + control_masks.img1_col.rows,
+      control_masks.positions[1].ypos + control_masks.img2_col.rows);
   std::cout << "Canvas size: " << canvas_width << " x " << canvas_height << std::endl;
 
   //
@@ -802,16 +822,18 @@ int main(int argc, char** argv) {
   mask_converter._minimize_blend = true;
   mask_converter._canvas_info.width = canvas_width;
   mask_converter._canvas_info.height = canvas_height;
-  mask_converter._canvas_info.positions.emplace_back(cv::Point(positions[0].xpos, positions[0].ypos));
-  mask_converter._canvas_info.positions.emplace_back(cv::Point(positions[1].xpos, positions[1].ypos));
-  mask_converter._remapper_1.width = img1_col.cols;
-  mask_converter._remapper_1.height = img1_col.rows;
-  mask_converter._remapper_2.width = img2_col.cols;
-  mask_converter._remapper_2.height = img2_col.rows;
+  mask_converter._canvas_info.positions.emplace_back(
+      cv::Point(control_masks.positions[0].xpos, control_masks.positions[0].ypos));
+  mask_converter._canvas_info.positions.emplace_back(
+      cv::Point(control_masks.positions[1].xpos, control_masks.positions[1].ypos));
+  mask_converter._remapper_1.width = control_masks.img1_col.cols;
+  mask_converter._remapper_1.height = control_masks.img1_col.rows;
+  mask_converter._remapper_2.width = control_masks.img2_col.cols;
+  mask_converter._remapper_2.height = control_masks.img2_col.rows;
 
-  mask_converter.updateMinimizeBlend(img1_col.size(), img2_col.size());
+  mask_converter.updateMinimizeBlend(control_masks.img1_col.size(), control_masks.img2_col.size());
 
-  cv::Mat blend_seam = mask_converter.convertMaskMat(whole_seam_mask_image);
+  cv::Mat blend_seam = mask_converter.convertMaskMat(control_masks.whole_seam_mask_image);
   assert(!blend_seam.empty());
   blend_seam = blend_seam.clone();
 
@@ -844,14 +866,14 @@ int main(int argc, char** argv) {
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize);
 
-  auto canvas =
-      std::make_unique<CudaMat<T>>(as_batch(cv::Mat(whole_seam_mask_image.size(), CV_T_PIPELINE), kBatchSize));
+  auto canvas = std::make_unique<CudaMat<T>>(
+      as_batch(cv::Mat(control_masks.whole_seam_mask_image.size(), CV_T_PIPELINE), kBatchSize));
 
-  assert(img1_col.type() == CV_16U);
-  stitch_context.remap_1_x = std::make_unique<CudaMat<uint16_t>>(img1_col);
-  stitch_context.remap_1_y = std::make_unique<CudaMat<uint16_t>>(img1_row);
-  stitch_context.remap_2_x = std::make_unique<CudaMat<uint16_t>>(img2_col);
-  stitch_context.remap_2_y = std::make_unique<CudaMat<uint16_t>>(img2_row);
+  assert(control_masks.img1_col.type() == CV_16U);
+  stitch_context.remap_1_x = std::make_unique<CudaMat<uint16_t>>(control_masks.img1_col);
+  stitch_context.remap_1_y = std::make_unique<CudaMat<uint16_t>>(control_masks.img1_row);
+  stitch_context.remap_2_x = std::make_unique<CudaMat<uint16_t>>(control_masks.img2_col);
+  stitch_context.remap_2_y = std::make_unique<CudaMat<uint16_t>>(control_masks.img2_row);
 
   blend_seam.convertTo(blend_seam, CV_T_COMPUTE3);
   stitch_context.cudaBlendSeam = std::make_unique<CudaMat<T_compute>>(blend_seam);
@@ -876,7 +898,7 @@ int main(int argc, char** argv) {
   auto blendedCanvas = CudaStitchPano<T, T_compute>::process(
                            sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::move(canvas))
                            .ConsumeValueOrDie();
-  // SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
   //  blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
@@ -886,7 +908,7 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 1 /* perf test */
+#if 0 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
