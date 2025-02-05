@@ -782,14 +782,14 @@ struct ControlMasks {
 
 int main(int argc, char** argv) {
   // Usage check.
-  // if (argc < 2) {
-  //   std::cerr << "Usage: " << argv[0] << " <game-id>" << std::endl;
-  //   return -1;
-  // }
+  if (argc < 2) {
+    std::cerr << "Usage: " << argv[0] << " <game-id>" << std::endl;
+    return -1;
+  }
 
   RenderSet display;
 
-  std::string game_id = "stitch-fix";
+  std::string game_id = argv[1];
   std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id + "/";
 
   std::string sample_img_left_path = game_dir + "GX010100.png";
