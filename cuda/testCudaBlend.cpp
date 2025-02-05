@@ -905,13 +905,13 @@ int main(int argc, char** argv) {
       CudaStitchPano<T, T_compute>::process(
           sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
           .ConsumeValueOrDie();
-  SHOW_IMAGE(blendedCanvas);
+  //SHOW_IMAGE(blendedCanvas);
   // blendedCanvas.reset();
 
   blendedCanvas = CudaStitchPano<T, T_compute>::process(
                       sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
                       .ConsumeValueOrDie();
-  SHOW_IMAGE(blendedCanvas);
+  //SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 
