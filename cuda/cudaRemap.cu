@@ -248,6 +248,19 @@ template cudaError_t batched_remap_kernel<float, float>(
     int batchSize,
     cudaStream_t stream);
 
+template cudaError_t batched_remap_kernel_ex<float3, float3>(
+    const float3* d_src,
+    int srcW,
+    int srcH,
+    float3* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    float3 dflt,
+    int batchSize,
+    cudaStream_t stream);
+
 template cudaError_t batched_remap_kernel<float, __half>(
     const float* d_src,
     int srcW,

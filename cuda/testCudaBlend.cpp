@@ -573,37 +573,33 @@ class CudaStitchPano {
     }
 
     // Set default color for unmapped pixels.
-    constexpr T defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
+    // constexpr T defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
 #if 1
     // Launch the remap kernel.
-    cuerr = batched_remap_kernel(
-        sampleImage1.data(),
+    cuerr = batched_remap_kernel_ex(
+        (const float3*)sampleImage1.data(),
         sampleImage1.width(),
         sampleImage1.height(),
-        stitch_context.cudaRemapped_1->data(),
+        (float3*)stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
         stitch_context.cudaRemapped_1->height(),
-        (uint16_t*)stitch_context.remap_1_x->data(),
-        (uint16_t*)stitch_context.remap_1_y->data(),
-        defaultR,
-        defaultG,
-        defaultB,
+        stitch_context.remap_1_x->data(),
+        stitch_context.remap_1_y->data(),
+        make_float3(0, 0, 0),
         /*batchSize=*/stitch_context.batch_size(),
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
 
-    cuerr = batched_remap_kernel(
-        sampleImage2.data(),
+    cuerr = batched_remap_kernel_ex(
+        (const float3*)sampleImage2.data(),
         sampleImage2.width(),
         sampleImage2.height(),
-        stitch_context.cudaRemapped_2->data(),
+        (float3*)stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
         stitch_context.cudaRemapped_2->height(),
-        (uint16_t*)stitch_context.remap_2_x->data(),
-        (uint16_t*)stitch_context.remap_2_y->data(),
-        defaultR,
-        defaultG,
-        defaultB,
+        stitch_context.remap_2_x->data(),
+        stitch_context.remap_2_y->data(),
+        make_float3(0, 0, 0),
         /*batchSize=*/stitch_context.batch_size(),
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
@@ -613,7 +609,7 @@ class CudaStitchPano {
 
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
-#if 0
+#if 1
     cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
         stitch_context.cudaRemapped_1->data(),
@@ -681,7 +677,7 @@ class CudaStitchPano {
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
-#if 0
+#if 1
     // Unblended Left Side
     assert(mask_converter.partial_size_1.width == roi_width(mask_converter.roi_partial_1));
     assert(mask_converter.partial_size_1.height == roi_height(mask_converter.roi_partial_1));
@@ -856,11 +852,6 @@ int main(int argc, char** argv) {
   int numLevels = 1;
 #else
   int numLevels = 6;
-<<<<<<< HEAD
-  // int numLevels = 2;
-=======
-  // int numLevels = 6;
->>>>>>> b547b7d3d9265f048155fb952028ae89ccc1b1e4
 #endif
 
 #if 1
@@ -910,11 +901,11 @@ int main(int argc, char** argv) {
       CudaStitchPano<T, T_compute>::process(
           sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
           .ConsumeValueOrDie();
-  // SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
   // blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
-  // SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 

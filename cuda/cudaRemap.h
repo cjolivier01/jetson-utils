@@ -37,3 +37,17 @@ cudaError_t batched_remap_kernel(
     T_in defB,
     int batchSize,
     cudaStream_t stream = 0);
+
+template <typename T_in, typename T_out>
+cudaError_t batched_remap_kernel_ex(
+    const T_in* d_src,
+    int srcW,
+    int srcH,
+    T_out* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    T_in dflt,
+    int batchSize,
+    cudaStream_t stream = 0);
