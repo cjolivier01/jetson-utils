@@ -424,6 +424,8 @@ class MaskConverter {
       assert(box_x1 >= 0);
       assert(box_x2 <= _canvas_info.width);
 
+      canvas_mat = cv::Mat(cv::Size(_canvas_info.width, _canvas_info.height), CV_32FC3);
+
       // Compute ROIs
       partial_size_1 = cv::Size(_x2 + _overlap_pad, _remapper_1.height);
       roi_partial_1 = {0, 0, _x2 + _overlap_pad, partial_size_1.height};
@@ -453,6 +455,8 @@ class MaskConverter {
   int4 roi_blend_2{
       0,
   };
+
+  cv::Mat canvas_mat;
 
   // Example conversion function that returns a cv::Mat with the same size as the canvas.
   // If _minimize_blend is true, it also updates the blend parameters and returns a cropped region.
@@ -669,11 +673,11 @@ int main(int argc, char** argv) {
   CudaMat sampleImage1(sample_img_left);
   CudaMat sampleImage2(sample_img_right);
 
-  auto process = [&](const CudaMat& sampleImage1,
-                     const CudaMat sampleImage2,
-                     StitchingContext& stitch_context,
-                     MaskConverter& mask_converter,
-                     cudaStream_t stream) -> CudaMat {
+  auto process = [](const CudaMat& sampleImage1,
+                    const CudaMat sampleImage2,
+                    StitchingContext& stitch_context,
+                    MaskConverter& mask_converter,
+                    cudaStream_t stream) -> CudaMat {
     cudaError_t cuerr = cudaError_t::cudaSuccess;
 
     // Set default color for unmapped pixels.
@@ -710,8 +714,8 @@ int main(int argc, char** argv) {
         /*batchSize=*/stitch_context.batch_size(),
         stream);
 
-    int y1 = positions[0].ypos;
-    int y2 = positions[1].ypos;
+    int y1 = mask_converter._y1;
+    int y2 = mask_converter._y2;
 
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
@@ -779,7 +783,7 @@ int main(int argc, char** argv) {
         stream);
 
     // Destination canvas
-    CudaMat canvas(canvas_mat, /*copy=*/false);
+    CudaMat canvas(mask_converter.canvas_mat, /*copy=*/false);
 
 #if 1
     // Unblended Left Side
@@ -796,8 +800,8 @@ int main(int argc, char** argv) {
         (float*)canvas.data(),
         canvas.width(),
         canvas.height(),
-        /*offsetX=*/positions[0].xpos,
-        /*offsetY=*/positions[0].ypos,
+        /*offsetX=*/mask_converter._x1,
+        /*offsetY=*/mask_converter._y1,
         /*channels=*/3,
         /*batchSize=*/stitch_context.batch_size(),
         stream);
@@ -817,8 +821,8 @@ int main(int argc, char** argv) {
         (float*)canvas.data(),
         canvas.width(),
         canvas.height(),
-        /*offsetX=*/positions[1].xpos + mask_converter._overlapping_width - mask_converter._overlap_pad,
-        /*offsetY=*/positions[1].ypos,
+        /*offsetX=*/mask_converter._x2 + mask_converter._overlapping_width - mask_converter._overlap_pad,
+        /*offsetY=*/mask_converter._y2,
         /*channels=*/3,
         /*batchSize=*/stitch_context.batch_size(),
         stream);
@@ -837,7 +841,7 @@ int main(int argc, char** argv) {
         (float*)canvas.data(),
         canvas.width(),
         canvas.height(),
-        /*offsetX=*/positions[1].xpos - mask_converter._overlap_pad,
+        /*offsetX=*/mask_converter._x2 - mask_converter._overlap_pad,
         /*offsetY=*/0,
         /*channels=*/3,
         /*batchSize=*/stitch_context.batch_size(),
