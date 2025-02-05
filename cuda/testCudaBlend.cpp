@@ -873,7 +873,7 @@ int main(int argc, char** argv) {
   //     self._y2 : self._remapper_2.height + self._y2,
   //     self._x2 + self._overlapping_width - self._overlap_pad :,
   // ] = partial_2
-#if 0
+#if 1
   // Unblended Left Side
   cuerr = copyRoiBatchedInterface(
     (const float*)cudaRemapped_1.data(),
@@ -893,7 +893,10 @@ int main(int argc, char** argv) {
     stream);
 #endif
 
-#if 1
+#if 0
+  const int4 _roi_partial_2 = {
+      mask_converter._overlapping_width - mask_converter._overlap_pad, 0, partial_size_2.width, partial_size_2.height};
+
   // Unblended Right Side
   cuerr = copyRoiBatchedInterface(
       (const float*)cudaRemapped_2.data(),
@@ -906,14 +909,15 @@ int main(int argc, char** argv) {
       (float*)canvas.data(),
       canvas.width(),
       canvas.height(),
-      /*offsetX=*/positions[1].xpos + roi_partial_2.x,
-      /*offsetY=*/positions[1].ypos + roi_partial_2.y,
+      /*offsetX=*/positions[1].xpos + mask_converter._overlapping_width - mask_converter._overlap_pad,
+      /*offsetY=*/positions[1].ypos,
       /*channels=*/3,
       /*batchSize=*/1,
       stream);
 #endif
 
 #if 1
+  // Blended middle
   cuerr = copyRoiBatchedInterface(
       (const float*)cudaBlendedFull.data(),
       cudaBlendedFull.width(),
@@ -925,8 +929,8 @@ int main(int argc, char** argv) {
       (float*)canvas.data(),
       canvas.width(),
       canvas.height(),
-      /*offsetX=*/mask_converter._x2 + mask_converter._overlapping_width - mask_converter._overlap_pad,
-      /*offsetY=*/mask_converter._y2,
+      /*offsetX=*/positions[1].xpos - mask_converter._overlap_pad,
+      /*offsetY=*/0,
       /*channels=*/3,
       /*batchSize=*/1,
       stream);
