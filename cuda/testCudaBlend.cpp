@@ -135,7 +135,7 @@ template <typename T = float3>
 class CudaMat {
  private:
   T* d_data{nullptr};
-  size_t size;          // total size (in bytes) allocated on the device
+  size_t size; // total size (in bytes) allocated on the device
   int rows_, cols_, type_;
   int batch_size_{1};
 
@@ -145,8 +145,7 @@ class CudaMat {
   CudaMat(CudaMat&&) = delete;
 
   // Single image constructor
-  CudaMat(const cv::Mat& mat, bool copy = true)
-      : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
+  CudaMat(const cv::Mat& mat, bool copy = true) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
     assert(mat.isContinuous());
@@ -156,8 +155,7 @@ class CudaMat {
   }
 
   // Batch of images constructor
-  CudaMat(const std::vector<cv::Mat>& mat_batch, bool copy = true)
-      : batch_size_(static_cast<int>(mat_batch.size())) {
+  CudaMat(const std::vector<cv::Mat>& mat_batch, bool copy = true) : batch_size_(static_cast<int>(mat_batch.size())) {
     assert(batch_size_ > 0);
     const cv::Mat& first = mat_batch.at(0);
     rows_ = first.rows;
@@ -195,12 +193,24 @@ class CudaMat {
   }
 
   // Accessor functions
-  T* data() { return d_data; }
-  const T* data() const { return d_data; }
-  constexpr int width() const { return cols_; }
-  constexpr int height() const { return rows_; }
-  constexpr int type() const { return type_; }
-  constexpr int batch_size() const { return batch_size_; }
+  T* data() {
+    return d_data;
+  }
+  const T* data() const {
+    return d_data;
+  }
+  constexpr int width() const {
+    return cols_;
+  }
+  constexpr int height() const {
+    return rows_;
+  }
+  constexpr int type() const {
+    return type_;
+  }
+  constexpr int batch_size() const {
+    return batch_size_;
+  }
 };
 
 // imageFormat get_image_format(const int cv_type) {
@@ -440,7 +450,7 @@ class MaskConverter {
       assert(box_x1 >= 0);
       assert(box_x2 <= _canvas_info.width);
 
-      canvas_mat = cv::Mat(cv::Size(_canvas_info.width, _canvas_info.height), CV_32FC3);
+      // canvas_mat = cv::Mat(cv::Size(_canvas_info.width, _canvas_info.height), CV_32FC3);
 
       // Compute ROIs
       partial_size_1 = cv::Size(_x2 + _overlap_pad, _remapper_1.height);
@@ -515,7 +525,7 @@ class MaskConverter {
       0,
   };
 
-  cv::Mat canvas_mat;
+  // std::vector<cv::Mat> canvas_mat;
 };
 
 cv::Mat make_fake_mask_like(const cv::Mat& mask) {
@@ -569,10 +579,13 @@ class CudaStitchPano {
       std::unique_ptr<CudaMat<T>>&& canvas) {
     CudaStatus cuerr;
 
+    assert(canvas);
+
     // Destination canvas
-    if (!canvas) {
-      canvas = std::make_unique<CudaMat<T>>(mask_converter.canvas_mat, /*copy=*/false);
-    }
+    // if (!canvas) {
+    //   canvas = std::make_unique<CudaMat<T>>(as_batch(cv::Mat(cv::Size(mask_converter._canvas_info.width,
+    //   mask_converter._canvas_info.height), CV_32FC3)), /*copy=*/false);
+    // }
 
     // Set default color for unmapped pixels.
     // constexpr T defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
@@ -679,7 +692,7 @@ class CudaStitchPano {
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
-#if 0
+#if 1
     // Unblended Left Side
     assert(mask_converter.partial_size_1.width == roi_width(mask_converter.roi_partial_1));
     assert(mask_converter.partial_size_1.height == roi_height(mask_converter.roi_partial_1));
@@ -755,14 +768,14 @@ class CudaStitchPano {
     // auto disp = cudaBlendedFull.download();
     // auto disp = cudaFull1.download();
     auto disp = cudaBlendedFull.download(0);
-    //auto disp = stitch_context.cudaFull2->download(1);
-    //    auto disp = cudaFull2.download();
-    //    auto disp = blending_2.download();
-    // auto disp = stitch_context.cudaRemapped_1->download(1);
-    //  auto disp = cudaRemapped_2->download();
-    //    auto disp = sampleImage2.download();
-    //    auto disp = cudaBlendedFloat.download();
-    //    disp.convertTo(disp, CV_8UC3, 255.0);
+    // auto disp = stitch_context.cudaFull2->download(1);
+    //     auto disp = cudaFull2.download();
+    //     auto disp = blending_2.download();
+    //  auto disp = stitch_context.cudaRemapped_1->download(1);
+    //   auto disp = cudaRemapped_2->download();
+    //     auto disp = sampleImage2.download();
+    //     auto disp = cudaBlendedFloat.download();
+    //     disp.convertTo(disp, CV_8UC3, 255.0);
     cv::imshow("image", disp);
     cv::waitKey(0);
 
@@ -809,8 +822,6 @@ int main(int argc, char** argv) {
 
   cv::Mat whole_seam_mask_image = load_seam_mask(whole_seam_mask);
   whole_seam_mask_image.convertTo(whole_seam_mask_image, CV_32FC1);
-
-  const cv::Mat canvas_mat(whole_seam_mask_image.size(), CV_32FC3);
 
 #if 0
   whole_seam_mask_image = make_fake_mask_like(whole_seam_mask_image);
@@ -864,10 +875,12 @@ int main(int argc, char** argv) {
 #if 1
   using T = float;
   using T_compute = float;
+#define CV_T_PIPELINE CV_32FC3
 #define CV_T_COMPUTE3 CV_32FC3
 #else
   using T = float;
   using T_compute = __half;
+#define CV_T_PIPELINE CV_32FC3
 #define CV_T_COMPUTE3 CV_16FC3
 #endif
 
@@ -875,6 +888,9 @@ int main(int argc, char** argv) {
   constexpr int kBatchSize = 2;
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize);
+
+  auto canvas =
+      std::make_unique<CudaMat<T>>(as_batch(cv::Mat(whole_seam_mask_image.size(), CV_T_PIPELINE), kBatchSize));
 
   assert(img1_col.type() == CV_16U);
   stitch_context.remap_1_x = std::make_unique<CudaMat<uint16_t>>(img1_col);
@@ -907,10 +923,9 @@ int main(int argc, char** argv) {
   CudaMat<T> sampleImage1(as_batch(sample_img_left, kBatchSize));
   CudaMat<T> sampleImage2(as_batch(sample_img_right, kBatchSize));
 
-  auto blendedCanvas =
-      CudaStitchPano<T, T_compute>::process(
-          sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
-          .ConsumeValueOrDie();
+  auto blendedCanvas = CudaStitchPano<T, T_compute>::process(
+                           sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::move(canvas))
+                           .ConsumeValueOrDie();
   // SHOW_IMAGE(blendedCanvas);
   //  blendedCanvas.reset();
 
