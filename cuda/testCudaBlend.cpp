@@ -715,7 +715,7 @@ class CudaStitchPano {
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
 
-#if 0
+#if 1
     assert(mask_converter.partial_size_2.width == roi_width(mask_converter.roi_partial_2));
     assert(mask_converter.partial_size_2.height == roi_height(mask_converter.roi_partial_2));
     cuerr = copyRoiBatchedInterface(
@@ -737,7 +737,7 @@ class CudaStitchPano {
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
 
-#if 0
+#if 1
     // Blended middle
     cuerr = copyRoiBatchedInterface(
         cudaBlendedFull.data(),
@@ -763,11 +763,11 @@ class CudaStitchPano {
     // cudaStreamSynchronize(stream);
     // auto disp = blending_1.download();
     //  auto disp = cudaBlendSeam.download();
-    // auto disp = canvas->download();
+    auto disp = canvas->download(0);
     // auto disp = sampleImage1.download(1);
     // auto disp = cudaBlendedFull.download();
     // auto disp = cudaFull1.download();
-    auto disp = cudaBlendedFull.download(0);
+    // auto disp = cudaBlendedFull.download(0);
     // auto disp = stitch_context.cudaFull2->download(1);
     //     auto disp = cudaFull2.download();
     //     auto disp = blending_2.download();
