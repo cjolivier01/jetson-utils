@@ -893,7 +893,7 @@ int main(int argc, char** argv) {
     stream);
 #endif
 
-#if 0
+#if 1
   const int4 _roi_partial_2 = {
       mask_converter._overlapping_width - mask_converter._overlap_pad, 0, partial_size_2.width, partial_size_2.height};
 
