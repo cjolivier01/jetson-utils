@@ -651,13 +651,13 @@ int main(int argc, char** argv) {
   CudaMat partial_1(
       cv::Mat(cv::Size(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height), CV_32FC3));
 
-  CudaMat blending_1(
-      cv::Mat(
-          cv::Size{
-              mask_converter._remapper_1.width - (mask_converter._x2 - mask_converter._overlap_pad),
-              mask_converter._remapper_1.height},
-          CV_32FC3),
-      /*copy=*/false);
+  // CudaMat blending_1(
+  //     cv::Mat(
+  //         cv::Size{
+  //             mask_converter._remapper_1.width - (mask_converter._x2 - mask_converter._overlap_pad),
+  //             mask_converter._remapper_1.height},
+  //         CV_32FC3),
+  //     /*copy=*/false);
 
   // I think we can just copy from the original instead of this partial stuff
   // Right side, unblended
@@ -667,12 +667,12 @@ int main(int argc, char** argv) {
           mask_converter._remapper_2.height},
       CV_32FC3));
 
-  CudaMat blending_2(cv::Mat(
-      cv::Size{mask_converter._overlapping_width + mask_converter._overlap_pad, mask_converter._remapper_1.height},
-      CV_32FC3));
+  // CudaMat blending_2(cv::Mat(
+  //     cv::Size{mask_converter._overlapping_width + mask_converter._overlap_pad, mask_converter._remapper_1.height},
+  //     CV_32FC3));
 
-  assert(blending_1.width() == blending_2.width());
-  assert(blending_1.height() == blending_2.height());
+  // assert(blending_1.width() == blending_2.width());
+  // assert(blending_1.height() == blending_2.height());
 
 // Configurable parameter: number of pyramid levels.
 #ifdef __aarch64__
@@ -747,16 +747,16 @@ int main(int argc, char** argv) {
       /*batchSize=*/1);
   cudaDeviceSynchronize();
 
-  assert((roi_blend_1.z - roi_blend_1.x) == blending_1.width());
-  assert((roi_blend_1.w - roi_blend_1.y) == blending_1.height());
-  cudaCrop(
-      cudaRemapped_1.data(),
-      blending_1.data(),
-      roi_blend_1,
-      cudaRemapped_1.width(),
-      cudaRemapped_1.height(),
-      imageFormat::IMAGE_RGB32F,
-      stream);
+  // assert((roi_blend_1.z - roi_blend_1.x) == blending_1.width());
+  // assert((roi_blend_1.w - roi_blend_1.y) == blending_1.height());
+  // cudaCrop(
+  //     cudaRemapped_1.data(),
+  //     blending_1.data(),
+  //     roi_blend_1,
+  //     cudaRemapped_1.width(),
+  //     cudaRemapped_1.height(),
+  //     imageFormat::IMAGE_RGB32F,
+  //     stream);
 
   cudaDeviceSynchronize();
 
@@ -776,16 +776,16 @@ int main(int argc, char** argv) {
 
   cudaDeviceSynchronize();
 
-  assert((roi_blend_2.z - roi_blend_2.x) == blending_2.width());
-  assert((roi_blend_2.w - roi_blend_2.y) == blending_2.height());
-  cudaCrop(
-      cudaRemapped_2.data(),
-      blending_2.data(),
-      roi_blend_2,
-      cudaRemapped_2.width(),
-      cudaRemapped_2.height(),
-      imageFormat::IMAGE_RGB32F,
-      stream);
+  //assert((roi_blend_2.z - roi_blend_2.x) == blending_2.width());
+  //assert((roi_blend_2.w - roi_blend_2.y) == blending_2.height());
+  // cudaCrop(
+  //     cudaRemapped_2.data(),
+  //     blending_2.data(),
+  //     roi_blend_2,
+  //     cudaRemapped_2.width(),
+  //     cudaRemapped_2.height(),
+  //     imageFormat::IMAGE_RGB32F,
+  //     stream);
 
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
@@ -955,14 +955,14 @@ int main(int argc, char** argv) {
   // auto disp = blending_1.download();
   // auto disp = cudaBlendSeam.download();
   auto disp = cudaBlendedFull.download();
-  //auto disp = cudaFull1.download();
-  // auto disp = cudaFull2.download();
-  // auto disp = blending_2.download();
-  // auto disp = cudaRemapped_1.download();
-  //  auto disp = cudaRemapped_2.download();
-  // auto disp = sampleImage2.download();
-  // auto disp = cudaBlendedFloat.download();
-  // disp.convertTo(disp, CV_8UC3, 255.0);
+  // auto disp = cudaFull1.download();
+  //  auto disp = cudaFull2.download();
+  //  auto disp = blending_2.download();
+  //  auto disp = cudaRemapped_1.download();
+  //   auto disp = cudaRemapped_2.download();
+  //  auto disp = sampleImage2.download();
+  //  auto disp = cudaBlendedFloat.download();
+  //  disp.convertTo(disp, CV_8UC3, 255.0);
   cv::imshow("image", disp);
   cv::waitKey(0);
 
