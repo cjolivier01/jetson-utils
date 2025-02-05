@@ -482,6 +482,7 @@ cv::Mat make_fake_mask_like(const cv::Mat& mask) {
 }
 
 struct StitchingContext {
+  StitchingContext(int batch_size) : batch_size_(batch_size) {}
   // Static buffers
   std::unique_ptr<CudaMat> remap_1_x;
   std::unique_ptr<CudaMat> remap_1_y;
@@ -494,6 +495,15 @@ struct StitchingContext {
   std::unique_ptr<CudaMat> cudaRemapped_2;
   std::unique_ptr<CudaMat> cudaFull1;
   std::unique_ptr<CudaMat> cudaFull2;
+
+  // Laplacian Blend Scratch context
+  std::unique_ptr<CudaBatchLaplacianBlendContext> laplacian_blend_context;
+
+  constexpr int batch_size() const {
+    return batch_size_;
+  }
+
+  int batch_size_;
 };
 
 int main(int argc, char** argv) {
@@ -584,7 +594,7 @@ int main(int argc, char** argv) {
   // int numLevels = 2;
 #endif
 
-  StitchingContext stitch_context;
+  StitchingContext stitch_context(/*batch_size=*/1);
 
   stitch_context.remap_1_x = std::make_unique<CudaMat>(img1_col);
   stitch_context.remap_1_y = std::make_unique<CudaMat>(img1_row);
@@ -598,6 +608,12 @@ int main(int argc, char** argv) {
 
   stitch_context.cudaFull1 = std::make_unique<CudaMat>(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
   stitch_context.cudaFull2 = std::make_unique<CudaMat>(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
+
+  stitch_context.laplacian_blend_context = std::make_unique<CudaBatchLaplacianBlendContext>(
+      stitch_context.cudaBlendSeam->width(),
+      stitch_context.cudaBlendSeam->height(),
+      numLevels,
+      /*batch_size=*/stitch_context.batch_size());
 
   cudaError_t cuerr = cudaError_t::cudaSuccess;
 
@@ -642,7 +658,7 @@ int main(int argc, char** argv) {
       defaultR,
       defaultG,
       defaultB,
-      /*batchSize=*/1,
+      /*batchSize=*/stitch_context.batch_size(),
       stream);
 
   batched_remap_kernel(
@@ -657,7 +673,7 @@ int main(int argc, char** argv) {
       defaultR,
       defaultG,
       defaultB,
-      /*batchSize=*/1,
+      /*batchSize=*/stitch_context.batch_size(),
       stream);
 
   int y1 = positions[0].ypos;
@@ -686,7 +702,7 @@ int main(int argc, char** argv) {
       stitch_context.cudaBlendSeam->width(),
       stitch_context.cudaBlendSeam->height(),
       /*adjust_origin=*/false,
-      /*batchSize=*/1,
+      /*batchSize=*/stitch_context.batch_size(),
       (float*)stitch_context.cudaFull1->data(),
       /*d_full_masks=*/nullptr,
       stream);
@@ -713,21 +729,19 @@ int main(int argc, char** argv) {
       stitch_context.cudaBlendSeam->width(),
       stitch_context.cudaBlendSeam->height(),
       /*adjust_origin=*/false,
-      /*batchSize=*/1,
+      /*batchSize=*/stitch_context.batch_size(),
       (float*)stitch_context.cudaFull2->data(),
       /*d_full_masks=*/nullptr,
       stream);
 
   CudaMat& cudaBlendedFull = *stitch_context.cudaFull1;
-  CudaBatchLaplacianBlendContext context(
-      stitch_context.cudaBlendSeam->width(), stitch_context.cudaBlendSeam->height(), numLevels, /*batch_size=*/1);
   cuerr = cudaBatchedLaplacianBlendWithContext(
       (const float*)stitch_context.cudaFull1->data(),
       (const float*)stitch_context.cudaFull2->data(),
       (const float*)stitch_context.cudaBlendSeam->data(),
       // Put output in full-1 memory
       (float*)cudaBlendedFull.data(),
-      context,
+      *stitch_context.laplacian_blend_context,
       stream);
 
   // Destination canvas
@@ -751,7 +765,7 @@ int main(int argc, char** argv) {
       /*offsetX=*/positions[0].xpos,
       /*offsetY=*/positions[0].ypos,
       /*channels=*/3,
-      /*batchSize=*/1,
+      /*batchSize=*/stitch_context.batch_size(),
       stream);
 #endif
 
@@ -772,7 +786,7 @@ int main(int argc, char** argv) {
       /*offsetX=*/positions[1].xpos + mask_converter._overlapping_width - mask_converter._overlap_pad,
       /*offsetY=*/positions[1].ypos,
       /*channels=*/3,
-      /*batchSize=*/1,
+      /*batchSize=*/stitch_context.batch_size(),
       stream);
 #endif
 
@@ -792,7 +806,7 @@ int main(int argc, char** argv) {
       /*offsetX=*/positions[1].xpos - mask_converter._overlap_pad,
       /*offsetY=*/0,
       /*channels=*/3,
-      /*batchSize=*/1,
+      /*batchSize=*/stitch_context.batch_size(),
       stream);
 #endif
 
