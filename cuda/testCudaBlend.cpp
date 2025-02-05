@@ -1,7 +1,6 @@
 #include <opencv2/opencv.hpp>
 
 #include "cudaBlend.h"
-#include "cudaCrop.h"
 #include "cudaMakeFull.h"
 #include "glDisplay.h"
 #include "imageFormat.h"
@@ -10,21 +9,16 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <filesystem>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <mutex>
-#include <optional>
-#include <thread>
 
 #include <cuda_runtime.h>
 #include <opencv4/opencv2/highgui.hpp>
 
 #include <opencv4/opencv2/imgcodecs.hpp>
 #include <tiffio.h>
-// #include <geotiff/geotiff.h>
-//  #include <xtiffio.h>
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -135,12 +129,6 @@ class CudaMat {
   int batch_size_{1};
 
  public:
-  // CudaMat(int w, int h, int elemsize, int channels, int batch_size)
-  //     : rows_(h), cols_(w), batch_size_(batch_size), elemsize_(elemsize), channels_(channels) {
-  //   size_t total_size = rows_ * cols_ * elemsize_ * channels_ * batch_size_;
-  //   cudaError_t err = cudaMalloc(&d_data, total_size);
-  //   assert(err == cudaError_t::cudaSuccess);
-  // }
   CudaMat(const cv::Mat& mat, bool copy = true) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
@@ -190,9 +178,6 @@ class CudaMat {
   const void* data() const {
     return d_data;
   }
-  // size_t bytes() const {
-  //   return size;
-  // }
   constexpr int width() const {
     return cols_;
   }
@@ -607,54 +592,14 @@ int main(int argc, char** argv) {
   std::cout << "min=" << minmax.first << ", max=" << minmax.second
             << ", unique val count=" << countUniqueValues(seam_mask) << std::endl;
 
-  // float left = seam_mask.at<float>(0,0);
-  // float right = seam_mask.at<float>(0,seam_mask.cols - 1);
-
-  // Create a simple seam mask (single–channel, CV_32FC1):
-  // Here we use a hard–coded seam: the left half of the image is taken entirely
-  // from image1 (mask value 1.0) and the right half from image2 (mask value
-  // 0.0). In a more complex case, the mask can be generated based on feature
-  // detection or user input. cv::Mat mask(img1.size(), CV_32FC1); for (int y =
-  // 0; y < mask.rows; y++) {
-  //   for (int x = 0; x < mask.cols; x++) {
-  //     mask.at<float>(y, x) = (x < mask.cols / 2) ? 1.0f : 0.0f;
-  //   }
-  // }
-
   cudaSetDevice(0);
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-
-  // partial_1 = remapped_image_1[:, :, :, : self._x2 + self._overlap_pad]
-  // partial_2 = remapped_image_2[:, :, :, self._overlapping_width - self._overlap_pad :]
-
-  // assert remapped_image_1.shape[-2:] == alpha_mask_1.shape
-  // remapped_image_1 = remapped_image_1[
-  //     :, :, :, self._x2 - self._overlap_pad : # self._remapper_1.width
-  // ]
-  // alpha_mask_1 = alpha_mask_1[:, self._x2 - self._overlap_pad :
-  //     # self._remapper_1.width
-  // ]
-  // assert remapped_image_1.shape[-2:] == alpha_mask_1.shape
-
-  // assert remapped_image_2.shape[-2:] == alpha_mask_2.shape
-  // remapped_image_2 = remapped_image_2[
-  //     :, :, :, : self._overlapping_width + self._overlap_pad
-  // ]
-  // alpha_mask_2 = alpha_mask_2[:, : self._overlapping_width + self._overlap_pad]
 
   // Left side, unblended
   // I think we can just copy from the original instead of this partial stuff
   CudaMat partial_1(
       cv::Mat(cv::Size(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height), CV_32FC3));
-
-  // CudaMat blending_1(
-  //     cv::Mat(
-  //         cv::Size{
-  //             mask_converter._remapper_1.width - (mask_converter._x2 - mask_converter._overlap_pad),
-  //             mask_converter._remapper_1.height},
-  //         CV_32FC3),
-  //     /*copy=*/false);
 
   // I think we can just copy from the original instead of this partial stuff
   // Right side, unblended
@@ -664,13 +609,6 @@ int main(int argc, char** argv) {
           mask_converter._remapper_2.height},
       CV_32FC3));
 
-  // CudaMat blending_2(cv::Mat(
-  //     cv::Size{mask_converter._overlapping_width + mask_converter._overlap_pad, mask_converter._remapper_1.height},
-  //     CV_32FC3));
-
-  // assert(blending_1.width() == blending_2.width());
-  // assert(blending_1.height() == blending_2.height());
-
 // Configurable parameter: number of pyramid levels.
 #ifdef __aarch64__
   // Lower compute, quick and dirty
@@ -679,8 +617,6 @@ int main(int argc, char** argv) {
   int numLevels = 6;
   // int numLevels = 2;
 #endif
-  // int width = img1.cols;
-  // int height = img1.rows;
 
   CudaMat remap_1_x(img1_col), remap_1_y(img1_row);
   CudaMat remap_2_x(img2_col), remap_2_y(img2_row);
@@ -697,19 +633,6 @@ int main(int argc, char** argv) {
 
   CudaMat cudaFull1(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
   CudaMat cudaFull2(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
-
-  // TODO: this can be just cudaFull2
-  // CudaMat cudaBlendedFull(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
-
-  // Old stuff before end-to-end
-  // CudaMat cudaImage1Float(img1_float);
-  // CudaMat cudaImage2Float(img2_float);
-  // CudaMat cudaMask(seam_mask);
-
-  // // Prepare the output image (as float).
-  // cv::Mat blended_float(img1.size(), CV_32FC3);
-  // CudaMat cudaBlendedFloat(blended_float);
-
   cudaError_t cuerr = cudaError_t::cudaSuccess;
 
   cudaDeviceSynchronize();
@@ -831,51 +754,22 @@ int main(int argc, char** argv) {
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
-#if 1
-#if 1
   CudaMat& cudaBlendedFull = cudaFull1;
   CudaBatchLaplacianBlendContext context(cudaBlendSeam.width(), cudaBlendSeam.height(), numLevels, /*batch_size=*/1);
-  auto cu_err = cudaBatchedLaplacianBlendWithContext(
+  cuerr = cudaBatchedLaplacianBlendWithContext(
       (const float*)cudaFull1.data(),
       (const float*)cudaFull2.data(),
       (const float*)cudaBlendSeam.data(),
       // Put output in full-1 memory
       (float*)cudaBlendedFull.data(),
       context);
-#else
-  CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
-  auto cu_err = cudaBatchedLaplacianBlendWithContext(
-      (const float*)cudaImage1Float.data(),
-      (const float*)cudaImage2Float.data(),
-      (const float*)cudaMask.data(),
-      (float*)cudaBlendedFloat.data(),
-      context);
-#endif
-#endif
+
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
   // Destination canvas
   CudaMat canvas(canvas_mat, /*copy=*/false);
 
-  // canvas[
-  //     :,
-  //     :,
-  //     :,
-  //     self._x2
-  //     - self._overlap_pad : self._x2
-  //     + self._overlapping_width
-  //     + self._overlap_pad,
-  // ] = blended_img.clamp(min=0, max=255).to(dtype=canvas.dtype, non_blocking=True)
-  // canvas[
-  //     :, :, self._y1 : self._remapper_1.height + self._y1, : self._x2 + self._overlap_pad
-  // ] = partial_1
-  // canvas[
-  //     :,
-  //     :,
-  //     self._y2 : self._remapper_2.height + self._y2,
-  //     self._x2 + self._overlapping_width - self._overlap_pad :,
-  // ] = partial_2
 #if 1
   // Unblended Left Side
   assert(partial_size_1.width == roi_width(roi_partial_1));
@@ -899,14 +793,6 @@ int main(int argc, char** argv) {
 #endif
 
 #if 1
-  const int4 _roi_partial_2 = {
-      mask_converter._overlapping_width - mask_converter._overlap_pad, 0, partial_size_2.width, partial_size_2.height};
-
-  // Unblended Right Side
-  auto roi2_w = roi_width(roi_partial_2);
-  auto roi2_h = roi_height(roi_partial_2);
-  (void)partial_size_2;
-
   assert(partial_size_2.width == roi_width(roi_partial_2));
   assert(partial_size_2.height == roi_height(roi_partial_2));
   cuerr = copyRoiBatchedInterface(
@@ -973,41 +859,6 @@ int main(int argc, char** argv) {
 
   size_t frame_count = 100;
   for (size_t i = 0; i < frame_count; ++i) {
-#if 1
-    batched_remap_kernel(
-        (float*)sampleImage1.data(),
-        sampleImage1.width(),
-        sampleImage1.height(),
-        (float*)cudaRemapped_1.data(),
-        cudaRemapped_1.width(),
-        cudaRemapped_1.height(),
-        (uint16_t*)remap_1_x.data(),
-        (uint16_t*)remap_1_y.data(),
-        defaultR,
-        defaultG,
-        defaultB,
-        /*batchSize=*/1);
-    batched_remap_kernel(
-        (float*)sampleImage2.data(),
-        sampleImage2.width(),
-        sampleImage2.height(),
-        (float*)cudaRemapped_2.data(),
-        cudaRemapped_2.width(),
-        cudaRemapped_2.height(),
-        (uint16_t*)remap_2_x.data(),
-        (uint16_t*)remap_2_y.data(),
-        defaultR,
-        defaultG,
-        defaultB,
-        /*batchSize=*/1);
-#endif
-
-    cudaBatchedLaplacianBlendWithContext(
-        (const float*)cudaImage1Float.data(),
-        (const float*)cudaImage2Float.data(),
-        (const float*)cudaMask.data(),
-        (float*)cudaBlendedFloat.data(),
-        context);
   }
 
   auto stop_ms =
@@ -1018,23 +869,5 @@ int main(int argc, char** argv) {
   std::cout << "Blend speed: " << (1.0 / sec_per_frame) << "fps" << std::endl;
 #endif
 
-  // Convert the blended image from float back to 8–bit for saving.
-  // cv::Mat blended;
-  // blended_float = cudaBlendedFloat.download();
-
-  // cv::imshow("blended_float", blended_float);
-  // cv::waitKey(0);
-
-  // blended_float.convertTo(blended, CV_8UC3, 255.0);
-
-  // // show_image("blended_float", blended_float);
-
-  // // Save the final blended image.
-  // if (!cv::imwrite(argv[4], blended)) {
-  //   std::cerr << "Failed to save the blended image!" << std::endl;
-  //   return -1;
-  // }
-
-  std::cout << "Blended image saved as: " << argv[4] << std::endl;
-  return cu_err;
+  return cuerr;
 }
