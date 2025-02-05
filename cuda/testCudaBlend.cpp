@@ -946,7 +946,7 @@ int main(int argc, char** argv) {
   //   auto disp = cudaFull2.download();
   //   auto disp = blending_2.download();
   //   auto disp = cudaRemapped_1.download();
-  //    auto disp = cudaRemapped_2.download();
+  // auto disp = cudaRemapped_2.download();
   //   auto disp = sampleImage2.download();
   //   auto disp = cudaBlendedFloat.download();
   //   disp.convertTo(disp, CV_8UC3, 255.0);
