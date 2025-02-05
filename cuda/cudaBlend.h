@@ -8,6 +8,7 @@
 // Batched Context Structure (for images only; the mask is shared across the
 // batch)
 // =============================================================================
+template <typename T>
 struct CudaBatchLaplacianBlendContext {
   CudaBatchLaplacianBlendContext(int image_width, int image_height, int num_levels, int batch_size)
       : numLevels(num_levels),
@@ -46,13 +47,13 @@ struct CudaBatchLaplacianBlendContext {
   const int batchSize;
   std::vector<int> widths;
   std::vector<int> heights;
-  std::vector<float*> d_gauss1;
-  std::vector<float*> d_gauss2;
+  std::vector<T*> d_gauss1;
+  std::vector<T*> d_gauss2;
   // Note: The mask is shared, so each level’s allocation is only for one image.
-  std::vector<float*> d_maskPyr;
-  std::vector<float*> d_lap1;
-  std::vector<float*> d_lap2;
-  std::vector<float*> d_blend;
+  std::vector<T*> d_maskPyr;
+  std::vector<T*> d_lap1;
+  std::vector<T*> d_lap2;
+  std::vector<T*> d_blend;
   bool initialized{false};
 };
 
@@ -73,11 +74,12 @@ struct CudaBatchLaplacianBlendContext {
  * @param stream CUDA stream to use for all kernel launches and memory copies (default is 0).
  * @return cudaError_t CUDA error code.
  */
+template <typename T>
 cudaError_t cudaBatchedLaplacianBlend(
-    const float* h_image1,
-    const float* h_image2,
-    const float* h_mask,
-    float* h_output,
+    const T* h_image1,
+    const T* h_image2,
+    const T* h_mask,
+    T* h_output,
     int imageWidth,
     int imageHeight,
     int numLevels,
@@ -98,10 +100,11 @@ cudaError_t cudaBatchedLaplacianBlend(
  * @param stream CUDA stream to use for all kernel launches and memory copies (default is 0).
  * @return cudaError_t CUDA error code.
  */
+template <typename T>
 cudaError_t cudaBatchedLaplacianBlendWithContext(
-    const float* d_image1,
-    const float* d_image2,
-    const float* d_mask,
-    float* d_output,
-    CudaBatchLaplacianBlendContext& context,
+    const T* d_image1,
+    const T* d_image2,
+    const T* d_mask,
+    T* d_output,
+    CudaBatchLaplacianBlendContext<T>& context,
     cudaStream_t stream);
