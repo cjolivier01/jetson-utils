@@ -148,7 +148,7 @@ class CudaMat {
     if (copy) {
       cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
     } else {
-      cudaMemset(d_data, 0, size);
+      //cudaMemset(d_data, 0, size);
     }
   }
 
@@ -169,7 +169,7 @@ class CudaMat {
         p += size_each;
       }
     } else {
-      cudaMemset(d_data, 0, size_total);
+      //cudaMemset(d_data, 0, size_total);
     }
   }
 
