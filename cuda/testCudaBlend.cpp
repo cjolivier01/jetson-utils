@@ -854,8 +854,8 @@ int main(int argc, char** argv) {
   // Lower compute, quick and dirty
   int numLevels = 1;
 #else
-  //int numLevels = 6;
-  int numLevels = 2;
+  int numLevels = 6;
+  // int numLevels = 6;
 #endif
 
 #if 1
