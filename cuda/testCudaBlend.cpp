@@ -130,6 +130,8 @@ class CudaMat {
   int batch_size_{1};
 
  public:
+  CudaMat(const CudaMat&) = delete;
+  CudaMat(CudaMat&&) = delete;
   CudaMat(const cv::Mat& mat, bool copy = true) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
     size = mat.total() * mat.elemSize();
     cudaMalloc(&d_data, size);
@@ -670,21 +672,18 @@ int main(int argc, char** argv) {
   //
   // The actual incoming imaged
   //
-  CudaMat sampleImage1(sample_img_left);
-  CudaMat sampleImage2(sample_img_right);
-
   auto process = [](const CudaMat& sampleImage1,
-                    const CudaMat sampleImage2,
+                    const CudaMat& sampleImage2,
                     StitchingContext& stitch_context,
                     MaskConverter& mask_converter,
-                    cudaStream_t stream) -> CudaMat {
+                    cudaStream_t stream) -> std::unique_ptr<CudaMat> {
     cudaError_t cuerr = cudaError_t::cudaSuccess;
 
     // Set default color for unmapped pixels.
     constexpr float defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
 
     // Launch the remap kernel.
-    batched_remap_kernel(
+    cuerr = batched_remap_kernel(
         (float*)sampleImage1.data(),
         sampleImage1.width(),
         sampleImage1.height(),
@@ -698,8 +697,9 @@ int main(int argc, char** argv) {
         defaultB,
         /*batchSize=*/stitch_context.batch_size(),
         stream);
+    assert(cuerr == cudaError_t::cudaSuccess);
 
-    batched_remap_kernel(
+    cuerr = batched_remap_kernel(
         (float*)sampleImage2.data(),
         sampleImage2.width(),
         sampleImage2.height(),
@@ -713,6 +713,7 @@ int main(int argc, char** argv) {
         defaultB,
         /*batchSize=*/stitch_context.batch_size(),
         stream);
+    assert(cuerr == cudaError_t::cudaSuccess);
 
     int y1 = mask_converter._y1;
     int y2 = mask_converter._y2;
@@ -720,7 +721,7 @@ int main(int argc, char** argv) {
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
 
-    simple_make_full_batch(
+    cuerr = simple_make_full_batch(
         // Image 1 (float image)
         (const float*)stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
@@ -744,8 +745,9 @@ int main(int argc, char** argv) {
         (float*)stitch_context.cudaFull1->data(),
         /*d_full_masks=*/nullptr,
         stream);
+    assert(cuerr == cudaError_t::cudaSuccess);
 
-    simple_make_full_batch(
+    cuerr = simple_make_full_batch(
         // Image 1 (float image)
         (const float*)stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
@@ -771,6 +773,7 @@ int main(int argc, char** argv) {
         (float*)stitch_context.cudaFull2->data(),
         /*d_full_masks=*/nullptr,
         stream);
+    assert(cuerr == cudaError_t::cudaSuccess);
 
     CudaMat& cudaBlendedFull = *stitch_context.cudaFull1;
     cuerr = cudaBatchedLaplacianBlendWithContext(
@@ -781,9 +784,10 @@ int main(int argc, char** argv) {
         (float*)cudaBlendedFull.data(),
         *stitch_context.laplacian_blend_context,
         stream);
+    assert(cuerr == cudaError_t::cudaSuccess);
 
     // Destination canvas
-    CudaMat canvas(mask_converter.canvas_mat, /*copy=*/false);
+    std::unique_ptr<CudaMat> canvas = std::make_unique<CudaMat>(mask_converter.canvas_mat, /*copy=*/false);
 
 #if 1
     // Unblended Left Side
@@ -797,14 +801,15 @@ int main(int argc, char** argv) {
         roi_height(mask_converter.roi_partial_1),
         mask_converter.roi_partial_1.x,
         mask_converter.roi_partial_1.y,
-        (float*)canvas.data(),
-        canvas.width(),
-        canvas.height(),
+        (float*)canvas->data(),
+        canvas->width(),
+        canvas->height(),
         /*offsetX=*/mask_converter._x1,
         /*offsetY=*/mask_converter._y1,
         /*channels=*/3,
         /*batchSize=*/stitch_context.batch_size(),
         stream);
+    assert(cuerr == cudaError_t::cudaSuccess);
 #endif
 
 #if 1
@@ -818,14 +823,15 @@ int main(int argc, char** argv) {
         mask_converter.partial_size_2.height,
         mask_converter.roi_partial_2.x,
         mask_converter.roi_partial_2.y,
-        (float*)canvas.data(),
-        canvas.width(),
-        canvas.height(),
+        (float*)canvas->data(),
+        canvas->width(),
+        canvas->height(),
         /*offsetX=*/mask_converter._x2 + mask_converter._overlapping_width - mask_converter._overlap_pad,
         /*offsetY=*/mask_converter._y2,
         /*channels=*/3,
         /*batchSize=*/stitch_context.batch_size(),
         stream);
+    assert(cuerr == cudaError_t::cudaSuccess);
 #endif
 
 #if 1
@@ -838,22 +844,26 @@ int main(int argc, char** argv) {
         cudaBlendedFull.height(),
         0,
         0,
-        (float*)canvas.data(),
-        canvas.width(),
-        canvas.height(),
+        (float*)canvas->data(),
+        canvas->width(),
+        canvas->height(),
         /*offsetX=*/mask_converter._x2 - mask_converter._overlap_pad,
         /*offsetY=*/0,
         /*channels=*/3,
         /*batchSize=*/stitch_context.batch_size(),
         stream);
+    assert(cuerr == cudaError_t::cudaSuccess);
 #endif
 
+    cudaStreamSynchronize(stream);
+
     // cudaStreamSynchronize(stream);
-    //  auto disp = blending_1.download();
+    // auto disp = blending_1.download();
     //  auto disp = cudaBlendSeam.download();
-    auto disp = canvas.download();
-    //  auto disp = cudaBlendedFull.download();
-    //   auto disp = cudaFull1.download();
+    auto disp = canvas->download();
+    //auto disp = sampleImage2.download();
+    // auto disp = cudaBlendedFull.download();
+    // auto disp = cudaFull1.download();
     //    auto disp = cudaFull2.download();
     //    auto disp = blending_2.download();
     //    auto disp = cudaRemapped_1->download();
@@ -861,19 +871,25 @@ int main(int argc, char** argv) {
     //    auto disp = sampleImage2.download();
     //    auto disp = cudaBlendedFloat.download();
     //    disp.convertTo(disp, CV_8UC3, 255.0);
+    //cv::imshow("image", disp);
     cv::imshow("image", disp);
     cv::waitKey(0);
 
     return canvas;
   };
 
-  auto canvas_result = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+  CudaMat sampleImage1(sample_img_left);
+  CudaMat sampleImage2(sample_img_right);
+
+  process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+
+  process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
 
   cudaStreamSynchronize(stream);
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 1 /* perf test */
+#if 0 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
