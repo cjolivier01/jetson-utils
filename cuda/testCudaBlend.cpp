@@ -855,6 +855,26 @@ int main(int argc, char** argv) {
   // Destination canvas
   CudaMat canvas(canvas_mat, /*copy=*/false);
 
+  // canvas[
+  //     :,
+  //     :,
+  //     :,
+  //     self._x2
+  //     - self._overlap_pad : self._x2
+  //     + self._overlapping_width
+  //     + self._overlap_pad,
+  // ] = blended_img.clamp(min=0, max=255).to(dtype=canvas.dtype, non_blocking=True)
+  // canvas[
+  //     :, :, self._y1 : self._remapper_1.height + self._y1, : self._x2 + self._overlap_pad
+  // ] = partial_1
+  // canvas[
+  //     :,
+  //     :,
+  //     self._y2 : self._remapper_2.height + self._y2,
+  //     self._x2 + self._overlapping_width - self._overlap_pad :,
+  // ] = partial_2
+#if 0
+  // Unblended Left Side
   cuerr = copyRoiBatchedInterface(
     (const float*)cudaRemapped_1.data(),
     cudaRemapped_1.width(),
@@ -866,43 +886,66 @@ int main(int argc, char** argv) {
     (float*) canvas.data(),
     canvas.width(),
     canvas.height(),
-    /*offsetX=*/positions[0].xpos + roi_partial_1.x,
-    /*offsetY=*/positions[0].ypos + roi_partial_1.y,
+    /*offsetX=*/positions[0].xpos,
+    /*offsetY=*/positions[0].ypos,
     /*channels=*/3,
     /*batchSize=*/1,
     stream);
+#endif
 
+#if 1
+  // Unblended Right Side
   cuerr = copyRoiBatchedInterface(
-    (const float*)cudaRemapped_2.data(),
-    cudaRemapped_2.width(),
-    cudaRemapped_2.height(),
-    roi_width(roi_partial_2),
-    roi_height(roi_partial_2),
-    roi_partial_2.x,
-    roi_partial_2.y,
-    (float*) canvas.data(),
-    canvas.width(),
-    canvas.height(),
-    /*offsetX=*/positions[1].xpos + roi_partial_2.x,
-    /*offsetY=*/positions[1].ypos + roi_partial_2.y,
-    /*channels=*/3,
-    /*batchSize=*/1,
-    stream);
+      (const float*)cudaRemapped_2.data(),
+      cudaRemapped_2.width(),
+      cudaRemapped_2.height(),
+      roi_width(roi_partial_2),
+      roi_height(roi_partial_2),
+      roi_partial_2.x,
+      roi_partial_2.y,
+      (float*)canvas.data(),
+      canvas.width(),
+      canvas.height(),
+      /*offsetX=*/positions[1].xpos + roi_partial_2.x,
+      /*offsetY=*/positions[1].ypos + roi_partial_2.y,
+      /*channels=*/3,
+      /*batchSize=*/1,
+      stream);
+#endif
+
+#if 1
+  cuerr = copyRoiBatchedInterface(
+      (const float*)cudaBlendedFull.data(),
+      cudaBlendedFull.width(),
+      cudaBlendedFull.height(),
+      cudaBlendedFull.width(),
+      cudaBlendedFull.height(),
+      0,
+      0,
+      (float*)canvas.data(),
+      canvas.width(),
+      canvas.height(),
+      /*offsetX=*/mask_converter._x2 + mask_converter._overlapping_width - mask_converter._overlap_pad,
+      /*offsetY=*/mask_converter._y2,
+      /*channels=*/3,
+      /*batchSize=*/1,
+      stream);
+#endif
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
   // auto disp = blending_1.download();
   // auto disp = cudaBlendSeam.download();
   auto disp = canvas.download();
-  //auto disp = cudaBlendedFull.download();
-  // auto disp = cudaFull1.download();
-  //  auto disp = cudaFull2.download();
-  //  auto disp = blending_2.download();
-  //  auto disp = cudaRemapped_1.download();
-  //   auto disp = cudaRemapped_2.download();
-  //  auto disp = sampleImage2.download();
-  //  auto disp = cudaBlendedFloat.download();
-  //  disp.convertTo(disp, CV_8UC3, 255.0);
+  // auto disp = cudaBlendedFull.download();
+  //  auto disp = cudaFull1.download();
+  //   auto disp = cudaFull2.download();
+  //   auto disp = blending_2.download();
+  //   auto disp = cudaRemapped_1.download();
+  //    auto disp = cudaRemapped_2.download();
+  //   auto disp = sampleImage2.download();
+  //   auto disp = cudaBlendedFloat.download();
+  //   disp.convertTo(disp, CV_8UC3, 255.0);
   cv::imshow("image", disp);
   cv::waitKey(0);
 
@@ -978,4 +1021,3 @@ int main(int argc, char** argv) {
   std::cout << "Blended image saved as: " << argv[4] << std::endl;
   return cu_err;
 }
-
