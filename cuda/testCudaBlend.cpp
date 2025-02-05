@@ -550,8 +550,8 @@ struct StitchingContext {
   std::unique_ptr<CudaMat<T_compute>> cudaBlendSeam;
 
   // Scratch buffers
-  std::unique_ptr<CudaMat<T_compute>> cudaRemapped_1;
-  std::unique_ptr<CudaMat<T_compute>> cudaRemapped_2;
+  // std::unique_ptr<CudaMat<T_compute>> cudaRemapped_1;
+  // std::unique_ptr<CudaMat<T_compute>> cudaRemapped_2;
   std::unique_ptr<CudaMat<T_compute>> cudaFull1;
   std::unique_ptr<CudaMat<T_compute>> cudaFull2;
 
@@ -612,8 +612,8 @@ class CudaStitchPano {
         stitch_context.remap_1_y->data(),
         make_float3(0, 0, 0),
         /*batchSize=*/stitch_context.batch_size(),
-        stitch_context.cudaRemapped_1->width(),
-        stitch_context.cudaRemapped_1->height(),
+        stitch_context.remap_1_x->width(),
+        stitch_context.remap_1_x->height(),
         /*offsetX=*/mask_converter._x1,
         /*offsetY=*/mask_converter._y1,
         stream);
@@ -666,8 +666,8 @@ class CudaStitchPano {
         stitch_context.remap_2_y->data(),
         make_float3(0, 0, 0),
         /*batchSize=*/stitch_context.batch_size(),
-        stitch_context.cudaRemapped_2->width(),
-        stitch_context.cudaRemapped_2->height(),
+        stitch_context.remap_2_x->width(),
+        stitch_context.remap_2_x->height(),
         /*offsetX=*/mask_converter._x2,
         /*offsetY=*/mask_converter._y2,
         stream);
@@ -888,10 +888,10 @@ int main(int argc, char** argv) {
   stitch_context.remap_2_x = std::make_unique<CudaMat<uint16_t>>(img2_col);
   stitch_context.remap_2_y = std::make_unique<CudaMat<uint16_t>>(img2_row);
 
-  stitch_context.cudaRemapped_1 = std::make_unique<CudaMat<T_compute>>(
-      as_batch(cv::Mat(img1_col.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
-  stitch_context.cudaRemapped_2 = std::make_unique<CudaMat<T_compute>>(
-      as_batch(cv::Mat(img2_col.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
+  // stitch_context.cudaRemapped_1 = std::make_unique<CudaMat<T_compute>>(
+  //     as_batch(cv::Mat(img1_col.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
+  // stitch_context.cudaRemapped_2 = std::make_unique<CudaMat<T_compute>>(
+  //     as_batch(cv::Mat(img2_col.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
 
   blend_seam.convertTo(blend_seam, CV_T_COMPUTE3);
   stitch_context.cudaBlendSeam = std::make_unique<CudaMat<T_compute>>(blend_seam);
