@@ -551,14 +551,14 @@ struct StitchingContext {
 
 int main(int argc, char** argv) {
   // Usage check.
-  if (argc < 4) {
-    std::cerr << "Usage: " << argv[0] << " <image1> <image2> <mask> <output>" << std::endl;
-    return -1;
-  }
+  // if (argc < 2) {
+  //   std::cerr << "Usage: " << argv[0] << " <game-id>" << std::endl;
+  //   return -1;
+  // }
 
   RenderSet display;
 
-  std::string game_id = "stitch-fix";
+  std::string game_id = "stitch-fix2";
   std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id + "/";
 
   std::string mapping_0_pos = game_dir + "mapping_0000.tif";
@@ -873,12 +873,13 @@ int main(int argc, char** argv) {
   CudaMat<T> sampleImage2(sample_img_right);
 
   auto blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
-  SHOW_IMAGE(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
+  blendedCanvas.reset();
 
-  blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
-  SHOW_IMAGE(blendedCanvas);
+  // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+  // SHOW_IMAGE(blendedCanvas);
 
-  cudaStreamSynchronize(stream);
+  // cudaStreamSynchronize(stream);
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
