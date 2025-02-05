@@ -726,7 +726,10 @@ int main(int argc, char** argv) {
       mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
       mask_converter._remapper_2.height};
   const int4 roi_partial_2 = {
-      mask_converter._overlapping_width - mask_converter._overlap_pad, 0, partial_size_2.width, partial_size_2.height};
+      mask_converter._overlapping_width - mask_converter._overlap_pad,
+      0,
+      mask_converter._overlapping_width - mask_converter._overlap_pad + partial_size_2.width,
+      partial_size_2.height};
   const int4 roi_blend_2 = {
       0, 0, mask_converter._overlapping_width + mask_converter._overlap_pad, cudaRemapped_2.height()};
 
@@ -878,21 +881,21 @@ int main(int argc, char** argv) {
   assert(partial_size_1.width == roi_width(roi_partial_1));
   assert(partial_size_1.height == roi_height(roi_partial_1));
   cuerr = copyRoiBatchedInterface(
-    (const float*)cudaRemapped_1.data(),
-    cudaRemapped_1.width(),
-    cudaRemapped_1.height(),
-    roi_width(roi_partial_1),
-    roi_height(roi_partial_1),
-    roi_partial_1.x,
-    roi_partial_1.y,
-    (float*) canvas.data(),
-    canvas.width(),
-    canvas.height(),
-    /*offsetX=*/positions[0].xpos,
-    /*offsetY=*/positions[0].ypos,
-    /*channels=*/3,
-    /*batchSize=*/1,
-    stream);
+      (const float*)cudaRemapped_1.data(),
+      cudaRemapped_1.width(),
+      cudaRemapped_1.height(),
+      roi_width(roi_partial_1),
+      roi_height(roi_partial_1),
+      roi_partial_1.x,
+      roi_partial_1.y,
+      (float*)canvas.data(),
+      canvas.width(),
+      canvas.height(),
+      /*offsetX=*/positions[0].xpos,
+      /*offsetY=*/positions[0].ypos,
+      /*channels=*/3,
+      /*batchSize=*/1,
+      stream);
 #endif
 
 #if 1
@@ -903,6 +906,9 @@ int main(int argc, char** argv) {
   auto roi2_w = roi_width(roi_partial_2);
   auto roi2_h = roi_height(roi_partial_2);
   (void)partial_size_2;
+
+  assert(partial_size_2.width == roi_width(roi_partial_2));
+  assert(partial_size_2.height == roi_height(roi_partial_2));
   cuerr = copyRoiBatchedInterface(
       (const float*)cudaRemapped_2.data(),
       cudaRemapped_2.width(),
