@@ -541,6 +541,8 @@ int main(int argc, char** argv) {
   cv::Mat whole_seam_mask_image = load_seam_mask(whole_seam_mask);
   whole_seam_mask_image.convertTo(whole_seam_mask_image, CV_32FC1);
 
+  const cv::Mat canvas_mat(whole_seam_mask_image.size(), CV_32FC3);
+
 #if 0
   whole_seam_mask_image = make_fake_mask_like(whole_seam_mask_image);
 #endif
@@ -705,13 +707,13 @@ int main(int argc, char** argv) {
   // CudaMat cudaBlendedFull(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
 
   // Old stuff before end-to-end
-  CudaMat cudaImage1Float(img1_float);
-  CudaMat cudaImage2Float(img2_float);
-  CudaMat cudaMask(seam_mask);
+  // CudaMat cudaImage1Float(img1_float);
+  // CudaMat cudaImage2Float(img2_float);
+  // CudaMat cudaMask(seam_mask);
 
-  // Prepare the output image (as float).
-  cv::Mat blended_float(img1.size(), CV_32FC3);
-  CudaMat cudaBlendedFloat(blended_float);
+  // // Prepare the output image (as float).
+  // cv::Mat blended_float(img1.size(), CV_32FC3);
+  // CudaMat cudaBlendedFloat(blended_float);
 
   cudaDeviceSynchronize();
 
@@ -853,6 +855,9 @@ int main(int argc, char** argv) {
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
+  // Destination canvas
+  CudaMat canvas(canvas_mat, /*copy=*/false);
+
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
   // auto disp = blending_1.download();
@@ -922,21 +927,21 @@ int main(int argc, char** argv) {
 #endif
 
   // Convert the blended image from float back to 8–bit for saving.
-  cv::Mat blended;
-  blended_float = cudaBlendedFloat.download();
+  // cv::Mat blended;
+  // blended_float = cudaBlendedFloat.download();
 
   // cv::imshow("blended_float", blended_float);
   // cv::waitKey(0);
 
-  blended_float.convertTo(blended, CV_8UC3, 255.0);
+  // blended_float.convertTo(blended, CV_8UC3, 255.0);
 
-  // show_image("blended_float", blended_float);
+  // // show_image("blended_float", blended_float);
 
-  // Save the final blended image.
-  if (!cv::imwrite(argv[4], blended)) {
-    std::cerr << "Failed to save the blended image!" << std::endl;
-    return -1;
-  }
+  // // Save the final blended image.
+  // if (!cv::imwrite(argv[4], blended)) {
+  //   std::cerr << "Failed to save the blended image!" << std::endl;
+  //   return -1;
+  // }
 
   std::cout << "Blended image saved as: " << argv[4] << std::endl;
   test_remapping();
