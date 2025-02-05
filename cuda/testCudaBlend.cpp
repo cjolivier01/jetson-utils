@@ -854,8 +854,8 @@ int main(int argc, char** argv) {
   // Lower compute, quick and dirty
   int numLevels = 1;
 #else
-  int numLevels = 6;
-  // int numLevels = 2;
+  //int numLevels = 6;
+  int numLevels = 2;
 #endif
 
 #if 1
@@ -905,13 +905,13 @@ int main(int argc, char** argv) {
       CudaStitchPano<T, T_compute>::process(
           sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
           .ConsumeValueOrDie();
-  //SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
   // blendedCanvas.reset();
 
   blendedCanvas = CudaStitchPano<T, T_compute>::process(
                       sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
                       .ConsumeValueOrDie();
-  //SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 

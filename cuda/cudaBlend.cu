@@ -687,8 +687,10 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
         (void**)&d_reconstruct, context.widths[last] * context.heights[last] * 3 * sizeof(T) * context.batchSize);
     context.d_resonstruct[last] = d_reconstruct;
   } else {
+    assert(last);
     d_reconstruct = context.d_resonstruct[last];
   }
+  assert(d_reconstruct);
   cudaMemcpyAsync(
       d_reconstruct,
       context.d_blend[last],
@@ -701,14 +703,19 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
       size_t highSize = context.widths[level] * context.heights[level] * 3 * sizeof(T) * context.batchSize;
       if (level) {
         cudaMalloc((void**)&d_temp, highSize);
+        assert(!context.d_resonstruct[level]);
         context.d_resonstruct[level] = d_temp;
       } else {
+        // We intentionally don't set reconstrruct 0 to d_output since
+        // nothing ever accesses it that way
         d_temp = d_output;
         assert(highSize == imageSize * context.batchSize);
       }
     } else {
-      d_temp = context.d_resonstruct[level];
+      d_temp = level ? context.d_resonstruct[level] : d_output;
     }
+    assert(d_temp);
+    assert(d_reconstruct);
     dim3 grid(
         (context.widths[level] + block.x - 1) / block.x,
         (context.heights[level] + block.y - 1) / block.y,
