@@ -712,7 +712,7 @@ int main(int argc, char** argv) {
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
 
-    cuerr = simple_make_full_batch<T, unsigned char>(
+    cuerr = simple_make_full_batch<T, T, unsigned char>(
         // Image 1 (float image)
         stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
@@ -738,7 +738,7 @@ int main(int argc, char** argv) {
         stream);
     assert(cuerr == cudaError_t::cudaSuccess);
 
-    cuerr = simple_make_full_batch<T, unsigned char>(
+    cuerr = simple_make_full_batch<T, T, unsigned char>(
         // Image 1 (float image)
         stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
