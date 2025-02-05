@@ -682,8 +682,8 @@ int main(int argc, char** argv) {
   int numLevels = 6;
   // int numLevels = 2;
 #endif
-  int width = img1.cols;
-  int height = img1.rows;
+  // int width = img1.cols;
+  // int height = img1.rows;
 
   CudaMat remap_1_x(img1_col), remap_1_y(img1_row);
   CudaMat remap_2_x(img2_col), remap_2_y(img2_row);
@@ -812,8 +812,10 @@ int main(int argc, char** argv) {
       0,
       0,
       0,
+      // Src ROI x, y offset
       roi_blend_2.x,
       roi_blend_2.y,
+      // Dest ROI x, y offset
       mask_converter._remapper_2.xpos,
       y2,
       cudaBlendSeam.width(),
@@ -827,18 +829,6 @@ int main(int argc, char** argv) {
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
-  // cv::imshow("img1", img1_float);
-  // cv::waitKey(0);
-
-  // display.render("cudaImage1Float", CudaSurface(cudaImage1Float), stream);
-  // wait_key();
-  //  cv::waitKey(10);
-  //  char c;
-  //  std::cin >> c;
-
-  // Call the CUDA–based blending function.
-  // It is assumed that blendImages copies data to/from device memory,
-  // launches the appropriate kernels, and returns the blended image.
 #if 1
 #if 1
   CudaMat& cudaBlendedFull = cudaFull1;
