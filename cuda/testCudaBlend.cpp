@@ -589,7 +589,7 @@ class CudaStitchPano {
 
     // Set default color for unmapped pixels.
     // constexpr T defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
-#if 1
+#if 0
     // Launch the remap kernel.
     cuerr = batched_remap_kernel_ex(
         (const float3*)sampleImage1.data(),
@@ -681,7 +681,7 @@ class CudaStitchPano {
 #endif
 
     CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
-#if 1
+#if 0
     cuerr = cudaBatchedLaplacianBlendWithContext(
         stitch_context.cudaFull1->data(),
         stitch_context.cudaFull2->data(),
@@ -692,7 +692,7 @@ class CudaStitchPano {
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
-#if 1
+#if 0
     // Unblended Left Side
     assert(mask_converter.partial_size_1.width == roi_width(mask_converter.roi_partial_1));
     assert(mask_converter.partial_size_1.height == roi_height(mask_converter.roi_partial_1));
@@ -715,7 +715,7 @@ class CudaStitchPano {
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
 
-#if 1
+#if 0
     assert(mask_converter.partial_size_2.width == roi_width(mask_converter.roi_partial_2));
     assert(mask_converter.partial_size_2.height == roi_height(mask_converter.roi_partial_2));
     cuerr = copyRoiBatchedInterface(
@@ -737,7 +737,7 @@ class CudaStitchPano {
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
 
-#if 1
+#if 0
     // Blended middle
     cuerr = copyRoiBatchedInterface(
         cudaBlendedFull.data(),
