@@ -589,7 +589,7 @@ class CudaStitchPano {
 
     // Set default color for unmapped pixels.
     // constexpr T defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
-#if 0
+#if 1
     // Launch the remap kernel.
     cuerr = batched_remap_kernel_ex(
         (const float3*)sampleImage1.data(),
@@ -681,7 +681,7 @@ class CudaStitchPano {
 #endif
 
     CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
-#if 0
+#if 1
     cuerr = cudaBatchedLaplacianBlendWithContext(
         stitch_context.cudaFull1->data(),
         stitch_context.cudaFull2->data(),
