@@ -747,17 +747,6 @@ int main(int argc, char** argv) {
       /*batchSize=*/1);
   cudaDeviceSynchronize();
 
-  // assert((roi_blend_1.z - roi_blend_1.x) == blending_1.width());
-  // assert((roi_blend_1.w - roi_blend_1.y) == blending_1.height());
-  // cudaCrop(
-  //     cudaRemapped_1.data(),
-  //     blending_1.data(),
-  //     roi_blend_1,
-  //     cudaRemapped_1.width(),
-  //     cudaRemapped_1.height(),
-  //     imageFormat::IMAGE_RGB32F,
-  //     stream);
-
   cudaDeviceSynchronize();
 
   batched_remap_kernel(
@@ -776,20 +765,6 @@ int main(int argc, char** argv) {
 
   cudaDeviceSynchronize();
 
-  //assert((roi_blend_2.z - roi_blend_2.x) == blending_2.width());
-  //assert((roi_blend_2.w - roi_blend_2.y) == blending_2.height());
-  // cudaCrop(
-  //     cudaRemapped_2.data(),
-  //     blending_2.data(),
-  //     roi_blend_2,
-  //     cudaRemapped_2.width(),
-  //     cudaRemapped_2.height(),
-  //     imageFormat::IMAGE_RGB32F,
-  //     stream);
-
-  cudaStreamSynchronize(stream);
-  cudaDeviceSynchronize();
-
   // int x1 = positions[0].xpos;
   int y1 = positions[0].ypos;
   // int x2 = positions[1].xpos;
@@ -798,36 +773,6 @@ int main(int argc, char** argv) {
   auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
 
   auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
-
-  //  simple_make_full_batch(
-  //     // Batch of images:
-  //     const float* d_imgs,
-  //     int src_full_width,
-  //     int src_full_height,
-  //     int region_width,
-  //     int region_height,
-  //     int channels,
-  //     // Batch of masks (optional):
-  //     const unsigned char* d_masks,
-  //     int mask_width,
-  //     int mask_height,
-  //     int mask_channels,
-  //     // Source ROI offset:
-  //     int src_roi_x,
-  //     int src_roi_y,
-  //     // Destination offsets (for all images in the batch):
-  //     int& x,
-  //     int& y,
-  //     // Canvas dimensions:
-  //     int canvas_w,
-  //     int canvas_h,
-  //     bool adjust_origin,
-  //     // Batch size:
-  //     int batchSize,
-  //     // Preallocated destination canvases:
-  //     float* d_full_imgs,
-  //     unsigned char* d_full_masks,
-  //     cudaStream_t stream)
 
   simple_make_full_batch(
       // Image 1 (float image)
@@ -878,39 +823,6 @@ int main(int argc, char** argv) {
       (float*)cudaFull2.data(),
       /*d_full_masks=*/nullptr,
       stream);
-
-  // // Optional mask 1 (1-channel unsigned char; pass nullptr if not provided)
-  // /*d_mask_1=*/nullptr,
-  // 0,
-  // 0,
-  // 0,
-  // // Offsets for image 1
-  // mask_converter._remapper_1.xpos,
-  // y1,
-  // // Image 2 (float image)
-  // (const float*)blending_2.data(),
-  // blending_2.width(),
-  // blending_2.height(),
-  // 3,
-  // // Optional mask 2
-  // /*d_mask_2=*/nullptr,
-  // 0,
-  // 0,
-  // 0,
-  // // Offsets for image 2
-  // mask_converter._remapper_2.xpos,
-  // y2,
-  // // Canvas dimensions
-  // cudaBlendSeam.width(),
-  // cudaBlendSeam.height(),
-  // (float*)cudaFull1.data(),
-  // /*d_full_mask_1=*/nullptr,
-  // (float*)cudaFull2.data(),
-  // /*d_full_mask_2=*/nullptr,
-  // // If true, adjust the origins so that one image is anchored at (0,0)
-  // /*adjust_origin=*/false,
-  // // Optional CUDA stream (default stream if not provided)
-  // stream);
 
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
