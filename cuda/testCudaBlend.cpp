@@ -649,26 +649,6 @@ int main(int argc, char** argv) {
       numLevels,
       /*batch_size=*/stitch_context.batch_size());
 
-  // const cv::Size partial_size_1(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height);
-  // const int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_size_1.height};
-  // const int4 roi_blend_1 = {
-  //     mask_converter._x2 - mask_converter._overlap_pad,
-  //     0,
-  //     stitch_context.cudaRemapped_1->width(),
-  //     stitch_context.cudaRemapped_1->height()};
-
-  // const cv::Size partial_size_2{
-  //     mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
-  //     mask_converter._remapper_2.height};
-  // const int4 roi_partial_2 = {
-  //     mask_converter._overlapping_width - mask_converter._overlap_pad,
-  //     0,
-  //     mask_converter._overlapping_width - mask_converter._overlap_pad + partial_size_2.width,
-  //     partial_size_2.height};
-  // const int4 roi_blend_2 = {
-  //     0, 0, mask_converter._overlapping_width + mask_converter._overlap_pad,
-  //     stitch_context.cudaRemapped_2->height()};
-
   //
   // The actual incoming imaged
   //
