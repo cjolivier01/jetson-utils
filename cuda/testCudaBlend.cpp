@@ -599,8 +599,6 @@ int main(int argc, char** argv) {
   CudaMat cudaFull2(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
   cudaError_t cuerr = cudaError_t::cudaSuccess;
 
-  cudaDeviceSynchronize();
-
   // Set default color for unmapped pixels.
   float defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
 
@@ -636,9 +634,6 @@ int main(int argc, char** argv) {
       /*batchSize=*/1,
       stream);
 
-  cudaDeviceSynchronize();
-  cudaDeviceSynchronize();
-
   batched_remap_kernel(
       (float*)sampleImage2.data(),
       sampleImage2.width(),
@@ -653,8 +648,6 @@ int main(int argc, char** argv) {
       defaultB,
       /*batchSize=*/1,
       stream);
-
-  cudaDeviceSynchronize();
 
   int y1 = positions[0].ypos;
   int y2 = positions[1].ypos;
@@ -715,9 +708,6 @@ int main(int argc, char** argv) {
       /*d_full_masks=*/nullptr,
       stream);
 
-  cudaStreamSynchronize(stream);
-  cudaDeviceSynchronize();
-
   CudaMat& cudaBlendedFull = cudaFull1;
   CudaBatchLaplacianBlendContext context(cudaBlendSeam.width(), cudaBlendSeam.height(), numLevels, /*batch_size=*/1);
   cuerr = cudaBatchedLaplacianBlendWithContext(
@@ -728,9 +718,6 @@ int main(int argc, char** argv) {
       (float*)cudaBlendedFull.data(),
       context,
       stream);
-
-  cudaStreamSynchronize(stream);
-  cudaDeviceSynchronize();
 
   // Destination canvas
   CudaMat canvas(canvas_mat, /*copy=*/false);
@@ -797,6 +784,8 @@ int main(int argc, char** argv) {
       /*batchSize=*/1,
       stream);
 #endif
+
+  cudaStreamSynchronize(stream);
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
