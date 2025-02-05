@@ -635,8 +635,8 @@ int main(int argc, char** argv) {
       defaultB,
       /*batchSize=*/1,
       stream);
-  cudaDeviceSynchronize();
 
+  cudaDeviceSynchronize();
   cudaDeviceSynchronize();
 
   batched_remap_kernel(
@@ -726,7 +726,8 @@ int main(int argc, char** argv) {
       (const float*)cudaBlendSeam.data(),
       // Put output in full-1 memory
       (float*)cudaBlendedFull.data(),
-      context);
+      context,
+      stream);
 
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();

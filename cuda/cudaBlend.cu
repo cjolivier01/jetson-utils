@@ -10,48 +10,6 @@
 #include <vector>
 
 namespace {
-__global__ void remapKernel(
-    const float* src,
-    int srcW,
-    int srcH,
-    float* dest,
-    int destW,
-    int destH,
-    const unsigned short* mapX,
-    const unsigned short* mapY,
-    float defR,
-    float defG,
-    float defB) {
-  // Compute destination pixel coordinates.
-  int x = blockIdx.x * blockDim.x + threadIdx.x;
-  int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-  // Check destination bounds.
-  if (x >= destW || y >= destH)
-    return;
-
-  // Compute the linear index for the destination pixel.
-  int destIdx = y * destW + x;
-
-  // Retrieve mapping coordinates from unsigned short arrays and cast to int.
-  int srcX = static_cast<int>(mapX[destIdx]);
-  int srcY = static_cast<int>(mapY[destIdx]);
-
-  // Check if the mapping is within the source image bounds.
-  if (srcX < srcW && srcY < srcH) {
-    // Compute index into the source array (3 floats per pixel).
-    int srcIdx = (srcY * srcW + srcX) * 3;
-    dest[destIdx * 3 + 0] = src[srcIdx + 0];
-    dest[destIdx * 3 + 1] = src[srcIdx + 1];
-    dest[destIdx * 3 + 2] = src[srcIdx + 2];
-  } else {
-    // If out-of-range, set the destination pixel to the default color.
-    dest[destIdx * 3 + 0] = defR;
-    dest[destIdx * 3 + 1] = defG;
-    dest[destIdx * 3 + 2] = defB;
-  }
-}
-
 // ---------------------------------------------------------------------
 // Downsample kernel for RGB images.
 // For each output pixel (x,y), a 2x2 block of the input image is averaged.

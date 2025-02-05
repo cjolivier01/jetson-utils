@@ -109,16 +109,52 @@ cudaError_t cudaLaplacianBlend(
     int imageHeight,
     int numLevels);
 
-cudaError_t cudaLaplacianBlendWithContext(
-    const float* d_image1,
-    const float* d_image2,
-    const float* d_mask,
-    float* d_output,
-    CudaLaplacianBlendContext& context);
-
+/**
+ * @brief Batched Laplacian blending.
+ *
+ * Copies host images (batched layout) and a shared mask to device memory, builds Gaussian and Laplacian pyramids,
+ * blends the Laplacian pyramids, reconstructs the final blended images, and copies the result back to host.
+ *
+ * @param h_image1 Host pointer to the first set of full-resolution images.
+ * @param h_image2 Host pointer to the second set of full-resolution images.
+ * @param h_mask Host pointer to the full-resolution shared mask.
+ * @param h_output Host pointer where the final blended images will be copied.
+ * @param imageWidth Width of each full-resolution image.
+ * @param imageHeight Height of each full-resolution image.
+ * @param numLevels Number of pyramid levels.
+ * @param batchSize Number of images in the batch.
+ * @param stream CUDA stream to use for all kernel launches and memory copies (default is 0).
+ * @return cudaError_t CUDA error code.
+ */
+cudaError_t cudaBatchedLaplacianBlend(
+    const float* h_image1,
+    const float* h_image2,
+    const float* h_mask,
+    float* h_output,
+    int imageWidth,
+    int imageHeight,
+    int numLevels,
+    int batchSize,
+    cudaStream_t stream);
+/**
+ * @brief Batched Laplacian blending with a preallocated context.
+ *
+ * Uses a preallocated context to store intermediate pyramid arrays, builds Gaussian and Laplacian pyramids,
+ * blends the Laplacian pyramids, reconstructs the final blended image, and stores the result in d_output.
+ *
+ * @param d_image1 Device pointer to the first set of full-resolution images.
+ * @param d_image2 Device pointer to the second set of full-resolution images.
+ * @param d_mask Device pointer to the shared mask.
+ * @param d_output Device pointer where the final blended images will be stored.
+ * @param context Reference to a CudaBatchLaplacianBlendContext structure that holds preallocated arrays and blending
+ * parameters.
+ * @param stream CUDA stream to use for all kernel launches and memory copies (default is 0).
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t cudaBatchedLaplacianBlendWithContext(
     const float* d_image1,
     const float* d_image2,
     const float* d_mask,
     float* d_output,
-    CudaBatchLaplacianBlendContext& context);
+    CudaBatchLaplacianBlendContext& context,
+    cudaStream_t stream);

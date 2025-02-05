@@ -63,8 +63,7 @@ __global__ void BatchedDownsampleKernelRGB(
 // ---------------------
 // Shared (non-batched) downsample kernel for a single–channel mask.
 // ---------------------
-// Note: Since the seam mask is shared among the entire batch, no batch index is
-// used.
+// Note: Since the seam mask is shared among the entire batch, no batch index is used.
 __global__ void BatchedDownsampleKernelMask(
     const float* input,
     int inWidth,
@@ -97,8 +96,7 @@ __global__ void BatchedDownsampleKernelMask(
 // ---------------------
 // Batched upsample kernel for RGB images.
 // ---------------------
-// Upsamples a low-resolution image by a factor of 2 using bilinear
-// interpolation.
+// Upsamples a low-resolution image by a factor of 2 using bilinear interpolation.
 __global__ void BatchedUpsampleKernelRGB(
     const float* input,
     int inWidth,
@@ -364,15 +362,23 @@ __global__ void BatchedReconstructKernelRGB(
 // Host Functions: Batched Laplacian Blending
 // =============================================================================
 
-// ---------------------------------------------------------------------
-// Batched version of cudaLaplacianBlend.
-// h_image1, h_image2, h_mask: host pointers to full-resolution images/mask
-// (for images: batched layout; for the mask: a single image).
-// h_output will receive the final blended images (batched).
-// imageWidth, imageHeight: dimensions of each full-resolution image.
-// numLevels: number of pyramid levels.
-// batchSize: number of images in the batch.
-// ---------------------------------------------------------------------
+/**
+ * @brief Batched Laplacian blending.
+ *
+ * Copies host images (batched layout) and a shared mask to device memory, builds Gaussian and Laplacian pyramids,
+ * blends the Laplacian pyramids, reconstructs the final blended images, and copies the result back to host.
+ *
+ * @param h_image1 Host pointer to the first set of full-resolution images.
+ * @param h_image2 Host pointer to the second set of full-resolution images.
+ * @param h_mask Host pointer to the full-resolution shared mask.
+ * @param h_output Host pointer where the final blended images will be copied.
+ * @param imageWidth Width of each full-resolution image.
+ * @param imageHeight Height of each full-resolution image.
+ * @param numLevels Number of pyramid levels.
+ * @param batchSize Number of images in the batch.
+ * @param stream CUDA stream to use for all kernel launches and memory copies (default is 0).
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t cudaBatchedLaplacianBlend(
     const float* h_image1,
     const float* h_image2,
@@ -381,7 +387,8 @@ cudaError_t cudaBatchedLaplacianBlend(
     int imageWidth,
     int imageHeight,
     int numLevels,
-    int batchSize) {
+    int batchSize,
+    cudaStream_t stream) {
   // For RGB images (3 channels)
   size_t imageSize = imageWidth * imageHeight * 3 * sizeof(float);
   // For mask (single channel, not batched)
@@ -411,9 +418,9 @@ cudaError_t cudaBatchedLaplacianBlend(
   cudaMalloc((void**)&d_gauss2[0], sizeRGB0);
   cudaMalloc((void**)&d_maskPyr[0], sizeMask0);
   // Copy host images into device memory for level 0.
-  cudaMemcpy(d_gauss1[0], h_image1, imageSize * batchSize, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_gauss2[0], h_image2, imageSize * batchSize, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_maskPyr[0], h_mask, maskSize, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(d_gauss1[0], h_image1, imageSize * batchSize, cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync(d_gauss2[0], h_image2, imageSize * batchSize, cudaMemcpyHostToDevice, stream);
+  cudaMemcpyAsync(d_maskPyr[0], h_mask, maskSize, cudaMemcpyHostToDevice, stream);
 
   // Allocate device memory for higher pyramid levels.
   for (int level = 1; level < numLevels; level++) {
@@ -430,7 +437,7 @@ cudaError_t cudaBatchedLaplacianBlend(
   for (int level = 0; level < numLevels - 1; level++) {
     dim3 gridRGB((widths[level + 1] + block.x - 1) / block.x, (heights[level + 1] + block.y - 1) / block.y, batchSize);
     // Downsample image1.
-    BatchedDownsampleKernelRGB<<<gridRGB, block>>>(
+    BatchedDownsampleKernelRGB<<<gridRGB, block, 0, stream>>>(
         d_gauss1[level],
         widths[level],
         heights[level],
@@ -439,7 +446,7 @@ cudaError_t cudaBatchedLaplacianBlend(
         heights[level + 1],
         batchSize);
     // Downsample image2.
-    BatchedDownsampleKernelRGB<<<gridRGB, block>>>(
+    BatchedDownsampleKernelRGB<<<gridRGB, block, 0, stream>>>(
         d_gauss2[level],
         widths[level],
         heights[level],
@@ -450,7 +457,7 @@ cudaError_t cudaBatchedLaplacianBlend(
     // Downsample mask: use a 2D grid since mask is shared.
     {
       dim3 gridMask((widths[level + 1] + block.x - 1) / block.x, (heights[level + 1] + block.y - 1) / block.y, 1);
-      BatchedDownsampleKernelMask<<<gridMask, block>>>(
+      BatchedDownsampleKernelMask<<<gridMask, block, 0, stream>>>(
           d_maskPyr[level], widths[level], heights[level], d_maskPyr[level + 1], widths[level + 1], heights[level + 1]);
     }
   }
@@ -463,7 +470,7 @@ cudaError_t cudaBatchedLaplacianBlend(
   }
   for (int level = 0; level < numLevels - 1; level++) {
     dim3 grid((widths[level] + block.x - 1) / block.x, (heights[level] + block.y - 1) / block.y, batchSize);
-    BatchedComputeLaplacianKernelRGB<<<grid, block>>>(
+    BatchedComputeLaplacianKernelRGB<<<grid, block, 0, stream>>>(
         d_gauss1[level],
         widths[level],
         heights[level],
@@ -472,7 +479,7 @@ cudaError_t cudaBatchedLaplacianBlend(
         heights[level + 1],
         d_lap1[level],
         batchSize);
-    BatchedComputeLaplacianKernelRGB<<<grid, block>>>(
+    BatchedComputeLaplacianKernelRGB<<<grid, block, 0, stream>>>(
         d_gauss2[level],
         widths[level],
         heights[level],
@@ -485,8 +492,8 @@ cudaError_t cudaBatchedLaplacianBlend(
   int last = numLevels - 1;
   {
     size_t lastSize = widths[last] * heights[last] * 3 * batchSize * sizeof(float);
-    cudaMemcpy(d_lap1[last], d_gauss1[last], lastSize, cudaMemcpyDeviceToDevice);
-    cudaMemcpy(d_lap2[last], d_gauss2[last], lastSize, cudaMemcpyDeviceToDevice);
+    cudaMemcpyAsync(d_lap1[last], d_gauss1[last], lastSize, cudaMemcpyDeviceToDevice, stream);
+    cudaMemcpyAsync(d_lap2[last], d_gauss2[last], lastSize, cudaMemcpyDeviceToDevice, stream);
   }
 
   // 3. Blend the Laplacian pyramids.
@@ -494,7 +501,7 @@ cudaError_t cudaBatchedLaplacianBlend(
     size_t sizeRGB = widths[level] * heights[level] * 3 * batchSize * sizeof(float);
     cudaMalloc((void**)&d_blend[level], sizeRGB);
     dim3 grid((widths[level] + block.x - 1) / block.x, (heights[level] + block.y - 1) / block.y, batchSize);
-    BatchedBlendKernelRGB<<<grid, block>>>(
+    BatchedBlendKernelRGB<<<grid, block, 0, stream>>>(
         d_lap1[level],
         d_lap2[level],
         d_maskPyr[level], // shared mask
@@ -506,17 +513,19 @@ cudaError_t cudaBatchedLaplacianBlend(
 
   // 4. Reconstruct the final blended image.
   float* d_reconstruct = nullptr;
-  {
-    size_t sizeRGB = widths[last] * heights[last] * 3 * batchSize * sizeof(float);
-    cudaMalloc((void**)&d_reconstruct, sizeRGB);
-    cudaMemcpy(d_reconstruct, d_blend[last], sizeRGB, cudaMemcpyDeviceToDevice);
-  }
+  cudaMalloc((void**)&d_reconstruct, widths[last] * heights[last] * 3 * batchSize * sizeof(float));
+  cudaMemcpyAsync(
+      d_reconstruct,
+      d_blend[last],
+      widths[last] * heights[last] * 3 * batchSize * sizeof(float),
+      cudaMemcpyDeviceToDevice,
+      stream);
   for (int level = numLevels - 2; level >= 0; level--) {
     float* d_temp = nullptr;
     size_t highSize = widths[level] * heights[level] * 3 * batchSize * sizeof(float);
     cudaMalloc((void**)&d_temp, highSize);
     dim3 grid((widths[level] + block.x - 1) / block.x, (heights[level] + block.y - 1) / block.y, batchSize);
-    BatchedReconstructKernelRGB<<<grid, block>>>(
+    BatchedReconstructKernelRGB<<<grid, block, 0, stream>>>(
         d_reconstruct,
         widths[level + 1],
         heights[level + 1],
@@ -528,7 +537,7 @@ cudaError_t cudaBatchedLaplacianBlend(
     cudaFree(d_reconstruct);
     d_reconstruct = d_temp;
   }
-  cudaMemcpy(h_output, d_reconstruct, imageSize * batchSize, cudaMemcpyDeviceToHost);
+  cudaMemcpyAsync(h_output, d_reconstruct, imageSize * batchSize, cudaMemcpyDeviceToHost, stream);
   cudaFree(d_reconstruct);
 
   // Cleanup all allocated device memory.
@@ -544,20 +553,28 @@ cudaError_t cudaBatchedLaplacianBlend(
   return cudaGetLastError();
 }
 
-// ---------------------------------------------------------------------
-// Batched version of cudaLaplacianBlend using a preallocated context.
-// d_image1, d_image2, d_mask: device pointers to full-resolution images/mask.
-// d_output: device pointer for the final blended images.
-// The context stores intermediate pyramid arrays. Batch size is taken from
-// context.batchSize. Note: The mask pointer is assumed to point to a single
-// shared mask.
-// ---------------------------------------------------------------------
+/**
+ * @brief Batched Laplacian blending with a preallocated context.
+ *
+ * Uses a preallocated context to store intermediate pyramid arrays, builds Gaussian and Laplacian pyramids,
+ * blends the Laplacian pyramids, reconstructs the final blended image, and stores the result in d_output.
+ *
+ * @param d_image1 Device pointer to the first set of full-resolution images.
+ * @param d_image2 Device pointer to the second set of full-resolution images.
+ * @param d_mask Device pointer to the shared mask.
+ * @param d_output Device pointer where the final blended images will be stored.
+ * @param context Reference to a CudaBatchLaplacianBlendContext structure that holds preallocated arrays and blending
+ * parameters.
+ * @param stream CUDA stream to use for all kernel launches and memory copies (default is 0).
+ * @return cudaError_t CUDA error code.
+ */
 cudaError_t cudaBatchedLaplacianBlendWithContext(
     const float* d_image1,
     const float* d_image2,
     const float* d_mask,
     float* d_output,
-    CudaBatchLaplacianBlendContext& context) {
+    CudaBatchLaplacianBlendContext& context,
+    cudaStream_t stream) {
   size_t imageSize = context.imageWidth * context.imageHeight * 3 * sizeof(float);
   size_t maskSize = context.imageWidth * context.imageHeight * sizeof(float);
 
@@ -581,20 +598,20 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
       cudaMalloc((void**)&context.d_blend[level], sizeRGB);
     }
     // Copy level 0 mask (shared) from d_mask.
-    cudaMemcpy(context.d_maskPyr[0], d_mask, maskSize, cudaMemcpyDeviceToDevice);
+    cudaMemcpyAsync(context.d_maskPyr[0], d_mask, maskSize, cudaMemcpyDeviceToDevice, stream);
   }
   // Set level 0 images.
-  cudaMemcpy(context.d_gauss1[0], d_image1, imageSize * context.batchSize, cudaMemcpyDeviceToDevice);
-  cudaMemcpy(context.d_gauss2[0], d_image2, imageSize * context.batchSize, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync(context.d_gauss1[0], d_image1, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
+  cudaMemcpyAsync(context.d_gauss2[0], d_image2, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
 
   dim3 block(16, 16, 1);
-  // 1. Build Gaussian pyramids.
+  // 1. Build Gaussian pyramid for images and mask.
   for (int level = 0; level < context.numLevels - 1; level++) {
     dim3 grid(
         (context.widths[level + 1] + block.x - 1) / block.x,
         (context.heights[level + 1] + block.y - 1) / block.y,
         context.batchSize);
-    BatchedDownsampleKernelRGB<<<grid, block>>>(
+    BatchedDownsampleKernelRGB<<<grid, block, 0, stream>>>(
         context.d_gauss1[level],
         context.widths[level],
         context.heights[level],
@@ -602,7 +619,7 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
         context.widths[level + 1],
         context.heights[level + 1],
         context.batchSize);
-    BatchedDownsampleKernelRGB<<<grid, block>>>(
+    BatchedDownsampleKernelRGB<<<grid, block, 0, stream>>>(
         context.d_gauss2[level],
         context.widths[level],
         context.heights[level],
@@ -610,11 +627,10 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
         context.widths[level + 1],
         context.heights[level + 1],
         context.batchSize);
-    // Downsample the mask only on the first call.
-    if (!context.initialized) {
+    {
       dim3 gridMask(
           (context.widths[level + 1] + block.x - 1) / block.x, (context.heights[level + 1] + block.y - 1) / block.y, 1);
-      BatchedDownsampleKernelMask<<<gridMask, block>>>(
+      BatchedDownsampleKernelMask<<<gridMask, block, 0, stream>>>(
           context.d_maskPyr[level],
           context.widths[level],
           context.heights[level],
@@ -624,12 +640,17 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     }
   }
   // 2. Build Laplacian pyramids.
+  for (int level = 0; level < context.numLevels; level++) {
+    size_t sizeRGB = context.widths[level] * context.heights[level] * 3 * context.batchSize * sizeof(float);
+    cudaMalloc((void**)&context.d_lap1[level], sizeRGB);
+    cudaMalloc((void**)&context.d_lap2[level], sizeRGB);
+  }
   for (int level = 0; level < context.numLevels - 1; level++) {
     dim3 grid(
         (context.widths[level] + block.x - 1) / block.x,
         (context.heights[level] + block.y - 1) / block.y,
         context.batchSize);
-    BatchedComputeLaplacianKernelRGB<<<grid, block>>>(
+    BatchedComputeLaplacianKernelRGB<<<grid, block, 0, stream>>>(
         context.d_gauss1[level],
         context.widths[level],
         context.heights[level],
@@ -638,7 +659,7 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
         context.heights[level + 1],
         context.d_lap1[level],
         context.batchSize);
-    BatchedComputeLaplacianKernelRGB<<<grid, block>>>(
+    BatchedComputeLaplacianKernelRGB<<<grid, block, 0, stream>>>(
         context.d_gauss2[level],
         context.widths[level],
         context.heights[level],
@@ -649,23 +670,25 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
         context.batchSize);
   }
   int last = context.numLevels - 1;
-  cudaMemcpy(
+  cudaMemcpyAsync(
       context.d_lap1[last],
       context.d_gauss1[last],
       context.widths[last] * context.heights[last] * 3 * sizeof(float) * context.batchSize,
-      cudaMemcpyDeviceToDevice);
-  cudaMemcpy(
+      cudaMemcpyDeviceToDevice,
+      stream);
+  cudaMemcpyAsync(
       context.d_lap2[last],
       context.d_gauss2[last],
       context.widths[last] * context.heights[last] * 3 * sizeof(float) * context.batchSize,
-      cudaMemcpyDeviceToDevice);
+      cudaMemcpyDeviceToDevice,
+      stream);
   // 3. Blend pyramids.
   for (int level = 0; level < context.numLevels; level++) {
     dim3 grid(
         (context.widths[level] + block.x - 1) / block.x,
         (context.heights[level] + block.y - 1) / block.y,
         context.batchSize);
-    BatchedBlendKernelRGB<<<grid, block>>>(
+    BatchedBlendKernelRGB<<<grid, block, 0, stream>>>(
         context.d_lap1[level],
         context.d_lap2[level],
         context.d_maskPyr[level],
@@ -678,11 +701,12 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
   float* d_reconstruct = nullptr;
   cudaMalloc(
       (void**)&d_reconstruct, context.widths[last] * context.heights[last] * 3 * sizeof(float) * context.batchSize);
-  cudaMemcpy(
+  cudaMemcpyAsync(
       d_reconstruct,
       context.d_blend[last],
       context.widths[last] * context.heights[last] * 3 * sizeof(float) * context.batchSize,
-      cudaMemcpyDeviceToDevice);
+      cudaMemcpyDeviceToDevice,
+      stream);
   for (int level = context.numLevels - 2; level >= 0; level--) {
     float* d_temp = nullptr;
     size_t highSize = context.widths[level] * context.heights[level] * 3 * sizeof(float) * context.batchSize;
@@ -691,7 +715,7 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
         (context.widths[level] + block.x - 1) / block.x,
         (context.heights[level] + block.y - 1) / block.y,
         context.batchSize);
-    BatchedReconstructKernelRGB<<<grid, block>>>(
+    BatchedReconstructKernelRGB<<<grid, block, 0, stream>>>(
         d_reconstruct,
         context.widths[level + 1],
         context.heights[level + 1],
@@ -703,7 +727,7 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     cudaFree(d_reconstruct);
     d_reconstruct = d_temp;
   }
-  cudaMemcpy(d_output, d_reconstruct, imageSize * context.batchSize, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync(d_output, d_reconstruct, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
   cudaFree(d_reconstruct);
   context.initialized = true;
   return cudaGetLastError();
