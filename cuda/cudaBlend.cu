@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <iostream>
 #include <vector>
 
 // =============================================================================
@@ -564,6 +565,7 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     for (int level = 0; level < context.numLevels; level++) {
       size_t sizeRGB = context.widths[level] * context.heights[level] * 3 * context.batchSize * sizeof(T);
       size_t sizeMask = context.widths[level] * context.heights[level] * sizeof(T);
+      assert(sizeRGB && sizeMask);
       cudaMalloc((void**)&context.d_lap1[level], sizeRGB);
       cudaMalloc((void**)&context.d_lap2[level], sizeRGB);
       cudaMalloc((void**)&context.d_blend[level], sizeRGB);
@@ -697,8 +699,13 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     T* d_temp = nullptr;
     if (!context.initialized) {
       size_t highSize = context.widths[level] * context.heights[level] * 3 * sizeof(T) * context.batchSize;
-      cudaMalloc((void**)&d_temp, highSize);
-      context.d_resonstruct[level] = d_temp;
+      if (level) {
+        cudaMalloc((void**)&d_temp, highSize);
+        context.d_resonstruct[level] = d_temp;
+      } else {
+        d_temp = d_output;
+        assert(highSize == imageSize * context.batchSize);
+      }
     } else {
       d_temp = context.d_resonstruct[level];
     }
@@ -718,7 +725,8 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
     // cudaFree(d_reconstruct);
     d_reconstruct = d_temp;
   }
-  cudaMemcpyAsync(d_output, d_reconstruct, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
+  assert(d_reconstruct == d_output);
+  // cudaMemcpyAsync(d_output, d_reconstruct, imageSize * context.batchSize, cudaMemcpyDeviceToDevice, stream);
   // cudaFree(d_reconstruct);
   context.initialized = true;
   return cudaGetLastError();
