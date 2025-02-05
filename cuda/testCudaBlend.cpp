@@ -1,8 +1,8 @@
 #include <opencv2/opencv.hpp>
 
 #include "cudaBlend.h"
-#include "cudaRemap.h"
 #include "cudaMakeFull.h"
+#include "cudaRemap.h"
 #include "glDisplay.h"
 #include "imageFormat.h"
 #include "videoOutput.h"
@@ -633,7 +633,8 @@ int main(int argc, char** argv) {
       defaultR,
       defaultG,
       defaultB,
-      /*batchSize=*/1);
+      /*batchSize=*/1,
+      stream);
   cudaDeviceSynchronize();
 
   cudaDeviceSynchronize();
@@ -650,7 +651,8 @@ int main(int argc, char** argv) {
       defaultR,
       defaultG,
       defaultB,
-      /*batchSize=*/1);
+      /*batchSize=*/1,
+      stream);
 
   cudaDeviceSynchronize();
 
