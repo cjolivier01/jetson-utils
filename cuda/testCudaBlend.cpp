@@ -550,8 +550,6 @@ struct StitchingContext {
   std::unique_ptr<CudaMat<T_compute>> cudaBlendSeam;
 
   // Scratch buffers
-  // std::unique_ptr<CudaMat<T_compute>> cudaRemapped_1;
-  // std::unique_ptr<CudaMat<T_compute>> cudaRemapped_2;
   std::unique_ptr<CudaMat<T_compute>> cudaFull1;
   std::unique_ptr<CudaMat<T_compute>> cudaFull2;
 
@@ -587,14 +585,6 @@ class CudaStitchPano {
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
 
-    // Destination canvas
-    // if (!canvas) {
-    //   canvas = std::make_unique<CudaMat<T>>(as_batch(cv::Mat(cv::Size(mask_converter._canvas_info.width,
-    //   mask_converter._canvas_info.height), CV_32FC3)), /*copy=*/false);
-    // }
-
-    // Set default color for unmapped pixels.
-    // constexpr T defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
 #if 1
     //
     // Image 1
@@ -719,7 +709,6 @@ class CudaStitchPano {
         *stitch_context.laplacian_blend_context,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
-    // SHOW_IMAGE(&cudaBlendedFull);
 #endif
 
 #if 1
@@ -745,30 +734,6 @@ class CudaStitchPano {
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
-
-    // SHOW_IMAGE(canvas);
-
-    // cudaStreamSynchronize(stream);
-
-    // cudaStreamSynchronize(stream);
-    // auto disp = blending_1.download();
-    //  auto disp = cudaBlendSeam.download();
-    // auto disp = canvas->download(1);
-    // auto disp = sampleImage1.download(1);
-    // auto disp = cudaBlendedFull.download();
-    // auto disp = cudaFull1.download();
-    // auto disp = cudaBlendedFull.download(0);
-    // auto disp = stitch_context.cudaFull1->download(0);
-    //     auto disp = cudaFull2.download();
-    //     auto disp = blending_2.download();
-    //  auto disp = stitch_context.cudaRemapped_1->download(1);
-    //   auto disp = cudaRemapped_2->download();
-    //     auto disp = sampleImage2.download();
-    //     auto disp = cudaBlendedFloat.download();
-    //     disp.convertTo(disp, CV_8UC3, 255.0);
-    // cv::imshow("image", disp);
-    // cv::waitKey(0);
-
     return std::move(canvas);
   };
 };
@@ -874,8 +839,8 @@ int main(int argc, char** argv) {
 #define CV_T_COMPUTE3 CV_16FC3
 #endif
 
-  // constexpr int kBatchSize = 1;
-  constexpr int kBatchSize = 2;
+  constexpr int kBatchSize = 1;
+  // constexpr int kBatchSize = 2;
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize);
 
@@ -887,11 +852,6 @@ int main(int argc, char** argv) {
   stitch_context.remap_1_y = std::make_unique<CudaMat<uint16_t>>(img1_row);
   stitch_context.remap_2_x = std::make_unique<CudaMat<uint16_t>>(img2_col);
   stitch_context.remap_2_y = std::make_unique<CudaMat<uint16_t>>(img2_row);
-
-  // stitch_context.cudaRemapped_1 = std::make_unique<CudaMat<T_compute>>(
-  //     as_batch(cv::Mat(img1_col.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
-  // stitch_context.cudaRemapped_2 = std::make_unique<CudaMat<T_compute>>(
-  //     as_batch(cv::Mat(img2_col.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
 
   blend_seam.convertTo(blend_seam, CV_T_COMPUTE3);
   stitch_context.cudaBlendSeam = std::make_unique<CudaMat<T_compute>>(blend_seam);
@@ -916,7 +876,7 @@ int main(int argc, char** argv) {
   auto blendedCanvas = CudaStitchPano<T, T_compute>::process(
                            sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::move(canvas))
                            .ConsumeValueOrDie();
-  SHOW_IMAGE(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
   //  blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
@@ -926,7 +886,7 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
