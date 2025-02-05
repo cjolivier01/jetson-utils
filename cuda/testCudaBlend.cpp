@@ -392,7 +392,7 @@ class MaskConverter {
   MaskConverter() : _minimize_blend(false), _overlap_pad(128), _x1(0), _y1(0), _x2(0), _y2(0), _overlapping_width(0) {}
 
   // This function updates blending parameters if _minimize_blend is true.
-  void updateMinimizeBlend() {
+  void updateMinimizeBlend(const cv::Size& remapped_size_1, const cv::Size& remapped_size_2) {
     if (_minimize_blend) {
       // Ensure that canvas positions are available.
       assert(_canvas_info.positions.size() >= 2);
@@ -423,8 +423,36 @@ class MaskConverter {
       // Validate the computed coordinates.
       assert(box_x1 >= 0);
       assert(box_x2 <= _canvas_info.width);
+
+      // Compute ROIs
+      partial_size_1 = cv::Size(_x2 + _overlap_pad, _remapper_1.height);
+      roi_partial_1 = {0, 0, _x2 + _overlap_pad, partial_size_1.height};
+      roi_blend_1 = {_x2 - _overlap_pad, 0, remapped_size_1.width, remapped_size_1.height};
+
+      partial_size_2 = cv::Size{_remapper_2.width - (_overlapping_width - _overlap_pad), _remapper_2.height};
+      roi_partial_2 = {
+          _overlapping_width - _overlap_pad,
+          0,
+          _overlapping_width - _overlap_pad + partial_size_2.width,
+          partial_size_2.height};
+      roi_blend_2 = {0, 0, _overlapping_width + _overlap_pad, remapped_size_2.height};
     }
   }
+
+  cv::Size partial_size_1;
+  cv::Size partial_size_2;
+  int4 roi_partial_1{
+      0,
+  };
+  int4 roi_partial_2{
+      0,
+  };
+  int4 roi_blend_1{
+      0,
+  };
+  int4 roi_blend_2{
+      0,
+  };
 
   // Example conversion function that returns a cv::Mat with the same size as the canvas.
   // If _minimize_blend is true, it also updates the blend parameters and returns a cropped region.
@@ -456,7 +484,7 @@ class MaskConverter {
 
     if (_minimize_blend) {
       // Update blending parameters.
-      updateMinimizeBlend();
+      // updateMinimizeBlend();
       // In the original Python code, the mask is cropped horizontally:
       //   mask[..., positions[1].x - overlap_pad : remapper_1.width + overlap_pad]
       int x_start = _canvas_info.positions[1].x - _overlap_pad;
@@ -575,7 +603,7 @@ int main(int argc, char** argv) {
   mask_converter._remapper_2.width = img2_col.cols;
   mask_converter._remapper_2.height = img2_col.rows;
 
-  mask_converter.updateMinimizeBlend();
+  mask_converter.updateMinimizeBlend(img1_col.size(), img2_col.size());
 
   cv::Mat blend_seam = mask_converter.convertMaskMat(whole_seam_mask_image);
   assert(!blend_seam.empty());
@@ -615,24 +643,25 @@ int main(int argc, char** argv) {
       numLevels,
       /*batch_size=*/stitch_context.batch_size());
 
-  const cv::Size partial_size_1(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height);
-  const int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_size_1.height};
-  const int4 roi_blend_1 = {
-      mask_converter._x2 - mask_converter._overlap_pad,
-      0,
-      stitch_context.cudaRemapped_1->width(),
-      stitch_context.cudaRemapped_1->height()};
+  // const cv::Size partial_size_1(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height);
+  // const int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_size_1.height};
+  // const int4 roi_blend_1 = {
+  //     mask_converter._x2 - mask_converter._overlap_pad,
+  //     0,
+  //     stitch_context.cudaRemapped_1->width(),
+  //     stitch_context.cudaRemapped_1->height()};
 
-  const cv::Size partial_size_2{
-      mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
-      mask_converter._remapper_2.height};
-  const int4 roi_partial_2 = {
-      mask_converter._overlapping_width - mask_converter._overlap_pad,
-      0,
-      mask_converter._overlapping_width - mask_converter._overlap_pad + partial_size_2.width,
-      partial_size_2.height};
-  const int4 roi_blend_2 = {
-      0, 0, mask_converter._overlapping_width + mask_converter._overlap_pad, stitch_context.cudaRemapped_2->height()};
+  // const cv::Size partial_size_2{
+  //     mask_converter._remapper_2.width - (mask_converter._overlapping_width - mask_converter._overlap_pad),
+  //     mask_converter._remapper_2.height};
+  // const int4 roi_partial_2 = {
+  //     mask_converter._overlapping_width - mask_converter._overlap_pad,
+  //     0,
+  //     mask_converter._overlapping_width - mask_converter._overlap_pad + partial_size_2.width,
+  //     partial_size_2.height};
+  // const int4 roi_blend_2 = {
+  //     0, 0, mask_converter._overlapping_width + mask_converter._overlap_pad,
+  //     stitch_context.cudaRemapped_2->height()};
 
   //
   // The actual incoming imaged
@@ -692,16 +721,16 @@ int main(int argc, char** argv) {
         (const float*)stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
         stitch_context.cudaRemapped_1->height(),
-        /*region_width=*/roi_width(roi_blend_1),
-        /*region_height=*/roi_height(roi_blend_1),
+        /*region_width=*/roi_width(mask_converter.roi_blend_1),
+        /*region_height=*/roi_height(mask_converter.roi_blend_1),
         /*channels=*/3,
         // Batch of masks (optional)
         nullptr,
         0,
         0,
         0,
-        roi_blend_1.x,
-        roi_blend_1.y,
+        mask_converter.roi_blend_1.x,
+        mask_converter.roi_blend_1.y,
         mask_converter._remapper_1.xpos,
         y1,
         stitch_context.cudaBlendSeam->width(),
@@ -717,8 +746,8 @@ int main(int argc, char** argv) {
         (const float*)stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
         stitch_context.cudaRemapped_2->height(),
-        /*region_width=*/roi_width(roi_blend_2),
-        /*region_height=*/roi_height(roi_blend_2),
+        /*region_width=*/roi_width(mask_converter.roi_blend_2),
+        /*region_height=*/roi_height(mask_converter.roi_blend_2),
         /*channels=*/3,
         // Batch of masks (optional)
         nullptr,
@@ -726,8 +755,8 @@ int main(int argc, char** argv) {
         0,
         0,
         // Src ROI x, y offset
-        roi_blend_2.x,
-        roi_blend_2.y,
+        mask_converter.roi_blend_2.x,
+        mask_converter.roi_blend_2.y,
         // Dest ROI x, y offset
         mask_converter._remapper_2.xpos,
         y2,
@@ -754,16 +783,16 @@ int main(int argc, char** argv) {
 
 #if 1
     // Unblended Left Side
-    assert(partial_size_1.width == roi_width(roi_partial_1));
-    assert(partial_size_1.height == roi_height(roi_partial_1));
+    assert(mask_converter.partial_size_1.width == roi_width(mask_converter.roi_partial_1));
+    assert(mask_converter.partial_size_1.height == roi_height(mask_converter.roi_partial_1));
     cuerr = copyRoiBatchedInterface(
         (const float*)stitch_context.cudaRemapped_1->data(),
         stitch_context.cudaRemapped_1->width(),
         stitch_context.cudaRemapped_1->height(),
-        roi_width(roi_partial_1),
-        roi_height(roi_partial_1),
-        roi_partial_1.x,
-        roi_partial_1.y,
+        roi_width(mask_converter.roi_partial_1),
+        roi_height(mask_converter.roi_partial_1),
+        mask_converter.roi_partial_1.x,
+        mask_converter.roi_partial_1.y,
         (float*)canvas.data(),
         canvas.width(),
         canvas.height(),
@@ -775,16 +804,16 @@ int main(int argc, char** argv) {
 #endif
 
 #if 1
-    assert(partial_size_2.width == roi_width(roi_partial_2));
-    assert(partial_size_2.height == roi_height(roi_partial_2));
+    assert(mask_converter.partial_size_2.width == roi_width(mask_converter.roi_partial_2));
+    assert(mask_converter.partial_size_2.height == roi_height(mask_converter.roi_partial_2));
     cuerr = copyRoiBatchedInterface(
         (const float*)stitch_context.cudaRemapped_2->data(),
         stitch_context.cudaRemapped_2->width(),
         stitch_context.cudaRemapped_2->height(),
-        partial_size_2.width,
-        partial_size_2.height,
-        roi_partial_2.x,
-        roi_partial_2.y,
+        mask_converter.partial_size_2.width,
+        mask_converter.partial_size_2.height,
+        mask_converter.roi_partial_2.x,
+        mask_converter.roi_partial_2.y,
         (float*)canvas.data(),
         canvas.width(),
         canvas.height(),
