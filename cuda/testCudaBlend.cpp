@@ -567,6 +567,11 @@ class CudaStitchPano {
       std::unique_ptr<CudaMat<T>>&& canvas) {
     CudaStatus cuerr;
 
+    // Destination canvas
+    if (!canvas) {
+      canvas = std::make_unique<CudaMat<T>>(mask_converter.canvas_mat, /*copy=*/false);
+    }
+
     // Set default color for unmapped pixels.
     constexpr T defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
 #if 1
@@ -608,7 +613,7 @@ class CudaStitchPano {
 
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
-#if 1
+#if 0
     cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
         stitch_context.cudaRemapped_1->data(),
@@ -676,11 +681,7 @@ class CudaStitchPano {
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
-    // Destination canvas
-    if (!canvas) {
-      canvas = std::make_unique<CudaMat<T>>(mask_converter.canvas_mat, /*copy=*/false);
-    }
-#if 1
+#if 0
     // Unblended Left Side
     assert(mask_converter.partial_size_1.width == roi_width(mask_converter.roi_partial_1));
     assert(mask_converter.partial_size_1.height == roi_height(mask_converter.roi_partial_1));
@@ -854,8 +855,8 @@ int main(int argc, char** argv) {
   // Lower compute, quick and dirty
   int numLevels = 1;
 #else
-  //int numLevels = 6;
-  int numLevels = 2;
+  int numLevels = 6;
+  // int numLevels = 2;
 #endif
 
 #if 1
@@ -905,13 +906,11 @@ int main(int argc, char** argv) {
       CudaStitchPano<T, T_compute>::process(
           sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
           .ConsumeValueOrDie();
-  //SHOW_IMAGE(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
   // blendedCanvas.reset();
 
-  blendedCanvas = CudaStitchPano<T, T_compute>::process(
-                      sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::unique_ptr<CudaMat<T>>())
-                      .ConsumeValueOrDie();
-  //SHOW_IMAGE(blendedCanvas);
+  // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+  // SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 

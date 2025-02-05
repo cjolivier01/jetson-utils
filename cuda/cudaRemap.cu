@@ -101,6 +101,49 @@ __global__ void BatchedRemapKernel(
   }
 }
 
+template <typename T_in, typename T_out>
+__global__ void BatchedRemapKernelEx(
+    const T_in* src,
+    int srcW,
+    int srcH,
+    T_out* dest,
+    int destW,
+    int destH,
+    const unsigned short* mapX,
+    const unsigned short* mapY,
+    T_out deflt,
+    int batchSize)
+{
+  int b = blockIdx.z;
+  if (b >= batchSize)
+    return;
+
+  int srcImageSize  = srcW * srcH;
+  int destImageSize = destW * destH;
+  int mapSize       = destW * destH; // mapping arrays match destination size
+
+  const T_in*  srcImage  = src  + b * srcImageSize;
+  T_out*       destImage = dest + b * destImageSize;
+  const unsigned short* mapXImage = mapX + b * mapSize;
+  const unsigned short* mapYImage = mapY + b * mapSize;
+
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
+  int y = blockIdx.y * blockDim.y + threadIdx.y;
+  if (x >= destW || y >= destH)
+    return;
+
+  int destIdx = y * destW + x;
+  int srcX = static_cast<int>(mapXImage[destIdx]);
+  int srcY = static_cast<int>(mapYImage[destIdx]);
+
+  if (srcX < srcW && srcY < srcH) {
+    int srcIdx = srcY * srcW + srcX;
+    destImage[destIdx] = static_cast<T_out>( srcImage[srcIdx] );
+  } else {
+    destImage[destIdx] = deflt;
+  }
+}
+
 } // anonymous namespace
 
 //------------------------------------------------------------------------------
@@ -157,6 +200,31 @@ cudaError_t batched_remap_kernel(
   BatchedRemapKernel<T_in, T_out><<<gridDim, blockDim, 0, stream>>>(
       d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY,
       defR, defG, defB, batchSize);
+  return cudaGetLastError();
+}
+
+template <typename T_in, typename T_out>
+cudaError_t batched_remap_kernel_ex(
+    const T_in* d_src,
+    int srcW,
+    int srcH,
+    T_out* d_dest,
+    int destW,
+    int destH,
+    const unsigned short* d_mapX,
+    const unsigned short* d_mapY,
+    T_in dflt,
+    int batchSize,
+    cudaStream_t stream)
+{
+  dim3 blockDim(10, 10, 1);
+  dim3 gridDim((destW + blockDim.x - 1) / blockDim.x,
+               (destH + blockDim.y - 1) / blockDim.y,
+               batchSize);
+
+  BatchedRemapKernelEx<T_in, T_out><<<gridDim, blockDim, 0, stream>>>(
+      d_src, srcW, srcH, d_dest, destW, destH, d_mapX, d_mapY,
+      dflt, batchSize);
   return cudaGetLastError();
 }
 
