@@ -642,7 +642,7 @@ int main(int argc, char** argv) {
 
 #if 1
   using T = float;
-  using T_compute = float_half;
+  using T_compute = float;
   #define CV_T_COMPUTE3   CV_32FC3
 #else
   using T = float;
