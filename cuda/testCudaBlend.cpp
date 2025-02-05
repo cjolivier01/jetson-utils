@@ -597,24 +597,10 @@ class CudaStitchPano {
     // constexpr T defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
 #if 1
     //
-    // Image 1, remap it right onto the final canvas and from there, position it into the blending sub-image
+    // Image 1
     //
-
-    // Launch the remap kernel.
-    // cuerr = batched_remap_kernel_ex(
-    //     (const float3*)sampleImage1.data(),
-    //     sampleImage1.width(),
-    //     sampleImage1.height(),
-    //     (float3*)stitch_context.cudaRemapped_1->data(),
-    //     stitch_context.cudaRemapped_1->width(),
-    //     stitch_context.cudaRemapped_1->height(),
-    //     stitch_context.remap_1_x->data(),
-    //     stitch_context.remap_1_y->data(),
-    //     make_float3(0, 0, 0),
-    //     /*batchSize=*/stitch_context.batch_size(),
-    //     stream);
-    // CUDA_RETURN_IF_ERROR(cuerr);
-
+    // Remap image 1 ontp the canvas
+    //
     cuerr = batched_remap_kernel_ex_offset(
         (const float3*)sampleImage1.data(),
         sampleImage1.width(),
@@ -632,8 +618,12 @@ class CudaStitchPano {
         /*offsetY=*/mask_converter._y1,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
+#endif
 
+#if 1
+    //
     // Now copy the blending portion of image 1 from the canvas onto the blend image
+    //
     cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
         canvas->data(),
@@ -659,26 +649,12 @@ class CudaStitchPano {
         /*d_full_masks=*/nullptr,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
+#endif
 
-    // SHOW_IMAGE(stitch_context.cudaFull1);
-
+#if 1
     //
-    // Image 2
+    // Remap image 2 directly onto the canvas (will overwrite the overlappign portion of image 1)
     //
-    // cuerr = batched_remap_kernel_ex(
-    //     (const float3*)sampleImage2.data(),
-    //     sampleImage2.width(),
-    //     sampleImage2.height(),
-    //     (float3*)stitch_context.cudaRemapped_2->data(),
-    //     stitch_context.cudaRemapped_2->width(),
-    //     stitch_context.cudaRemapped_2->height(),
-    //     stitch_context.remap_2_x->data(),
-    //     stitch_context.remap_2_y->data(),
-    //     make_float3(0, 0, 0),
-    //     /*batchSize=*/stitch_context.batch_size(),
-    //     stream);
-    // CUDA_RETURN_IF_ERROR(cuerr);
-
     cuerr = batched_remap_kernel_ex_offset(
         (const float3*)sampleImage2.data(),
         sampleImage2.width(),
@@ -696,68 +672,12 @@ class CudaStitchPano {
         /*offsetY=*/mask_converter._y2,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
-    //SHOW_IMAGE(canvas);
 #endif
+
 #if 1
-#if 1
-    // cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
-    //     // Image 1 (float image)
-    //     canvas->data(),
-    //     canvas->width(),
-    //     canvas->height(),
-    //     /*region_width=*/roi_width(mask_converter.roi_blend_1),
-    //     /*region_height=*/roi_height(mask_converter.roi_blend_1),
-    //     /*channels=*/3,
-    //     // Batch of masks (optional)
-    //     nullptr,
-    //     0,
-    //     0,
-    //     0,
-    //     mask_converter.roi_blend_1.x,
-    //     mask_converter.roi_blend_1.y,
-    //     mask_converter._remapper_1.xpos,
-    //     y1,
-    //     stitch_context.cudaBlendSeam->width(),
-    //     stitch_context.cudaBlendSeam->height(),
-    //     /*adjust_origin=*/false,
-    //     /*batchSize=*/stitch_context.batch_size(),
-    //     stitch_context.cudaFull1->data(),
-    //     /*d_full_masks=*/nullptr,
-    //     stream);
-    // CUDA_RETURN_IF_ERROR(cuerr);
-    // SHOW_IMAGE(stitch_context.cudaFull1);
-    // SHOW_IMAGE(canvas);
-#else
-    cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
-        // Image 1 (float image)
-        stitch_context.cudaRemapped_1->data(),
-        stitch_context.cudaRemapped_1->width(),
-        stitch_context.cudaRemapped_1->height(),
-        /*region_width=*/roi_width(mask_converter.roi_blend_1),
-        /*region_height=*/roi_height(mask_converter.roi_blend_1),
-        /*channels=*/3,
-        // Batch of masks (optional)
-        nullptr,
-        0,
-        0,
-        0,
-        mask_converter.roi_blend_1.x,
-        mask_converter.roi_blend_1.y,
-        mask_converter._remapper_1.xpos,
-        y1,
-        stitch_context.cudaBlendSeam->width(),
-        stitch_context.cudaBlendSeam->height(),
-        /*adjust_origin=*/false,
-        /*batchSize=*/stitch_context.batch_size(),
-        stitch_context.cudaFull1->data(),
-        /*d_full_masks=*/nullptr,
-        stream);
-    CUDA_RETURN_IF_ERROR(cuerr);
-    SHOW_IMAGE(stitch_context.cudaFull1);
-#endif
-    // 2
-#if 1
-    // from canvas
+    //
+    // Now copy the blending portion of image 2 from the canvas onto the blend image
+    //
     cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
         // Image 1 (float image)
         canvas->data(),
@@ -783,40 +703,13 @@ class CudaStitchPano {
         /*d_full_masks=*/nullptr,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
-    //SHOW_IMAGE(stitch_context.cudaFull2);
-#else
-    cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
-        // Image 1 (float image)
-        stitch_context.cudaRemapped_2->data(),
-        stitch_context.cudaRemapped_2->width(),
-        stitch_context.cudaRemapped_2->height(),
-        /*region_width=*/roi_width(mask_converter.roi_blend_2),
-        /*region_height=*/roi_height(mask_converter.roi_blend_2),
-        /*channels=*/3,
-        // Batch of masks (optional)
-        nullptr,
-        0,
-        0,
-        0,
-        // Src ROI x, y offset
-        mask_converter.roi_blend_2.x,
-        mask_converter.roi_blend_2.y,
-        // Dest ROI x, y offset
-        mask_converter._remapper_2.xpos,
-        y2,
-        stitch_context.cudaBlendSeam->width(),
-        stitch_context.cudaBlendSeam->height(),
-        /*adjust_origin=*/false,
-        /*batchSize=*/stitch_context.batch_size(),
-        stitch_context.cudaFull2->data(),
-        /*d_full_masks=*/nullptr,
-        stream);
-    CUDA_RETURN_IF_ERROR(cuerr);
-#endif
 #endif
 
     CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
 #if 1
+    //
+    // BLEND THE IMAGES
+    //
     cuerr = cudaBatchedLaplacianBlendWithContext(
         stitch_context.cudaFull1->data(),
         stitch_context.cudaFull2->data(),
@@ -828,54 +721,12 @@ class CudaStitchPano {
     CUDA_RETURN_IF_ERROR(cuerr);
     // SHOW_IMAGE(&cudaBlendedFull);
 #endif
-#if 0
-    // Unblended Left Side
-    assert(mask_converter.partial_size_1.width == roi_width(mask_converter.roi_partial_1));
-    assert(mask_converter.partial_size_1.height == roi_height(mask_converter.roi_partial_1));
-    cuerr = copyRoiBatchedInterface(
-        stitch_context.cudaRemapped_1->data(),
-        stitch_context.cudaRemapped_1->width(),
-        stitch_context.cudaRemapped_1->height(),
-        roi_width(mask_converter.roi_partial_1),
-        roi_height(mask_converter.roi_partial_1),
-        mask_converter.roi_partial_1.x,
-        mask_converter.roi_partial_1.y,
-        canvas->data(),
-        canvas->width(),
-        canvas->height(),
-        /*offsetX=*/mask_converter._x1,
-        /*offsetY=*/mask_converter._y1,
-        /*channels=*/3,
-        /*batchSize=*/stitch_context.batch_size(),
-        stream);
-    CUDA_RETURN_IF_ERROR(cuerr);
-#endif
-
-#if 0
-    // Unblended right side
-    assert(mask_converter.partial_size_2.width == roi_width(mask_converter.roi_partial_2));
-    assert(mask_converter.partial_size_2.height == roi_height(mask_converter.roi_partial_2));
-    cuerr = copyRoiBatchedInterface(
-        stitch_context.cudaRemapped_2->data(),
-        stitch_context.cudaRemapped_2->width(),
-        stitch_context.cudaRemapped_2->height(),
-        mask_converter.partial_size_2.width,
-        mask_converter.partial_size_2.height,
-        mask_converter.roi_partial_2.x,
-        mask_converter.roi_partial_2.y,
-        canvas->data(),
-        canvas->width(),
-        canvas->height(),
-        /*offsetX=*/mask_converter._x2 + mask_converter._overlapping_width - mask_converter._overlap_pad,
-        /*offsetY=*/mask_converter._y2,
-        /*channels=*/3,
-        /*batchSize=*/stitch_context.batch_size(),
-        stream);
-    CUDA_RETURN_IF_ERROR(cuerr);
-#endif
 
 #if 1
-    // Blended middle
+    //
+    // Copy the blended portion (overlapping portion + some padding) onto
+    // the canvas over some of the remapped image 1 and image 2
+    //
     cuerr = copyRoiBatchedInterface(
         cudaBlendedFull.data(),
         cudaBlendedFull.width(),
@@ -895,7 +746,7 @@ class CudaStitchPano {
     CUDA_RETURN_IF_ERROR(cuerr);
 #endif
 
-    SHOW_IMAGE(canvas);
+    // SHOW_IMAGE(canvas);
 
     // cudaStreamSynchronize(stream);
 
@@ -1065,7 +916,7 @@ int main(int argc, char** argv) {
   auto blendedCanvas = CudaStitchPano<T, T_compute>::process(
                            sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::move(canvas))
                            .ConsumeValueOrDie();
-  // SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
   //  blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
