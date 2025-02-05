@@ -225,7 +225,7 @@ cc_library(
 cuda_library(
     name = "cuda_blend_lib",
     srcs = [
-        "cudaBlend.cu",
+        # "cudaBlend.cu",
         "cudaRemap.cu",
         "cudaMakeFull.cu",
         "cudaBlendBatched.cu",

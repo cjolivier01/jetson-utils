@@ -64,6 +64,11 @@ void show_image(const std::string& label, const cv::Mat& img, bool wait = true) 
   cv::waitKey(wait ? 0 : 1);
 }
 
+#define SHOW_IMAGE(_mat$)                                                 \
+  do {                                                                    \
+    show_image(std::string(#_mat$), (_mat$)->download(), /*waitr=*/true); \
+  } while (false)
+
 // A structure to hold TIFF information
 struct TiffInfo {
   // Resolution information
@@ -835,13 +840,13 @@ int main(int argc, char** argv) {
     assert(cuerr == cudaError_t::cudaSuccess);
 #endif
 
-    //cudaStreamSynchronize(stream);
+    cudaStreamSynchronize(stream);
 
     // cudaStreamSynchronize(stream);
     // auto disp = blending_1.download();
     //  auto disp = cudaBlendSeam.download();
-    //auto disp = canvas->download();
-    //auto disp = sampleImage2.download();
+    // auto disp = canvas->download();
+    // auto disp = sampleImage2.download();
     // auto disp = cudaBlendedFull.download();
     // auto disp = cudaFull1.download();
     //    auto disp = cudaFull2.download();
@@ -851,9 +856,9 @@ int main(int argc, char** argv) {
     //    auto disp = sampleImage2.download();
     //    auto disp = cudaBlendedFloat.download();
     //    disp.convertTo(disp, CV_8UC3, 255.0);
-    //cv::imshow("image", disp);
-    //cv::imshow("image", disp);
-    //cv::waitKey(0);
+    // cv::imshow("image", disp);
+    // cv::imshow("image", disp);
+    // cv::waitKey(0);
 
     return canvas;
   };
@@ -861,9 +866,11 @@ int main(int argc, char** argv) {
   CudaMat sampleImage1(sample_img_left);
   CudaMat sampleImage2(sample_img_right);
 
-  process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+  auto blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+  SHOW_IMAGE(blendedCanvas);
 
-  process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+  blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+  SHOW_IMAGE(blendedCanvas);
 
   cudaStreamSynchronize(stream);
 
