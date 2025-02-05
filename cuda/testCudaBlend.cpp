@@ -135,8 +135,6 @@ class CudaMat {
     assert(mat.isContinuous());
     if (copy) {
       cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
-    } else {
-      // cudaMemset(d_data, 0, size);
     }
   }
 
@@ -156,8 +154,6 @@ class CudaMat {
         cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
         p += size_each;
       }
-    } else {
-      // cudaMemset(d_data, 0, size_total);
     }
   }
 
@@ -517,7 +513,6 @@ int main(int argc, char** argv) {
   cv::Mat img2_col = cv::imread(mapping_1_x, cv::IMREAD_ANYDEPTH);
   cv::Mat img2_row = cv::imread(mapping_1_y, cv::IMREAD_ANYDEPTH);
 
-  // cv::Mat whole_seam_mask_image = cv::imread(whole_seam_mask, cv::IMREAD_ANYDEPTH);
   cv::Mat whole_seam_mask_image = load_seam_mask(whole_seam_mask);
   whole_seam_mask_image.convertTo(whole_seam_mask_image, CV_32FC1);
 
@@ -526,7 +521,6 @@ int main(int argc, char** argv) {
 #if 0
   whole_seam_mask_image = make_fake_mask_like(whole_seam_mask_image);
 #endif
-  // show_image("whole_seam_mask_image", whole_seam_mask_image);
 
   cv::Mat sample_img_left = cv::imread(sample_img_left_path, cv::IMREAD_COLOR);
   assert(!sample_img_left.empty());
@@ -560,37 +554,6 @@ int main(int argc, char** argv) {
   cv::Mat blend_seam = mask_converter.convertMaskMat(whole_seam_mask_image);
   assert(!blend_seam.empty());
   blend_seam = blend_seam.clone();
-
-  // assert(false);
-  //  Load the two images (in color).
-  cv::Mat img1 = cv::imread(argv[1], cv::IMREAD_COLOR);
-  cv::Mat img2 = cv::imread(argv[2], cv::IMREAD_COLOR);
-  cv::Mat seam_mask = load_seam_mask(argv[3]);
-
-  // show_image("left", img1, false);
-  // show_image("right", img2, true);
-  // show_image("seam_mask", seam_mask);
-
-  if (img1.empty() || img2.empty()) {
-    std::cerr << "Error loading images!" << std::endl;
-    return -1;
-  }
-
-  // For this simple test, require both images to have the same dimensions.
-  if (img1.size() != img2.size()) {
-    std::cerr << "Images must have the same dimensions!" << std::endl;
-    return -1;
-  }
-
-  // Convert images to float (CV_32FC3) and scale pixel values to [0,1].
-  cv::Mat img1_float, img2_float;
-  img1.convertTo(img1_float, CV_32FC3, 1.0 / 255.0);
-  img2.convertTo(img2_float, CV_32FC3, 1.0 / 255.0);
-
-  seam_mask.convertTo(seam_mask, CV_32FC1);
-  auto minmax = get_min_max(seam_mask);
-  std::cout << "min=" << minmax.first << ", max=" << minmax.second
-            << ", unique val count=" << countUniqueValues(seam_mask) << std::endl;
 
   cudaSetDevice(0);
   cudaStream_t stream;
@@ -690,9 +653,7 @@ int main(int argc, char** argv) {
 
   cudaDeviceSynchronize();
 
-  // int x1 = positions[0].xpos;
   int y1 = positions[0].ypos;
-  // int x2 = positions[1].xpos;
   int y2 = positions[1].ypos;
 
   auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
@@ -801,8 +762,6 @@ int main(int argc, char** argv) {
       cudaRemapped_2.height(),
       partial_size_2.width,
       partial_size_2.height,
-      // roi_width(roi_partial_2),
-      // roi_height(roi_partial_2),
       roi_partial_2.x,
       roi_partial_2.y,
       (float*)canvas.data(),
