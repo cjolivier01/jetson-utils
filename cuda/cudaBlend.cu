@@ -636,22 +636,3 @@ cudaError_t cudaLaplacianBlendWithContext(const float *d_image1,
   return cudaGetLastError();
 }
 
-
-cudaError_t remap_kernel(const float *d_src, int srcW, int srcH, float *d_dest,
-                         int destW, int destH, const unsigned short *d_mapX,
-                         const unsigned short *d_mapY, float defR, float defG,
-                         float defB) {
-  // Define kernel launch configuration.
-  dim3 blockDim(16, 16);
-  dim3 gridDim((destW + blockDim.x - 1) / blockDim.x,
-               (destH + blockDim.y - 1) / blockDim.y);
-
-  // Set default color for unmapped pixels.
-  float defaultR = 100.0f, defaultG = 100.0f, defaultB = 100.0f;
-
-  // Launch the remap kernel.
-  remapKernel<<<gridDim, blockDim>>>(d_src, srcW, srcH, d_dest, destW, destH,
-                                     d_mapX, d_mapY, defaultR, defaultG,
-                                     defaultB);
-  return cudaGetLastError();
-}

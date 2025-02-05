@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "cudaBlend.h"
+#include "cudaRemap.h"
 #include "cudaMakeFull.h"
 #include "glDisplay.h"
 #include "imageFormat.h"
