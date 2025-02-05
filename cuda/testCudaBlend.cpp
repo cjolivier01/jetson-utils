@@ -763,7 +763,7 @@ class CudaStitchPano {
     // cudaStreamSynchronize(stream);
     // auto disp = blending_1.download();
     //  auto disp = cudaBlendSeam.download();
-    auto disp = canvas->download(0);
+    // auto disp = canvas->download(1);
     // auto disp = sampleImage1.download(1);
     // auto disp = cudaBlendedFull.download();
     // auto disp = cudaFull1.download();
@@ -776,8 +776,8 @@ class CudaStitchPano {
     //     auto disp = sampleImage2.download();
     //     auto disp = cudaBlendedFloat.download();
     //     disp.convertTo(disp, CV_8UC3, 255.0);
-    cv::imshow("image", disp);
-    cv::waitKey(0);
+    // cv::imshow("image", disp);
+    // cv::waitKey(0);
 
     return std::move(canvas);
   };
@@ -953,7 +953,7 @@ int main(int argc, char** argv) {
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
   float ms = stop_ms - start_ms;
-  float sec_per_frame = (ms / 1000) / frame_count;
+  float sec_per_frame = (ms / 1000) / (frame_count * stitch_context.batch_size());
   std::cout << "Blend speed: " << (1.0 / sec_per_frame) << "fps" << std::endl;
 #endif
 
