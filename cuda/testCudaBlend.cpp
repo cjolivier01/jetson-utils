@@ -640,11 +640,15 @@ int main(int argc, char** argv) {
   // int numLevels = 2;
 #endif
 
+#if 1
+  using T = float;
+  using T_compute = float_half;
+  #define CV_T_COMPUTE3   CV_32FC3
+#else
   using T = float;
   using T_compute = __half;
-  
   #define CV_T_COMPUTE3   CV_16FC3
-  // #define CV_T_COMPUTE3   CV_32FC3
+#endif
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/1);
 
