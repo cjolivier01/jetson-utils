@@ -147,6 +147,8 @@ class CudaMat {
     assert(mat.isContinuous());
     if (copy) {
       cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
+    } else {
+      cudaMemset(d_data, 0, size);
     }
   }
 
@@ -166,6 +168,8 @@ class CudaMat {
         cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
         p += size_each;
       }
+    } else {
+      cudaMemset(d_data, 0, size_total);
     }
   }
 
@@ -489,6 +493,17 @@ class MaskConverter {
   }
 };
 
+cv::Mat make_fake_mask_like(const cv::Mat& mask) {
+  cv::Mat img(mask.rows, mask.cols, CV_32FC1, cv::Scalar(0));
+
+  // Define a region of interest (ROI) for the left half of the image.
+  cv::Rect leftHalfROI(0, 0, mask.cols / 2, mask.rows);
+
+  // Set all pixels in the left half to 1.
+  img(leftHalfROI).setTo(1.0f);
+  return img;
+}
+
 int main(int argc, char** argv) {
   // Usage check.
   if (argc < 4) {
@@ -521,7 +536,15 @@ int main(int argc, char** argv) {
   cv::Mat img1_row = cv::imread(mapping_0_y, cv::IMREAD_ANYDEPTH);
   cv::Mat img2_col = cv::imread(mapping_1_x, cv::IMREAD_ANYDEPTH);
   cv::Mat img2_row = cv::imread(mapping_1_y, cv::IMREAD_ANYDEPTH);
-  cv::Mat whole_seam_mask_image = cv::imread(whole_seam_mask, cv::IMREAD_ANYDEPTH);
+
+  // cv::Mat whole_seam_mask_image = cv::imread(whole_seam_mask, cv::IMREAD_ANYDEPTH);
+  cv::Mat whole_seam_mask_image = load_seam_mask(whole_seam_mask);
+  whole_seam_mask_image.convertTo(whole_seam_mask_image, CV_32FC1);
+
+#if 0
+  whole_seam_mask_image = make_fake_mask_like(whole_seam_mask_image);
+#endif
+  // show_image("whole_seam_mask_image", whole_seam_mask_image);
 
   cv::Mat sample_img_left = cv::imread(sample_img_left_path, cv::IMREAD_COLOR);
   assert(!sample_img_left.empty());
@@ -657,12 +680,10 @@ int main(int argc, char** argv) {
   int numLevels = 1;
 #else
   int numLevels = 6;
+  //int numLevels = 2;
 #endif
   int width = img1.cols;
   int height = img1.rows;
-
-  // CudaLaplacianBlendContext context(width, height, numLevels);
-  CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
 
   CudaMat remap_1_x(img1_col), remap_1_y(img1_row);
   CudaMat remap_2_x(img2_col), remap_2_y(img2_row);
@@ -680,6 +701,9 @@ int main(int argc, char** argv) {
   CudaMat cudaFull1(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
   CudaMat cudaFull2(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
 
+  // TODO: this can be just cudaFull2
+  CudaMat cudaBlendedFull(cv::Mat(blend_seam.size(), CV_32FC3), /*copy=*/false);
+
   // Old stuff before end-to-end
   CudaMat cudaImage1Float(img1_float);
   CudaMat cudaImage2Float(img2_float);
@@ -692,7 +716,7 @@ int main(int argc, char** argv) {
   cudaDeviceSynchronize();
 
   // Set default color for unmapped pixels.
-  float defaultR = 128.0f, defaultG = 128.0f, defaultB = 128.0f;
+  float defaultR = 0.0f, defaultG = 0.0f, defaultB = 0.0f;
 
   const cv::Size partial_size_1(mask_converter._x2 + mask_converter._overlap_pad, mask_converter._remapper_1.height);
   const int4 roi_partial_1 = {0, 0, mask_converter._x2 + mask_converter._overlap_pad, partial_size_1.height};
@@ -734,6 +758,8 @@ int main(int argc, char** argv) {
       imageFormat::IMAGE_RGB32F,
       stream);
 
+  cudaDeviceSynchronize();
+
   batched_remap_kernel(
       (float*)sampleImage2.data(),
       sampleImage2.width(),
@@ -747,6 +773,7 @@ int main(int argc, char** argv) {
       defaultG,
       defaultB,
       /*batchSize=*/1);
+
   cudaDeviceSynchronize();
 
   assert((roi_blend_2.z - roi_blend_2.x) == blending_2.width());
@@ -763,9 +790,9 @@ int main(int argc, char** argv) {
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
-  //int x1 = positions[0].xpos;
+  // int x1 = positions[0].xpos;
   int y1 = positions[0].ypos;
-  //int x2 = positions[1].xpos;
+  // int x2 = positions[1].xpos;
   int y2 = positions[1].ypos;
 
   SimpleFullResult full_result = simple_make_full(
@@ -810,17 +837,6 @@ int main(int argc, char** argv) {
   cudaStreamSynchronize(stream);
   cudaDeviceSynchronize();
 
-  // auto disp = blending_1.download();
-  // auto disp = cudaFull1.download();
-  auto disp = cudaFull2.download();
-  //auto disp = blending_2.download();
-  // auto disp = cudaRemapped_1.download();
-  //  auto disp = cudaRemapped_2.download();
-  //  // auto disp = sampleImage2.download();
-  disp.convertTo(disp, CV_8UC3, 255.0);
-  cv::imshow("remapped", disp);
-  cv::waitKey(0);
-
   // cv::imshow("img1", img1_float);
   // cv::waitKey(0);
 
@@ -833,19 +849,42 @@ int main(int argc, char** argv) {
   // Call the CUDA–based blending function.
   // It is assumed that blendImages copies data to/from device memory,
   // launches the appropriate kernels, and returns the blended image.
-
+#if 1
+  CudaBatchLaplacianBlendContext context(cudaBlendSeam.width(), cudaBlendSeam.height(), numLevels, /*batch_size=*/1);
+  auto cu_err = cudaBatchedLaplacianBlendWithContext(
+      (const float*)cudaFull1.data(),
+      (const float*)cudaFull2.data(),
+      (const float*)cudaBlendSeam.data(),
+      // Put output in full-1 memory
+      (float*)cudaBlendedFull.data(),
+      context);
+#else
+  CudaBatchLaplacianBlendContext context(width, height, numLevels, /*batch_size=*/1);
   auto cu_err = cudaBatchedLaplacianBlendWithContext(
       (const float*)cudaImage1Float.data(),
       (const float*)cudaImage2Float.data(),
       (const float*)cudaMask.data(),
       (float*)cudaBlendedFloat.data(),
       context);
-  // auto cu_err = cudaLaplacianBlendWithContext(
-  //     (const float*)cudaImage1Float.data(),
-  //     (const float*)cudaImage2Float.data(),
-  //     (const float*)cudaMask.data(),
-  //     (float*)cudaBlendedFloat.data(),
-  //     context);
+#endif
+  cudaStreamSynchronize(stream);
+  cudaDeviceSynchronize();
+
+  // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
+
+  // auto disp = blending_1.download();
+  // auto disp = cudaBlendSeam.download();
+  auto disp = cudaBlendedFull.download();
+  // auto disp = cudaFull1.download();
+  // auto disp = cudaFull2.download();
+  // auto disp = blending_2.download();
+  // auto disp = cudaRemapped_1.download();
+  //  auto disp = cudaRemapped_2.download();
+  // auto disp = sampleImage2.download();
+  // auto disp = cudaBlendedFloat.download();
+  // disp.convertTo(disp, CV_8UC3, 255.0);
+  cv::imshow("image", disp);
+  cv::waitKey(0);
 
 #if 0 /* perf test */
   auto start_ms =
