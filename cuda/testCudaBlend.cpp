@@ -556,6 +556,8 @@ struct StitchingContext {
 template <typename T, typename T_compute>
 class CudaStitchPano {
  public:
+  CudaStitchPano(int batch_size) {}
+
   static CudaStatusOr<std::unique_ptr<CudaMat<T>>> process(
       const CudaMat<T>& sampleImage1,
       const CudaMat<T>& sampleImage2,
@@ -663,7 +665,7 @@ class CudaStitchPano {
 #endif
 
     CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
-#if 0
+#if 1
     cuerr = cudaBatchedLaplacianBlendWithContext(
         stitch_context.cudaFull1->data(),
         stitch_context.cudaFull2->data(),
