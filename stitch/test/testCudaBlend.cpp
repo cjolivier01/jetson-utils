@@ -1064,13 +1064,13 @@ int main(int argc, char** argv) {
   // int numLevels = 6;
 #else
   // int numLevels = 6;
-  int numLevels = 1;
-  // int numLevels = 6;
+  // int numLevels = 2;
+  int numLevels = 6;
   // int numLevels = 0;
 #endif
 
 #if 1
-#if 1
+#if 0
   using T = uchar3;
   using T_compute = uchar3;
 #else
@@ -1177,7 +1177,7 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 1 /* perf test */
+#if 0 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
