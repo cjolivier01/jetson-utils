@@ -1060,8 +1060,8 @@ int main(int argc, char** argv) {
 #else
   // int numLevels = 6;
   // int numLevels = 1;
-  // int numLevels = 6;
-  int numLevels = 0;
+  int numLevels = 6;
+  // int numLevels = 0;
 #endif
 
 #if 1
