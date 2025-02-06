@@ -604,7 +604,7 @@ class CudaStitchPano {
         /*batchSize=*/stitch_context.batch_size(),
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
-    SHOW_IMAGE(canvas);
+    // SHOW_IMAGE(canvas);
 #endif
     return std::move(canvas);
   };
@@ -828,7 +828,7 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
