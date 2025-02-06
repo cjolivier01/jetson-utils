@@ -743,53 +743,86 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
   return cudaGetLastError();
 }
 
-//
-// Instantiations
-//
-template cudaError_t cudaBatchedLaplacianBlendWithContext<float>(
-    const float* d_image1,
-    const float* d_image2,
-    const float* d_mask,
-    float* d_output,
-    CudaBatchLaplacianBlendContext<float>& context,
-    cudaStream_t stream);
+//------------------------------------------------------------------------------
+// Device Kernels
+//------------------------------------------------------------------------------
 
-// Instantiate for __half (float16)
-template cudaError_t cudaBatchedLaplacianBlend<__half>(
-    const __half* h_image1,
-    const __half* h_image2,
-    const __half* h_mask,
-    __half* h_output,
-    int imageWidth,
-    int imageHeight,
-    int numLevels,
-    int batchSize,
-    cudaStream_t stream);
+// BatchedDownsampleKernelRGB<T>
+#define INSTANTIATE_BATCHED_DOWNSAMPLE_KERNEL_RGB(T)      \
+  template __global__ void BatchedDownsampleKernelRGB<T>( \
+      const T* input, int inWidth, int inHeight, T* output, int outWidth, int outHeight, int batchSize);
 
-template cudaError_t cudaBatchedLaplacianBlendWithContext<__half>(
-    const __half* d_image1,
-    const __half* d_image2,
-    const __half* d_mask,
-    __half* d_output,
-    CudaBatchLaplacianBlendContext<__half>& context,
-    cudaStream_t stream);
+// BatchedDownsampleKernelMask<T>
+#define INSTANTIATE_BATCHED_DOWNSAMPLE_KERNEL_MASK(T)      \
+  template __global__ void BatchedDownsampleKernelMask<T>( \
+      const T* input, int inWidth, int inHeight, T* output, int outWidth, int outHeight);
 
-// Instantiate for __nv_bfloat16 (bfloat16)
-template cudaError_t cudaBatchedLaplacianBlend<__nv_bfloat16>(
-    const __nv_bfloat16* h_image1,
-    const __nv_bfloat16* h_image2,
-    const __nv_bfloat16* h_mask,
-    __nv_bfloat16* h_output,
-    int imageWidth,
-    int imageHeight,
-    int numLevels,
-    int batchSize,
-    cudaStream_t stream);
+// BatchedUpsampleKernelRGB<T>
+#define INSTANTIATE_BATCHED_UPSAMPLE_KERNEL_RGB(T)      \
+  template __global__ void BatchedUpsampleKernelRGB<T>( \
+      const T* input, int inWidth, int inHeight, T* output, int outWidth, int outHeight, int batchSize);
 
-template cudaError_t cudaBatchedLaplacianBlendWithContext<__nv_bfloat16>(
-    const __nv_bfloat16* d_image1,
-    const __nv_bfloat16* d_image2,
-    const __nv_bfloat16* d_mask,
-    __nv_bfloat16* d_output,
-    CudaBatchLaplacianBlendContext<__nv_bfloat16>& context,
-    cudaStream_t stream);
+// BatchedComputeLaplacianKernelRGB<T>
+#define INSTANTIATE_BATCHED_COMPUTE_LAPLACIAN_KERNEL_RGB(T)     \
+  template __global__ void BatchedComputeLaplacianKernelRGB<T>( \
+      const T* gaussHigh,                                       \
+      int highWidth,                                            \
+      int highHeight,                                           \
+      const T* gaussLow,                                        \
+      int lowWidth,                                             \
+      int lowHeight,                                            \
+      T* laplacian,                                             \
+      int batchSize);
+
+// BatchedBlendKernelRGB<T>
+#define INSTANTIATE_BATCHED_BLEND_KERNEL_RGB(T)      \
+  template __global__ void BatchedBlendKernelRGB<T>( \
+      const T* lap1, const T* lap2, const T* mask, T* blended, int width, int height, int batchSize);
+
+// BatchedReconstructKernelRGB<T>
+#define INSTANTIATE_BATCHED_RECONSTRUCT_KERNEL_RGB(T)      \
+  template __global__ void BatchedReconstructKernelRGB<T>( \
+      const T* lowerRes,                                   \
+      int lowWidth,                                        \
+      int lowHeight,                                       \
+      const T* lap,                                        \
+      int highWidth,                                       \
+      int highHeight,                                      \
+      T* reconstruction,                                   \
+      int batchSize);
+
+//------------------------------------------------------------------------------
+// Host Functions
+//------------------------------------------------------------------------------
+
+// cudaBatchedLaplacianBlend<T>
+#define INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND(T)  \
+  template cudaError_t cudaBatchedLaplacianBlend<T>( \
+      const T* h_image1,                             \
+      const T* h_image2,                             \
+      const T* h_mask,                               \
+      T* h_output,                                   \
+      int imageWidth,                                \
+      int imageHeight,                               \
+      int numLevels,                                 \
+      int batchSize,                                 \
+      cudaStream_t stream);
+
+// cudaBatchedLaplacianBlendWithContext<T>
+#define INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND_WITH_CONTEXT(T) \
+  template cudaError_t cudaBatchedLaplacianBlendWithContext<T>(  \
+      const T* d_image1,                                         \
+      const T* d_image2,                                         \
+      const T* d_mask,                                           \
+      T* d_output,                                               \
+      CudaBatchLaplacianBlendContext<T>& context,                \
+      cudaStream_t stream);
+
+INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND(float)
+INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND_WITH_CONTEXT(float)
+INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND(unsigned char)
+INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND_WITH_CONTEXT(unsigned char)
+INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND(__half)
+INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND_WITH_CONTEXT(__half)
+INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND(__nv_bfloat16)
+INSTANTIATE_CUDA_BATCHED_LAPLACIAN_BLEND_WITH_CONTEXT(__nv_bfloat16)
