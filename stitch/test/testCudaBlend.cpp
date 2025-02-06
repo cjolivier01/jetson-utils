@@ -628,16 +628,12 @@ class CudaStitchPano {
       const CudaMat<T>& sampleImage1,
       const CudaMat<T>& sampleImage2,
       StitchingContext<T, T_compute>& stitch_context,
-      CanvasManager& canvas_manager,
+      const CanvasManager& canvas_manager,
       cudaStream_t stream,
       std::unique_ptr<CudaMat<T>>&& canvas) {
     CudaStatus cuerr;
 
     assert(canvas);
-
-    int zero = 0;
-    // int y1 = canvas_manager._y1;
-    // int y2 = canvas_manager._y2;
 
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     // auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
@@ -690,11 +686,9 @@ class CudaStitchPano {
           0,
           0,
           canvas_manager.roi_blend_1.x,
-          // canvas_manager.roi_blend_1.y,
           0 /* we've already applied our Y offset */,
-          canvas_manager._remapper_1.xpos,
-          // y1,
-          zero,
+          /*destOffsetX=*/canvas_manager._remapper_1.xpos,
+          /*destOffsetY=*/0,
           stitch_context.cudaBlendSoftSeam->width(),
           stitch_context.cudaBlendSoftSeam->height(),
           /*adjust_origin=*/false,
@@ -784,9 +778,8 @@ class CudaStitchPano {
           0,
           /*offsetX=*/canvas_manager._x2,
           /*offsetY=*/canvas_manager._y2,
-          canvas_manager._remapper_2.xpos,
-          // y2,
-          zero,
+          /*destOffsetX=*/canvas_manager._remapper_2.xpos,
+          /*destOffsetY=*/0,
           stitch_context.cudaBlendSoftSeam->width(),
           stitch_context.cudaBlendSoftSeam->height(),
           /*adjust_origin=*/false,

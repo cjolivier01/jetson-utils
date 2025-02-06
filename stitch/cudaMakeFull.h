@@ -71,7 +71,6 @@ cudaError_t copyRoiBatchedInterface(
  * @param y Reference to destination Y-offset for the ROI in the destination canvases (may be adjusted).
  * @param canvas_w Width of the destination canvases.
  * @param canvas_h Height of the destination canvases.
- * @param adjust_origin If true, adjusts destination offsets so that one image is anchored at (0,0).
  * @param batchSize Number of images (and masks) in the batch.
  * @param d_full_imgs Preallocated pointer to the destination canvases for images in device memory.
  * @param d_full_masks Preallocated pointer to the destination canvases for masks in device memory (or nullptr).
@@ -92,8 +91,8 @@ cudaError_t simple_make_full_batch(
     int mask_channels,
     int src_roi_x,
     int src_roi_y,
-    int& x,
-    int& y,
+    int destOffsetX,
+    int destOffsetY,
     int canvas_w,
     int canvas_h,
     bool adjust_origin,
