@@ -730,7 +730,7 @@ class CudaStitchPano {
           /*offsetY=*/canvas_manager._y1,
           stream);
       // SHOW_SMALL(&sampleImage1);
-      SHOW_SMALL(canvas);
+      // SHOW_IMAGE(canvas);
 #endif
     }
     //
@@ -1073,19 +1073,13 @@ int main(int argc, char** argv) {
 #if 1
   using T = uchar3;
   using T_compute = uchar3;
-// #define CV_T_PIPELINE CV_8UC3
-// #define CV_T_COMPUTE3 CV_8UC3
 #else
   using T = float3;
   using T_compute = float3;
-// #define CV_T_PIPELINE CV_32FC3
-// #define CV_T_COMPUTE3 CV_32FC3
 #endif
 #else
   using T = float;
   using T_compute = __half;
-// #define CV_T_PIPELINE CV_32FC3
-// #define CV_T_COMPUTE3 CV_16FC3
 #endif
 
   const int CV_T_PIPELINE = cudaPixelTypeToCvType(CudaTypeToPixelType<T>::value);
@@ -1096,8 +1090,8 @@ int main(int argc, char** argv) {
     sample_img_right.convertTo(sample_img_right, CV_T_PIPELINE, 1.0 / 255.0);
   }
 
-  // constexpr int kBatchSize = 1;
-  constexpr int kBatchSize = 2;
+  constexpr int kBatchSize = 1;
+  //constexpr int kBatchSize = 2;
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
 
@@ -1147,7 +1141,7 @@ int main(int argc, char** argv) {
         numLevels,
         /*batch_size=*/stitch_context.batch_size());
   } else {
-    assert(blend_seam.type() == CV_8U);
+    assert(blend_seam.type() == CV_8U);3
     stitch_context.cudaBlendHardSeam = std::make_unique<CudaMat<unsigned char>>(blend_seam);
   }
 
@@ -1174,9 +1168,9 @@ int main(int argc, char** argv) {
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
   // SHOW_SMALL(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
-  // SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 
