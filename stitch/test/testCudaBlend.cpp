@@ -777,13 +777,10 @@ int main(int argc, char** argv) {
 #define CV_T_COMPUTE3 CV_16FC3
 #endif
 
-  constexpr int kBatchSize = 1;
-  // constexpr int kBatchSize = 2;
+  // constexpr int kBatchSize = 1;
+  constexpr int kBatchSize = 2;
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize);
-
-  // auto canvas = std::make_unique<CudaMat<T>>(
-  //     as_batch(cv::Mat(control_masks.whole_seam_mask_image.size(), CV_T_PIPELINE), kBatchSize));
 
   auto canvas = std::make_unique<CudaMat<T>>(
       stitch_context.batch_size(), control_masks.whole_seam_mask_image.cols, control_masks.whole_seam_mask_image.rows);
