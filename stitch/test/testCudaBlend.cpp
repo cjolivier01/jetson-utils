@@ -644,7 +644,7 @@ class CudaStitchPano {
       //
       // Image 1
       //
-      // Remap image 1 ontp the canvas
+      // Remap image 1 onto the canvas
       //
       cuerr = batched_remap_kernel_ex_offset(
           sampleImage1.data(),
@@ -1058,9 +1058,9 @@ int main(int argc, char** argv) {
   int numLevels = 0;
   // int numLevels = 6;
 #else
-  // int numLevels = 6;
-  // int numLevels = 1;
   int numLevels = 6;
+  // int numLevels = 2;
+  // int numLevels = 6;
   // int numLevels = 0;
 #endif
 

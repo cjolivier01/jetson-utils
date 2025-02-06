@@ -51,6 +51,7 @@ struct CudaBatchLaplacianBlendContext {
   const int imageWidth;
   const int imageHeight;
   const int batchSize;
+  size_t allocation_size{0};
   std::vector<int> widths;
   std::vector<int> heights;
   std::vector<T*> d_gauss1;
