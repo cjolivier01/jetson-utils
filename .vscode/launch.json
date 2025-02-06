@@ -44,7 +44,8 @@
       "program": "${workspaceFolder}/bazel-bin/stitch/test/test_cuda_blend",
       "args": [
         //"stitch-fix",
-        "mlk-heat-1",
+        //"mlk-heat-1",
+        "pdp",
         "${workspaceRoot}/output.png",
       ],
       "sourceMap": {
@@ -69,7 +70,7 @@
       "cwd": "${workspaceFolder}",
       "debuggerPath": "/usr/local/cuda/bin/cuda-gdb",
       "program": "${workspaceFolder}/bazel-bin/stitch/test/test_cuda_blend",
-      "args": "mlk-heat-1 ${workspaceRoot}/output.png",
+      "args": "pdp ${workspaceRoot}/output.png",
       "initCommands": [
         "directory ${workspaceFolder}",
       ],

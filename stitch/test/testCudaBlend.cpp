@@ -67,6 +67,137 @@ int wait_key() {
   return c;
 }
 
+#include <opencv2/opencv.hpp>
+#include <algorithm>
+#include <iostream>
+
+// This function examines N pixels on the left of the seam (from image1)
+// and N pixels on the right of the seam (from image2) for the middle 50% of rows,
+// then computes an offset per channel to adjust the images so that they visually match.
+void matchSeamImages(cv::Mat& image1, cv::Mat& image2, const cv::Mat& seam, int N) {
+  // Check that the seam image is of type CV_8U
+  if (seam.type() != CV_8U) {
+    std::cerr << "Error: Seam image must be of type CV_8U (uchar)." << std::endl;
+    return;
+  }
+
+  // Define the rows to examine – only the middle 50% of the seam image.
+  int totalRows = seam.rows;
+  int startRow = totalRows / 4;
+  int endRow = (3 * totalRows) / 4;
+
+  // These accumulators will sum the pixel values from the two sides of the seam.
+  cv::Scalar sumLeft(0, 0, 0);
+  cv::Scalar sumRight(0, 0, 0);
+  int countLeft = 0, countRight = 0;
+
+  // Loop over the valid rows.
+  for (int row = startRow; row < endRow; ++row) {
+    // Find the seam boundary in this row:
+    // We assume that the seam image contains a continuous transition
+    // where pixels change from 0 to 1. We look for the first column with a 1.
+    int seamCol = -1;
+    for (int col = 0; col < seam.cols; ++col) {
+      if (seam.at<uchar>(row, col) == 1) {
+        seamCol = col;
+        break;
+      }
+    }
+    if (seamCol == -1)
+      continue; // No seam boundary found on this row; skip.
+
+    // For image1, sample N pixels immediately to the left of the seam boundary.
+    for (int col = std::max(0, seamCol - N); col < seamCol; ++col) {
+      // Make sure we do not exceed image1’s bounds.
+      if (row < image1.rows && col < image1.cols) {
+        if (image1.depth() == CV_8U) {
+          cv::Vec3b pixel = image1.at<cv::Vec3b>(row, col);
+          sumLeft[0] += pixel[0];
+          sumLeft[1] += pixel[1];
+          sumLeft[2] += pixel[2];
+        } else if (image1.depth() == CV_32F) {
+          cv::Vec3f pixel = image1.at<cv::Vec3f>(row, col);
+          sumLeft[0] += pixel[0];
+          sumLeft[1] += pixel[1];
+          sumLeft[2] += pixel[2];
+        }
+        ++countLeft;
+      }
+    }
+
+    // For image2, sample N pixels immediately to the right of the seam boundary.
+    for (int col = seamCol; col < std::min(seamCol + N, image2.cols); ++col) {
+      if (row < image2.rows && col < image2.cols) {
+        if (image2.depth() == CV_8U) {
+          cv::Vec3b pixel = image2.at<cv::Vec3b>(row, col);
+          sumRight[0] += pixel[0];
+          sumRight[1] += pixel[1];
+          sumRight[2] += pixel[2];
+        } else if (image2.depth() == CV_32F) {
+          cv::Vec3f pixel = image2.at<cv::Vec3f>(row, col);
+          sumRight[0] += pixel[0];
+          sumRight[1] += pixel[1];
+          sumRight[2] += pixel[2];
+        }
+        ++countRight;
+      }
+    }
+  }
+
+  // Make sure we collected samples from both sides.
+  if (countLeft == 0 || countRight == 0) {
+    std::cerr << "Error: Not enough seam pixels found for adjustment." << std::endl;
+    return;
+  }
+
+  // Compute the per-channel averages.
+  cv::Scalar avgLeft = sumLeft * (1.0 / countLeft);
+  cv::Scalar avgRight = sumRight * (1.0 / countRight);
+
+  std::cout << "Average from image1 (left of seam): " << avgLeft << std::endl;
+  std::cout << "Average from image2 (right of seam): " << avgRight << std::endl;
+
+  // Compute an offset per channel. Here we choose the average of the difference so that:
+  //   image1 will be adjusted down by half the difference and
+  //   image2 will be adjusted up by half the difference.
+  cv::Scalar offset = (avgLeft - avgRight) * 0.5;
+  std::cout << "Per-channel offset: " << offset << std::endl;
+
+  // A helper lambda that applies a per-channel adjustment to an image.
+  auto adjustImage = [&](cv::Mat& image, cv::Scalar adjustment) {
+    // If the image is 8-bit, convert it to float for arithmetic and convert back afterward.
+    if (image.depth() == CV_8U) {
+      cv::Mat floatImage;
+      image.convertTo(floatImage, CV_32F);
+      std::vector<cv::Mat> channels;
+      cv::split(floatImage, channels);
+      for (int c = 0; c < 3; ++c) {
+        channels[c] = channels[c] + static_cast<float>(adjustment[c]);
+      }
+      cv::merge(channels, floatImage);
+      // Clamp the result between 0 and 255.
+      cv::min(floatImage, 255.0, floatImage);
+      cv::max(floatImage, 0.0, floatImage);
+      floatImage.convertTo(image, CV_8U);
+    }
+    // For float images, do the adjustment directly.
+    else if (image.depth() == CV_32F) {
+      std::vector<cv::Mat> channels;
+      cv::split(image, channels);
+      for (int c = 0; c < 3; ++c) {
+        channels[c] = channels[c] + static_cast<float>(adjustment[c]);
+      }
+      cv::merge(channels, image);
+    }
+  };
+
+  // Adjust the images:
+  // Subtract the offset from image1 so its seam side becomes darker (if needed)
+  // and add the offset to image2 so its seam side becomes brighter.
+  adjustImage(image1, -offset);
+  adjustImage(image2, offset);
+}
+
 void show_image(const std::string& label, const cv::Mat& img, bool wait = true) {
   cv::imshow(label, img);
   cv::waitKey(wait ? 0 : 1);
@@ -92,9 +223,9 @@ void displayScaledImage(const std::string& label, cv::Mat image, float scale = 1
     show_image(std::string(#_mat$), (_mat$)->download(), /*wait=*/true); \
   } while (false)
 
-#define SHOW_SMALL(_mat$)                                                 \
-  do {                                                                           \
-    displayScaledImage(std::string(#_mat$), (_mat$)->download(), 0.25, /*wait=*/true); \
+#define SHOW_SMALL(_mat$)                                                             \
+  do {                                                                                \
+    displayScaledImage(std::string(#_mat$), (_mat$)->download(), 0.1, /*wait=*/true); \
   } while (false)
 
 // A structure to hold TIFF information
@@ -290,42 +421,48 @@ class MaskConverter {
  public:
   // Canvas and blending parameters.
   CanvasInfo _canvas_info;
-  bool _minimize_blend{true};
-  int _overlap_pad{0};
 
   // Two remappers (for example, for two image streams).
   Remapper _remapper_1;
   Remapper _remapper_2;
 
   // Additional members for blending logic.
-  int _x1, _y1, _x2, _y2;
-  int _overlapping_width;
+  int _x1{0}, _y1{0}, _x2{0}, _y2{0};
+  int _overlapping_width{0};
   // The padded blended box, stored as [x1, y1, x2, y2].
   std::vector<int> _padded_blended_tlbr;
 
   // Constructor (if needed)
-  MaskConverter() : _minimize_blend(false), _overlap_pad(128), _x1(0), _y1(0), _x2(0), _y2(0), _overlapping_width(0) {}
+  MaskConverter(bool minimize_blend, int overlap_pad = 128)
+      : _x1(0),
+        _y1(0),
+        _x2(0),
+        _y2(0),
+        _overlapping_width(0),
+        _minimize_blend(minimize_blend),
+        _overlap_pad(overlap_pad) {}
 
   // This function updates blending parameters if _minimize_blend is true.
   void updateMinimizeBlend(const cv::Size& remapped_size_1, const cv::Size& remapped_size_2) {
+
+    // Ensure that canvas positions are available.
+    assert(_canvas_info.positions.size() >= 2);
+
+    // Unpack positions from the canvas.
+    _x1 = _canvas_info.positions[0].x;
+    _y1 = _canvas_info.positions[0].y;
+    _x2 = _canvas_info.positions[1].x;
+    _y2 = _canvas_info.positions[1].y;
+
+    int width_1 = _remapper_1.width;
+    _overlapping_width = width_1 - _x2;
+    // The first remapper's width must be greater than _x2.
+    assert(width_1 > _x2);
+
     if (_minimize_blend) {
-      // Ensure that canvas positions are available.
-      assert(_canvas_info.positions.size() >= 2);
-
-      // Unpack positions from the canvas.
-      _x1 = _canvas_info.positions[0].x;
-      _y1 = _canvas_info.positions[0].y;
-      _x2 = _canvas_info.positions[1].x;
-      _y2 = _canvas_info.positions[1].y;
-
       // Set remapper x positions.
       _remapper_1.xpos = _x1;
       _remapper_2.xpos = _x1 + _overlap_pad; // Start overlapping right away.
-
-      int width_1 = _remapper_1.width;
-      _overlapping_width = width_1 - _x2;
-      // The first remapper's width must be greater than _x2.
-      assert(width_1 > _x2);
 
       // Define the seam box (the region to be blended).
       int box_x1 = _x2 - _overlap_pad;
@@ -412,7 +549,13 @@ class MaskConverter {
       0,
   };
 
-  // std::vector<cv::Mat> canvas_mat;
+  constexpr int overlap_padding() const {
+    return _overlap_pad;
+  }
+
+ private:
+  bool _minimize_blend{false};
+  int _overlap_pad{0};
 };
 
 cv::Mat make_fake_mask_like(const cv::Mat& mask) {
@@ -680,7 +823,7 @@ class CudaStitchPano {
           canvas->data(),
           canvas->width(),
           canvas->height(),
-          /*offsetX=*/mask_converter._x2 - mask_converter._overlap_pad,
+          /*offsetX=*/mask_converter._x2 - mask_converter.overlap_padding(),
           /*offsetY=*/0,
           /*channels=*/1, // <-- 1 when using stuff like float3
           /*batchSize=*/stitch_context.batch_size(),
@@ -817,28 +960,6 @@ int main(int argc, char** argv) {
       control_masks.positions[1].ypos + control_masks.img2_col.rows);
   std::cout << "Canvas size: " << canvas_width << " x " << canvas_height << std::endl;
 
-  //
-  // MaskConverter
-  //
-  MaskConverter mask_converter;
-  mask_converter._minimize_blend = true;
-  mask_converter._canvas_info.width = canvas_width;
-  mask_converter._canvas_info.height = canvas_height;
-  mask_converter._canvas_info.positions.emplace_back(
-      cv::Point(control_masks.positions[0].xpos, control_masks.positions[0].ypos));
-  mask_converter._canvas_info.positions.emplace_back(
-      cv::Point(control_masks.positions[1].xpos, control_masks.positions[1].ypos));
-  mask_converter._remapper_1.width = control_masks.img1_col.cols;
-  mask_converter._remapper_1.height = control_masks.img1_col.rows;
-  mask_converter._remapper_2.width = control_masks.img2_col.cols;
-  mask_converter._remapper_2.height = control_masks.img2_col.rows;
-
-  mask_converter.updateMinimizeBlend(control_masks.img1_col.size(), control_masks.img2_col.size());
-
-  cv::Mat blend_seam = mask_converter.convertMaskMat(control_masks.whole_seam_mask_image);
-  assert(!blend_seam.empty());
-  blend_seam = blend_seam.clone();
-
   cudaSetDevice(0);
   cudaStream_t stream;
   cudaStreamCreate(&stream);
@@ -849,10 +970,10 @@ int main(int argc, char** argv) {
   int numLevels = 0;
   // int numLevels = 6;
 #else
-  int numLevels = 6;
+  // int numLevels = 6;
   // int numLevels = 1;
   // int numLevels = 6;
-  // int numLevels = 0;
+  int numLevels = 0;
 #endif
 
 #if 1
@@ -878,6 +999,27 @@ int main(int argc, char** argv) {
   // constexpr int kBatchSize = 2;
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
+
+  //
+  // MaskConverter
+  //
+  MaskConverter mask_converter(/*minimize_blend=*/!stitch_context.is_hard_seam());
+  mask_converter._canvas_info.width = canvas_width;
+  mask_converter._canvas_info.height = canvas_height;
+  mask_converter._canvas_info.positions.emplace_back(
+      cv::Point(control_masks.positions[0].xpos, control_masks.positions[0].ypos));
+  mask_converter._canvas_info.positions.emplace_back(
+      cv::Point(control_masks.positions[1].xpos, control_masks.positions[1].ypos));
+  mask_converter._remapper_1.width = control_masks.img1_col.cols;
+  mask_converter._remapper_1.height = control_masks.img1_col.rows;
+  mask_converter._remapper_2.width = control_masks.img2_col.cols;
+  mask_converter._remapper_2.height = control_masks.img2_col.rows;
+
+  mask_converter.updateMinimizeBlend(control_masks.img1_col.size(), control_masks.img2_col.size());
+
+  cv::Mat blend_seam = mask_converter.convertMaskMat(control_masks.whole_seam_mask_image);
+  assert(!blend_seam.empty());
+  blend_seam = blend_seam.clone();
 
   auto canvas = std::make_unique<CudaMat<T>>(
       stitch_context.batch_size(), control_masks.whole_seam_mask_image.cols, control_masks.whole_seam_mask_image.rows);
