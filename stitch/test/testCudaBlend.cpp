@@ -711,11 +711,11 @@ int main(int argc, char** argv) {
   std::string game_id = argv[1];
   std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id + "/";
 
-  // std::string sample_img_left_path = game_dir + "GX010100.png";
-  // std::string sample_img_right_path = game_dir + "GX010019.png";
+  std::string sample_img_left_path = game_dir + "GX010100.png";
+  std::string sample_img_right_path = game_dir + "GX010019.png";
 
-  std::string sample_img_left_path = game_dir + "GX010097.png";
-  std::string sample_img_right_path = game_dir + "GX010016.png";
+  // std::string sample_img_left_path = game_dir + "GX010097.png";
+  // std::string sample_img_right_path = game_dir + "GX010016.png";
 
   cv::Mat sample_img_left = cv::imread(sample_img_left_path, cv::IMREAD_COLOR);
   assert(!sample_img_left.empty());
@@ -828,7 +828,7 @@ int main(int argc, char** argv) {
     return blendedCanvasResult.status().code();
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
-  SHOW_IMAGE(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
   //  blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
@@ -838,7 +838,7 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
