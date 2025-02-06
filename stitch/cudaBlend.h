@@ -1,15 +1,43 @@
+/**
+ * @file cudaBlend.h
+ * @brief Batched Laplacian blending for images using CUDA.
+ *
+ * This file contains the declarations, definitions, and templated kernels for
+ * performing batched Laplacian blending. The blending is performed by building
+ * Gaussian and Laplacian pyramids for two image sets and a shared mask, blending
+ * the Laplacian pyramids, and reconstructing the final blended image.
+ */
+
 #pragma once
 
 #include <cuda_runtime.h>
-
 #include <vector>
+#include <cassert>
+#include <cmath>
+#include <cstdio>
+#include <iostream>
 
-// =============================================================================
-// Batched Context Structure (for images only; the mask is shared across the
-// batch)
-// =============================================================================
+/**
+ * @brief Batched Context Structure for Laplacian Blending (images only).
+ *
+ * This structure holds all the device pointers and parameters needed for performing
+ * batched Laplacian blending. The mask is shared across the batch.
+ *
+ * @tparam T The data type for the images (e.g. float, unsigned char, __half, __nv_bfloat16).
+ */
 template <typename T>
 struct CudaBatchLaplacianBlendContext {
+  /**
+   * @brief Constructor.
+   *
+   * Initializes the context with the image dimensions, number of pyramid levels,
+   * and batch size. The device pointer vectors are sized appropriately.
+   *
+   * @param image_width Width of the full-resolution image.
+   * @param image_height Height of the full-resolution image.
+   * @param num_levels Number of pyramid levels.
+   * @param batch_size Number of images in the batch.
+   */
   CudaBatchLaplacianBlendContext(int image_width, int image_height, int num_levels, int batch_size)
       : numLevels(num_levels),
         imageWidth(image_width),
@@ -25,13 +53,23 @@ struct CudaBatchLaplacianBlendContext {
         d_blend(num_levels, nullptr),
         d_resonstruct(num_levels, nullptr) {}
 
-  // Helper: free pointer if non-null.
+  /**
+   * @brief Helper to free a CUDA pointer if non-null.
+   *
+   * @param p Pointer to free.
+   */
   static constexpr void maybeCudaFree(void* p) {
     if (p) {
       cudaFree(p);
     }
   }
 
+  /**
+   * @brief Destructor.
+   *
+   * Frees all device memory allocations (except level 0, which is assumed to be
+   * managed by user code).
+   */
   ~CudaBatchLaplacianBlendContext() {
     for (int level = 0; level < numLevels; level++) {
       maybeCudaFree(d_lap1[level]);
@@ -47,22 +85,21 @@ struct CudaBatchLaplacianBlendContext {
     }
   }
 
-  const int numLevels;
-  const int imageWidth;
-  const int imageHeight;
-  const int batchSize;
-  size_t allocation_size{0};
-  std::vector<int> widths;
-  std::vector<int> heights;
-  std::vector<T*> d_gauss1;
-  std::vector<T*> d_gauss2;
-  // Note: The mask is shared, so each level’s allocation is only for one image.
-  std::vector<T*> d_maskPyr;
-  std::vector<T*> d_lap1;
-  std::vector<T*> d_lap2;
-  std::vector<T*> d_blend;
-  std::vector<T*> d_resonstruct;
-  bool initialized{false};
+  const int numLevels;           ///< Number of pyramid levels.
+  const int imageWidth;          ///< Width of the full-resolution image.
+  const int imageHeight;         ///< Height of the full-resolution image.
+  const int batchSize;           ///< Number of images in the batch.
+  size_t allocation_size{0};     ///< Total allocated device memory size.
+  std::vector<int> widths;       ///< Widths of images at each pyramid level.
+  std::vector<int> heights;      ///< Heights of images at each pyramid level.
+  std::vector<T*> d_gauss1;      ///< Gaussian pyramid for first image.
+  std::vector<T*> d_gauss2;      ///< Gaussian pyramid for second image.
+  std::vector<T*> d_maskPyr;     ///< Pyramid for the shared mask.
+  std::vector<T*> d_lap1;        ///< Laplacian pyramid for first image.
+  std::vector<T*> d_lap2;        ///< Laplacian pyramid for second image.
+  std::vector<T*> d_blend;       ///< Blended Laplacian pyramid.
+  std::vector<T*> d_resonstruct; ///< Temporary arrays for reconstruction.
+  bool initialized{false};       ///< Flag indicating if the context has been initialized.
 };
 
 /**
@@ -71,6 +108,7 @@ struct CudaBatchLaplacianBlendContext {
  * Copies host images (batched layout) and a shared mask to device memory, builds Gaussian and Laplacian pyramids,
  * blends the Laplacian pyramids, reconstructs the final blended images, and copies the result back to host.
  *
+ * @tparam T The image data type.
  * @param h_image1 Host pointer to the first set of full-resolution images.
  * @param h_image2 Host pointer to the second set of full-resolution images.
  * @param h_mask Host pointer to the full-resolution shared mask.
@@ -93,12 +131,14 @@ cudaError_t cudaBatchedLaplacianBlend(
     int numLevels,
     int batchSize,
     cudaStream_t stream);
+
 /**
  * @brief Batched Laplacian blending with a preallocated context.
  *
  * Uses a preallocated context to store intermediate pyramid arrays, builds Gaussian and Laplacian pyramids,
  * blends the Laplacian pyramids, reconstructs the final blended image, and stores the result in d_output.
  *
+ * @tparam T The image data type.
  * @param d_image1 Device pointer to the first set of full-resolution images.
  * @param d_image2 Device pointer to the second set of full-resolution images.
  * @param d_mask Device pointer to the shared mask.
