@@ -600,7 +600,7 @@ class CudaStitchPano {
         canvas->height(),
         /*offsetX=*/mask_converter._x2 - mask_converter._overlap_pad,
         /*offsetY=*/0,
-        /*channels=*/1,  // <-- 1 when using stuff like float3
+        /*channels=*/1, // <-- 1 when using stuff like float3
         /*batchSize=*/stitch_context.batch_size(),
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
@@ -782,8 +782,11 @@ int main(int argc, char** argv) {
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize);
 
+  // auto canvas = std::make_unique<CudaMat<T>>(
+  //     as_batch(cv::Mat(control_masks.whole_seam_mask_image.size(), CV_T_PIPELINE), kBatchSize));
+
   auto canvas = std::make_unique<CudaMat<T>>(
-      as_batch(cv::Mat(control_masks.whole_seam_mask_image.size(), CV_T_PIPELINE), kBatchSize));
+      stitch_context.batch_size(), control_masks.whole_seam_mask_image.cols, control_masks.whole_seam_mask_image.rows);
 
   assert(control_masks.img1_col.type() == CV_16U);
   stitch_context.remap_1_x = std::make_unique<CudaMat<uint16_t>>(control_masks.img1_col);
@@ -794,14 +797,10 @@ int main(int argc, char** argv) {
   blend_seam.convertTo(blend_seam, CV_T_COMPUTE3);
   stitch_context.cudaBlendSeam = std::make_unique<CudaMat<T_compute>>(blend_seam);
 
-  // stitch_context.cudaFull1 = std::make_unique<CudaMat<T_compute>>(
-  //     as_batch(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
-
   stitch_context.cudaFull1 =
       std::make_unique<CudaMat<T_compute>>(stitch_context.batch_size(), blend_seam.cols, blend_seam.rows);
-
-  stitch_context.cudaFull2 = std::make_unique<CudaMat<T_compute>>(
-      as_batch(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
+  stitch_context.cudaFull2 =
+      std::make_unique<CudaMat<T_compute>>(stitch_context.batch_size(), blend_seam.cols, blend_seam.rows);
 
   stitch_context.laplacian_blend_context = std::make_unique<CudaBatchLaplacianBlendContext<BaseScalar_t<T_compute>>>(
       stitch_context.cudaBlendSeam->width(),
