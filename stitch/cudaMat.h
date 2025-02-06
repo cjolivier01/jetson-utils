@@ -91,6 +91,11 @@ struct BaseScalar<unsigned char> {
 };
 
 template <>
+struct BaseScalar<uchar1> {
+  using type = unsigned char;
+};
+
+template <>
 struct BaseScalar<unsigned short> {
   using type = unsigned short;
 };
@@ -385,6 +390,11 @@ struct CudaTypeToPixelType;
 // --- 1-channel types ---
 template <>
 struct CudaTypeToPixelType<unsigned char> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_UCHAR1;
+};
+
+template <>
+struct CudaTypeToPixelType<uchar1> {
   static constexpr CudaPixelType value = CUDA_PIXEL_UCHAR1;
 };
 

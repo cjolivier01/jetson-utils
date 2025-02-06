@@ -476,7 +476,7 @@ class CudaStitchPano {
           canvas->height(),
           stitch_context.remap_1_x->data(),
           stitch_context.remap_1_y->data(),
-          make_float3(0, 0, 0),
+          {0, 0, 0},
           /*batchSize=*/stitch_context.batch_size(),
           stitch_context.remap_1_x->width(),
           stitch_context.remap_1_x->height(),
@@ -530,7 +530,7 @@ class CudaStitchPano {
           canvas->height(),
           stitch_context.remap_1_x->data(),
           stitch_context.remap_1_y->data(),
-          make_float3(0, 0, 0),
+          {0, 0, 0},
           /*this_image_index=*/
           1 /* <-- we inverted the mask at load-time to make it a weight, so image 0 is actually 1 in the mask */,
           stitch_context.cudaBlendHardSeam->data(),
@@ -559,7 +559,7 @@ class CudaStitchPano {
           canvas->height(),
           stitch_context.remap_2_x->data(),
           stitch_context.remap_2_y->data(),
-          make_float3(0, 0, 0),
+          {0, 0, 0},
           /*batchSize=*/stitch_context.batch_size(),
           stitch_context.remap_2_x->width(),
           stitch_context.remap_2_x->height(),
@@ -614,7 +614,7 @@ class CudaStitchPano {
           canvas->height(),
           stitch_context.remap_2_x->data(),
           stitch_context.remap_2_y->data(),
-          make_float3(0, 0, 0),
+          {0, 0, 0},
           /*this_image_index=*/
           0 /* <-- we inverted the mask at load-time to make it a weight, so image 1 is actually 0 in the mask */,
           stitch_context.cudaBlendHardSeam->data(),
@@ -825,17 +825,24 @@ int main(int argc, char** argv) {
   int numLevels = 0;
   // int numLevels = 6;
 #else
-  //int numLevels = 6;
-  //int numLevels = 1;
-  //int numLevels = 6;
+  // int numLevels = 6;
+  // int numLevels = 1;
+  // int numLevels = 6;
   int numLevels = 0;
 #endif
 
 #if 1
+#if 1
+  using T = uchar3;
+  using T_compute = uchar3;
+#define CV_T_PIPELINE CV_8UC3
+#define CV_T_COMPUTE3 CV_8UC3
+#else
   using T = float3;
   using T_compute = float3;
 #define CV_T_PIPELINE CV_32FC3
 #define CV_T_COMPUTE3 CV_32FC3
+#endif
 #else
   using T = float;
   using T_compute = __half;
@@ -844,7 +851,7 @@ int main(int argc, char** argv) {
 #endif
 
   constexpr int kBatchSize = 1;
-  //constexpr int kBatchSize = 2;
+  // constexpr int kBatchSize = 2;
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
 
