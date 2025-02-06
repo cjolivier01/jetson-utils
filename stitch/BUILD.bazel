@@ -18,8 +18,8 @@ cc_library(
         "cudaMat.h",
         "cudaMat.inl",
     ],
-    copts=[
-      # "-DWITH_JETSON_UTILS=1",
+    copts = [
+        # "-DWITH_JETSON_UTILS=1",
     ],
     includes = ["."],
     visibility = ["//visibility:public"],
@@ -31,17 +31,37 @@ cc_library(
 )
 
 cc_library(
+    name = "pano",
+    srcs = [
+        "controlMasks.cpp",
+    ],
+    hdrs = [
+        "controlMasks.h",
+    ],
+    copts = [
+    ],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+      "@opencv_linux//:opencv",
+    ],
+)
+
+cc_library(
     name = "cuda_pano",
-    srcs = ["cudaPano.cpp"],
+    srcs = [
+        "cudaPano.cpp",
+    ],
     hdrs = [
         "cudaPano.h",
     ],
-    copts=[
+    copts = [
     ],
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_matrix",
+        ":pano",
     ],
 )
 
