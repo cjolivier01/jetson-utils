@@ -640,7 +640,7 @@ class CudaStitchPano {
       //
       // SOFT SEAM LEFT
       //
-#if 0
+#if 1
       //
       // Image 1
       //
@@ -666,7 +666,7 @@ class CudaStitchPano {
       // SHOW_SMALL(canvas);
 #endif
 
-#if 0
+#if 1
       //
       // Now copy the blending portion of remapped image 1 from the canvas onto the blend image
       //
@@ -703,7 +703,7 @@ class CudaStitchPano {
       //
       // HARD SEAM LEFT
       //
-#if 0
+#if 1
       cuerr = batched_remap_kernel_ex_offset_with_dest_map(
           sampleImage1.data(),
           sampleImage1.width(),
@@ -723,7 +723,7 @@ class CudaStitchPano {
           /*offsetX=*/canvas_manager._x1,
           /*offsetY=*/canvas_manager._y1,
           stream);
-      SHOW_SMALL(canvas);
+      // SHOW_SMALL(canvas);
 #endif
     }
     //
@@ -733,7 +733,7 @@ class CudaStitchPano {
       //
       // SOFT SEAM RIGHT
       //
-#if 0
+#if 1
       //
       // Remap image 2 directly onto the canvas (will overwrite the overlappign portion of image 1)
       //
@@ -757,7 +757,7 @@ class CudaStitchPano {
       // SHOW_SMALL(canvas);
 #endif
 
-#if 0
+#if 1
       //
       // Now copy the blending portion of remapped image 2 from the canvas onto the blend image
       //
@@ -816,14 +816,14 @@ class CudaStitchPano {
           /*offsetX=*/canvas_manager._x2,
           /*offsetY=*/canvas_manager._y2,
           stream);
-         //SHOW_SMALL(&sampleImage2);
-      SHOW_SMALL(canvas);
+      // SHOW_SMALL(&sampleImage2);
+      // SHOW_SMALL(canvas);
       // SHOW_SMALL(stitch_context.cudaBlendHardSeam);
 #endif
     }
     if (!stitch_context.is_hard_seam()) {
       CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
-#if 0
+#if 1
       //
       // BLEND THE IMAGES (overlapping portions + some padding)
       //
@@ -839,7 +839,7 @@ class CudaStitchPano {
       // SHOW_IMAGE(&cudaBlendedFull);
 #endif
 
-#if 0
+#if 1
       //
       // Copy the blended portion (overlapping portion + some padding) onto
       // the canvas over some of the remapped image 1 and image 2
@@ -1160,7 +1160,7 @@ int main(int argc, char** argv) {
     return blendedCanvasResult.status().code();
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
-  // SHOW_SMALL(blendedCanvas);
+  SHOW_SMALL(blendedCanvas);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
   // SHOW_IMAGE(blendedCanvas);
