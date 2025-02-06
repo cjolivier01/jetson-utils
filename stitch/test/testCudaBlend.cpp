@@ -1,6 +1,7 @@
 #include "cudaBlend.h"
 #include "cudaMakeFull.h"
 #include "cudaMat.h"
+#include "cudaPano.h"
 #include "cudaRemap.h"
 #include "cudaStatus.h"
 #include "glDisplay.h"
@@ -588,36 +589,8 @@ cv::Mat make_fake_mask_like(const cv::Mat& mask) {
   return img;
 }
 
-template <typename T, typename T_compute>
-struct StitchingContext {
-  StitchingContext(int batch_size, bool is_hard_seam) : batch_size_(batch_size), is_hard_seam_(is_hard_seam) {}
-  // Static buffers
-  std::unique_ptr<CudaMat<uint16_t>> remap_1_x;
-  std::unique_ptr<CudaMat<uint16_t>> remap_1_y;
-  std::unique_ptr<CudaMat<uint16_t>> remap_2_x;
-  std::unique_ptr<CudaMat<uint16_t>> remap_2_y;
-
-  std::unique_ptr<CudaMat<T_compute>> cudaBlendSoftSeam;
-  std::unique_ptr<CudaMat<unsigned char>> cudaBlendHardSeam;
-
-  // Scratch buffers
-  std::unique_ptr<CudaMat<T_compute>> cudaFull1;
-  std::unique_ptr<CudaMat<T_compute>> cudaFull2;
-
-  // Laplacian Blend Scratch context
-  std::unique_ptr<CudaBatchLaplacianBlendContext<BaseScalar_t<T_compute>>> laplacian_blend_context;
-
-  constexpr int batch_size() const {
-    return batch_size_;
-  }
-  constexpr bool is_hard_seam() const {
-    return is_hard_seam_;
-  }
-
- private:
-  int batch_size_;
-  bool is_hard_seam_;
-};
+namespace hm {
+namespace cuda {
 
 template <typename T, typename T_compute>
 class CudaStitchPano {
@@ -868,6 +841,9 @@ class CudaStitchPano {
   };
 };
 
+} // namespace cuda
+} // namespace hm
+
 std::vector<cv::Mat> as_batch(const cv::Mat& mat, int batch_size) {
   return std::vector<cv::Mat>(batch_size, mat);
 }
@@ -1087,7 +1063,7 @@ int main(int argc, char** argv) {
   constexpr int kBatchSize = 1;
   // constexpr int kBatchSize = 2;
 
-  StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
+  hm::cuda::StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
 
   //
   // CanvasManager
@@ -1155,7 +1131,7 @@ int main(int argc, char** argv) {
   CudaMat<T> sampleImage1(as_batch(sample_img_left, kBatchSize));
   CudaMat<T> sampleImage2(as_batch(sample_img_right, kBatchSize));
 
-  auto blendedCanvasResult = CudaStitchPano<T, T_compute>::process(
+  auto blendedCanvasResult = hm::cuda::CudaStitchPano<T, T_compute>::process(
       sampleImage1, sampleImage2, stitch_context, canvas_manager, stream, std::move(canvas));
   if (!blendedCanvasResult.ok()) {
     std::cerr << blendedCanvasResult.status().message() << std::endl;
