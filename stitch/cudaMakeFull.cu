@@ -305,183 +305,107 @@ cudaError_t copyRoiBatchedInterface(
 // Explicit Template Instantiations
 ////////////////////////////////////////////////////////////////////////////////
 
-// For fillKernelBatched:
-template __global__ void fillKernelBatched<float>(float*, int, int, int, float, int);
-template __global__ void fillKernelBatched<__half>(__half*, int, int, int, __half, int);
-template __global__ void fillKernelBatched<__nv_bfloat16>(__nv_bfloat16*, int, int, int, __nv_bfloat16, int);
+#define INSTANTIATE_FILL_KERNEL_BATCHED(T)       \
+  template __global__ void fillKernelBatched<T>( \
+      T * dest, int destWidth, int destHeight, int channels, T value, int batchSize);
 
-// For copyRoiKernelBatched:
-// Same-type instantiations:
-template __global__ void copyRoiKernelBatched<
-    float,
-    float>(const float*, int, int, int, int, int, int, float*, int, int, int, int, int, int);
-template __global__ void copyRoiKernelBatched<
-    __half,
-    __half>(const __half*, int, int, int, int, int, int, __half*, int, int, int, int, int, int);
-template __global__ void copyRoiKernelBatched<
-    __nv_bfloat16,
-    __nv_bfloat16>(const __nv_bfloat16*, int, int, int, int, int, int, __nv_bfloat16*, int, int, int, int, int, int);
+#define INSTANTIATE_COPY_ROI_KERNEL_BATCHED(Tin, Tout)      \
+  template __global__ void copyRoiKernelBatched<Tin, Tout>( \
+      const Tin* src,                                       \
+      int full_src_width,                                   \
+      int full_src_height,                                  \
+      int regionWidth,                                      \
+      int regionHeight,                                     \
+      int srcROI_x,                                         \
+      int srcROI_y,                                         \
+      Tout* dest,                                           \
+      int destWidth,                                        \
+      int destHeight,                                       \
+      int offsetX,                                          \
+      int offsetY,                                          \
+      int channels,                                         \
+      int batchSize);
 
-// Conversion instantiations:
-template __global__ void copyRoiKernelBatched<
-    float,
-    __half>(const float*, int, int, int, int, int, int, __half*, int, int, int, int, int, int);
-template __global__ void copyRoiKernelBatched<
-    __half,
-    float>(const __half*, int, int, int, int, int, int, float*, int, int, int, int, int, int);
+#define INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(Tin, Tout, U)     \
+  template cudaError_t simple_make_full_batch<Tin, Tout, U>( \
+      const Tin* d_imgs,                                     \
+      int,                                                   \
+      int,                                                   \
+      int,                                                   \
+      int,                                                   \
+      int,                                                   \
+      const U* d_masks,                                      \
+      int,                                                   \
+      int,                                                   \
+      int,                                                   \
+      int,                                                   \
+      int,                                                   \
+      int&,                                                  \
+      int&,                                                  \
+      int,                                                   \
+      int,                                                   \
+      bool,                                                  \
+      int,                                                   \
+      Tout* d_full_imgs,                                     \
+      U* d_full_masks,                                       \
+      cudaStream_t stream);
 
-// For the host function simple_make_full_batch:
-template cudaError_t simple_make_full_batch<float, float, unsigned char>(
-    const float* d_imgs,
-    int,
-    int,
-    int,
-    int,
-    int,
-    const unsigned char* d_masks,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int&,
-    int&,
-    int,
-    int,
-    bool,
-    int,
-    float* d_full_imgs,
-    unsigned char* d_full_masks,
-    cudaStream_t);
-template cudaError_t simple_make_full_batch<__half, __half, unsigned char>(
-    const __half* d_imgs,
-    int,
-    int,
-    int,
-    int,
-    int,
-    const unsigned char* d_masks,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int&,
-    int&,
-    int,
-    int,
-    bool,
-    int,
-    __half* d_full_imgs,
-    unsigned char* d_full_masks,
-    cudaStream_t);
-template cudaError_t simple_make_full_batch<__nv_bfloat16, __nv_bfloat16, unsigned char>(
-    const __nv_bfloat16* d_imgs,
-    int,
-    int,
-    int,
-    int,
-    int,
-    const unsigned char* d_masks,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int&,
-    int&,
-    int,
-    int,
-    bool,
-    int,
-    __nv_bfloat16* d_full_imgs,
-    unsigned char* d_full_masks,
-    cudaStream_t);
+#define INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(Tin, Tout)  \
+  template cudaError_t copyRoiBatchedInterface<Tin, Tout>( \
+      const Tin* d_src,                                    \
+      int full_src_width,                                  \
+      int full_src_height,                                 \
+      int regionWidth,                                     \
+      int regionHeight,                                    \
+      int srcROI_x,                                        \
+      int srcROI_y,                                        \
+      Tout* d_dest,                                        \
+      int destWidth,                                       \
+      int destHeight,                                      \
+      int offsetX,                                         \
+      int offsetY,                                         \
+      int channels,                                        \
+      int batchSize,                                       \
+      cudaStream_t stream);
 
-// For the interface function copyRoiBatchedInterface:
-template cudaError_t copyRoiBatchedInterface<
-    float,
-    float>(const float* d_src, int, int, int, int, int, int, float* d_dest, int, int, int, int, int, int, cudaStream_t);
-template cudaError_t copyRoiBatchedInterface<__half, __half>(
-    const __half* d_src,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    __half* d_dest,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    cudaStream_t);
-template cudaError_t copyRoiBatchedInterface<__nv_bfloat16, __nv_bfloat16>(
-    const __nv_bfloat16* d_src,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    __nv_bfloat16* d_dest,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    cudaStream_t);
+// --- Device kernels ---
+
+// fillKernelBatched instantiations:
+INSTANTIATE_FILL_KERNEL_BATCHED(float)
+INSTANTIATE_FILL_KERNEL_BATCHED(float3)
+INSTANTIATE_FILL_KERNEL_BATCHED(__half)
+INSTANTIATE_FILL_KERNEL_BATCHED(__nv_bfloat16)
+
+// copyRoiKernelBatched instantiations:
+
+// Same–type instantiations:
+INSTANTIATE_COPY_ROI_KERNEL_BATCHED(float, float)
+INSTANTIATE_COPY_ROI_KERNEL_BATCHED(float3, float3)
+INSTANTIATE_COPY_ROI_KERNEL_BATCHED(uchar3, uchar3)
+INSTANTIATE_COPY_ROI_KERNEL_BATCHED(__half, __half)
+INSTANTIATE_COPY_ROI_KERNEL_BATCHED(__nv_bfloat16, __nv_bfloat16)
 
 // Conversion instantiations:
-template cudaError_t copyRoiBatchedInterface<float, __half>(
-    const float* d_src,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    __half* d_dest,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    cudaStream_t);
-template cudaError_t copyRoiBatchedInterface<__half, float>(
-    const __half* d_src,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    float* d_dest,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    cudaStream_t);
+INSTANTIATE_COPY_ROI_KERNEL_BATCHED(float, __half)
+INSTANTIATE_COPY_ROI_KERNEL_BATCHED(__half, float)
 
-template cudaError_t copyRoiBatchedInterface<float3, float3>(
-    const float3* d_src,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    float3* d_dest,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    cudaStream_t);
+// --- Host functions ---
+
+// simple_make_full_batch instantiations:
+INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(float, float, unsigned char)
+INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(unsigned char, unsigned char, unsigned char)
+INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(__half, __half, unsigned char)
+INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(__nv_bfloat16, __nv_bfloat16, unsigned char)
+
+// copyRoiBatchedInterface instantiations:
+
+// Same–type instantiations:
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(float, float)
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(float3, float3)
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(uchar3, uchar3)
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(__half, __half)
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(__nv_bfloat16, __nv_bfloat16)
+
+// Conversion instantiations:
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(float, __half)
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(__half, float)
