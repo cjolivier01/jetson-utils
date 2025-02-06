@@ -131,6 +131,21 @@ CudaMat<T>::CudaMat(int B, int W, int H, int C, CudaPixelType type) : batch_size
   cudaMalloc(&d_data, size);
 }
 
+template <typename T>
+CudaMat<T>::CudaMat(int B, int W, int H, int C)
+    : batch_size_(B),
+      rows_(H),
+      cols_(W),
+      type_(CudaTypeToPixelType<T>::value) // automatically inferred from T
+{
+  int expectedChannels = cudaPixelTypeChannels(type_);
+  assert(expectedChannels == C);
+  size_t elemSize = cudaPixelElementSize(type_);
+  assert(sizeof(T) == elemSize);
+  size = static_cast<size_t>(B * W * H) * elemSize;
+  cudaMalloc(&d_data, size);
+}
+
 /**
  * @brief Destructor for CudaMat.
  *

@@ -262,6 +262,105 @@ struct CudaPixelTypeToCudaType<CUDA_PIXEL_BF16_4> {
   using type = bfloat16_4;
 };
 
+//
+// Primary template declaration – no definition is provided.
+//
+template <typename T>
+struct CudaTypeToPixelType;
+
+// --- 1-channel types ---
+template <>
+struct CudaTypeToPixelType<unsigned char> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_UCHAR1;
+};
+
+template <>
+struct CudaTypeToPixelType<unsigned short> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_USHORT1;
+};
+
+template <>
+struct CudaTypeToPixelType<int> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_INT1;
+};
+
+template <>
+struct CudaTypeToPixelType<float> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_FLOAT1;
+};
+
+template <>
+struct CudaTypeToPixelType<__half> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_HALF1;
+};
+
+template <>
+struct CudaTypeToPixelType<__nv_bfloat16> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_BF16_1;
+};
+
+// --- 3-channel types ---
+template <>
+struct CudaTypeToPixelType<uchar3> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_UCHAR3;
+};
+
+template <>
+struct CudaTypeToPixelType<ushort3> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_USHORT3;
+};
+
+template <>
+struct CudaTypeToPixelType<int3> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_INT3;
+};
+
+template <>
+struct CudaTypeToPixelType<float3> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_FLOAT3;
+};
+
+template <>
+struct CudaTypeToPixelType<half3> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_HALF3;
+};
+
+template <>
+struct CudaTypeToPixelType<bfloat16_3> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_BF16_3;
+};
+
+// --- 4-channel types ---
+template <>
+struct CudaTypeToPixelType<uchar4> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_UCHAR4;
+};
+
+template <>
+struct CudaTypeToPixelType<ushort4> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_USHORT4;
+};
+
+template <>
+struct CudaTypeToPixelType<int4> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_INT4;
+};
+
+template <>
+struct CudaTypeToPixelType<float4> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_FLOAT4;
+};
+
+template <>
+struct CudaTypeToPixelType<half4> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_HALF4;
+};
+
+template <>
+struct CudaTypeToPixelType<bfloat16_4> {
+  static constexpr CudaPixelType value = CUDA_PIXEL_BF16_4;
+};
+
 /*----------------------------------------------------------------------------
   Template Class: CudaMat
 -----------------------------------------------------------------------------*/
@@ -316,6 +415,8 @@ class CudaMat {
    * @param type The CUDA pixel type.
    */
   CudaMat(int B, int W, int H, int C, CudaPixelType type);
+
+  CudaMat(int B, int W, int H, int C = 1);
 
   /**
    * @brief Destructor.
