@@ -843,8 +843,8 @@ int main(int argc, char** argv) {
 #define CV_T_COMPUTE3 CV_16FC3
 #endif
 
-  // constexpr int kBatchSize = 1;
-  constexpr int kBatchSize = 2;
+  constexpr int kBatchSize = 1;
+  //constexpr int kBatchSize = 2;
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
 
