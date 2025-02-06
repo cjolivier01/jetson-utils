@@ -554,6 +554,15 @@ class CudaMat {
   ~CudaMat();
 
   /**
+   * @brief Check whether the CudaMat is a valid surface
+   *
+   * @returns true if this surface is value (has memory allocated)
+   */
+  constexpr bool is_valid() const {
+    return d_data != nullptr;
+  }
+
+  /**
    * @brief Downloads an image from device memory to a cv::Mat.
    *
    * For batched images, the parameter `batch_item` specifies which image to download.

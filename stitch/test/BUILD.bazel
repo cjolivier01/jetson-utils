@@ -8,7 +8,7 @@ cc_binary(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//stitch:cuda_matrix",
+        "//stitch:cuda_pano",
         "//display",
         "@local_cuda//:cuda_runtime",
         "@opencv_linux//:opencv",

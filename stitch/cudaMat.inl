@@ -93,8 +93,8 @@ CudaMat<T>::CudaMat(const std::vector<cv::Mat>& mat_batch, bool copy)
   assert(first.elemSize() == expectedElemSize);
   size_t size_each = first.total() * expectedElemSize;
   size = size_each * batch_size_;
-  cudaMalloc(&d_data, size);
-  if (copy) {
+  cudaError_t cuerr = cudaMalloc(&d_data, size);
+  if (cuerr == cudaError_t::cudaSuccess && copy) {
     uint8_t* p = reinterpret_cast<uint8_t*>(d_data);
     for (const cv::Mat& mat : mat_batch) {
       assert(mat.isContinuous());

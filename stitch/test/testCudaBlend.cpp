@@ -745,10 +745,10 @@ class CudaStitchPano {
       // Remap image 2 directly onto the canvas (will overwrite the overlappign portion of image 1)
       //
       cuerr = batched_remap_kernel_ex_offset(
-          (const float3*)sampleImage2.data(),
+          sampleImage2.data(),
           sampleImage2.width(),
           sampleImage2.height(),
-          (float3*)canvas->data(),
+          canvas->data(),
           canvas->width(),
           canvas->height(),
           stitch_context.remap_2_x->data(),
@@ -1064,13 +1064,13 @@ int main(int argc, char** argv) {
   // int numLevels = 6;
 #else
   // int numLevels = 6;
-  // int numLevels = 2;
-  int numLevels = 6;
+  int numLevels = 1;
+  // int numLevels = 6;
   // int numLevels = 0;
 #endif
 
 #if 1
-#if 0
+#if 1
   using T = uchar3;
   using T_compute = uchar3;
 #else
@@ -1156,7 +1156,8 @@ int main(int argc, char** argv) {
   //     /*N=*/10,
   //     cv::Point(canvas_manager.canvas_info_.positions[0].x, canvas_manager.canvas_info_.positions[0].y),
   //     cv::Point(canvas_manager.canvas_info_.positions[1].x, canvas_manager.canvas_info_.positions[1].y));
-
+  // assert(sample_img_left.type() == CV_8UC3);
+  // assert(sample_img_right.type() == CV_8UC3);
   CudaMat<T> sampleImage1(as_batch(sample_img_left, kBatchSize));
   CudaMat<T> sampleImage2(as_batch(sample_img_right, kBatchSize));
 
@@ -1168,7 +1169,7 @@ int main(int argc, char** argv) {
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
   // SHOW_SMALL(blendedCanvas);
-  //SHOW_IMAGE(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
   SHOW_SCALED(blendedCanvas, 0.25);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
