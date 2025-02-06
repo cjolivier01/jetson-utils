@@ -271,9 +271,14 @@ void displayScaledImage(const std::string& label, cv::Mat image, float scale = 1
     show_image(std::string(#_mat$), (_mat$)->download(), /*wait=*/true); \
   } while (false)
 
-#define SHOW_SMALL(_mat$)                                                              \
-  do {                                                                                 \
-    displayScaledImage(std::string(#_mat$), (_mat$)->download(), 0.05, /*wait=*/true); \
+#define SHOW_SCALED(_mat$, _scale$)                                                       \
+  do {                                                                                    \
+    displayScaledImage(std::string(#_mat$), (_mat$)->download(), _scale$, /*wait=*/true); \
+  } while (false)
+
+#define SHOW_SMALL(_mat$)     \
+  do {                        \
+    SHOW_SCALED(_mat$, 0.05); \
   } while (false)
 
 namespace {
@@ -724,7 +729,7 @@ class CudaStitchPano {
           /*offsetX=*/canvas_manager._x1,
           /*offsetY=*/canvas_manager._y1,
           stream);
-      //SHOW_SMALL(&sampleImage1);
+      // SHOW_SMALL(&sampleImage1);
       SHOW_SMALL(canvas);
 #endif
     }
@@ -1024,15 +1029,16 @@ int main(int argc, char** argv) {
   std::string game_id = argv[1];
   std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id + "/";
 
-  // std::string sample_img_left_path = game_dir + "GX010100.png";
-  // std::string sample_img_right_path = game_dir + "GX010019.png";
+  // stitch-fix
+  std::string sample_img_left_path = game_dir + "GX010100.png";
+  std::string sample_img_right_path = game_dir + "GX010019.png";
 
   // std::string sample_img_left_path = game_dir + "GX010097.png";
   // std::string sample_img_right_path = game_dir + "GX010016.png";
 
   // PDP
-  std::string sample_img_left_path = game_dir + "GX010087.png";
-  std::string sample_img_right_path = game_dir + "GX010003.png";
+  // std::string sample_img_left_path = game_dir + "GX010087.png";
+  // std::string sample_img_right_path = game_dir + "GX010003.png";
 
   cv::Mat sample_img_left = cv::imread(sample_img_left_path, cv::IMREAD_COLOR);
   assert(!sample_img_left.empty());
@@ -1089,7 +1095,6 @@ int main(int argc, char** argv) {
     sample_img_left.convertTo(sample_img_left, CV_T_PIPELINE, 1.0 / 255.0);
     sample_img_right.convertTo(sample_img_right, CV_T_PIPELINE, 1.0 / 255.0);
   }
-
 
   // constexpr int kBatchSize = 1;
   constexpr int kBatchSize = 2;
