@@ -1,2 +1,2 @@
 #!/bin/bash
-./bazel-bin/cuda/test_cuda_blend $@
+./bazel-bin/stitch/test/test_cuda_blend $@
