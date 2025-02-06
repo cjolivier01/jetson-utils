@@ -18,6 +18,8 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
+#include <unordered_set>
 
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -67,133 +69,178 @@ int wait_key() {
   return c;
 }
 
-#include <opencv2/opencv.hpp>
-#include <algorithm>
-#include <iostream>
-
-// This function examines N pixels on the left of the seam (from image1)
-// and N pixels on the right of the seam (from image2) for the middle 50% of rows,
-// then computes an offset per channel to adjust the images so that they visually match.
-void matchSeamImages(cv::Mat& image1, cv::Mat& image2, const cv::Mat& seam, int N) {
-  // Check that the seam image is of type CV_8U
+// Function parameters:
+//   - image1, image2: the two RGB images to be adjusted.
+//   - seam: the seam mask image (CV_8U) that is larger than both images.
+//   - N: number of pixels to sample on each side of the seam.
+//   - topLeft1, topLeft2: the (x,y) coordinates (relative to the seam mask)
+//                           of the top left corners of image1 and image2, respectively.
+void matchSeamImages(
+    cv::Mat& image1,
+    cv::Mat& image2,
+    const cv::Mat& seam,
+    int N,
+    const cv::Point& topLeft1,
+    const cv::Point& topLeft2) {
+  // Ensure the seam mask is of type CV_8U.
   if (seam.type() != CV_8U) {
-    std::cerr << "Error: Seam image must be of type CV_8U (uchar)." << std::endl;
+    std::cerr << "Error: Seam mask must be of type CV_8U." << std::endl;
     return;
   }
 
-  // Define the rows to examine – only the middle 50% of the seam image.
-  int totalRows = seam.rows;
-  int startRow = totalRows / 4;
-  int endRow = (3 * totalRows) / 4;
-
-  // These accumulators will sum the pixel values from the two sides of the seam.
-  cv::Scalar sumLeft(0, 0, 0);
-  cv::Scalar sumRight(0, 0, 0);
+  // Accumulators for summing per-channel pixel values.
+  cv::Scalar sumLeft(0, 0, 0); // For image1 samples (left of the seam).
+  cv::Scalar sumRight(0, 0, 0); // For image2 samples (right of the seam).
   int countLeft = 0, countRight = 0;
 
-  // Loop over the valid rows.
-  for (int row = startRow; row < endRow; ++row) {
-    // Find the seam boundary in this row:
-    // We assume that the seam image contains a continuous transition
-    // where pixels change from 0 to 1. We look for the first column with a 1.
-    int seamCol = -1;
-    for (int col = 0; col < seam.cols; ++col) {
-      if (seam.at<uchar>(row, col) == 1) {
-        seamCol = col;
+  // ----- Process image1 (sampling from the left side of the seam) -----
+  // Only examine the middle 50% of image1's rows.
+  int startRow1 = image1.rows / 4;
+  int endRow1 = (3 * image1.rows) / 4;
+  for (int r = startRow1; r < endRow1; r++) {
+    // Map image1’s local row (r) to the seam mask’s row coordinate.
+    int globalRow = topLeft1.y + r;
+    if (globalRow < 0 || globalRow >= seam.rows)
+      continue; // Row is outside the seam mask.
+
+    // Define the horizontal span of image1 in the seam mask.
+    int colStart = topLeft1.x;
+    int colEnd = topLeft1.x + image1.cols;
+
+    // Find the seam boundary: the first column (within image1’s span)
+    // where the seam mask pixel equals 1.
+    int seamGlobalCol = -1;
+    for (int c = colStart; c < colEnd; c++) {
+      if (c < 0 || c >= seam.cols)
+        continue;
+      if (seam.at<uchar>(globalRow, c) == 1) {
+        seamGlobalCol = c;
         break;
       }
     }
-    if (seamCol == -1)
-      continue; // No seam boundary found on this row; skip.
+    if (seamGlobalCol == -1)
+      continue; // No seam boundary found for this row.
 
-    // For image1, sample N pixels immediately to the left of the seam boundary.
-    for (int col = std::max(0, seamCol - N); col < seamCol; ++col) {
-      // Make sure we do not exceed image1’s bounds.
-      if (row < image1.rows && col < image1.cols) {
-        if (image1.depth() == CV_8U) {
-          cv::Vec3b pixel = image1.at<cv::Vec3b>(row, col);
-          sumLeft[0] += pixel[0];
-          sumLeft[1] += pixel[1];
-          sumLeft[2] += pixel[2];
-        } else if (image1.depth() == CV_32F) {
-          cv::Vec3f pixel = image1.at<cv::Vec3f>(row, col);
-          sumLeft[0] += pixel[0];
-          sumLeft[1] += pixel[1];
-          sumLeft[2] += pixel[2];
-        }
-        ++countLeft;
-      }
-    }
+    // Convert the global seam column to image1’s local coordinate.
+    int seamLocalCol = seamGlobalCol - topLeft1.x;
 
-    // For image2, sample N pixels immediately to the right of the seam boundary.
-    for (int col = seamCol; col < std::min(seamCol + N, image2.cols); ++col) {
-      if (row < image2.rows && col < image2.cols) {
-        if (image2.depth() == CV_8U) {
-          cv::Vec3b pixel = image2.at<cv::Vec3b>(row, col);
-          sumRight[0] += pixel[0];
-          sumRight[1] += pixel[1];
-          sumRight[2] += pixel[2];
-        } else if (image2.depth() == CV_32F) {
-          cv::Vec3f pixel = image2.at<cv::Vec3f>(row, col);
-          sumRight[0] += pixel[0];
-          sumRight[1] += pixel[1];
-          sumRight[2] += pixel[2];
-        }
-        ++countRight;
+    // Sample up to N pixels immediately to the left of the seam boundary.
+    int sampleStart = std::max(0, seamLocalCol - N);
+    for (int c = sampleStart; c < seamLocalCol; c++) {
+      // Safety check.
+      if (c < 0 || c >= image1.cols)
+        continue;
+
+      // Depending on the image depth, read the pixel appropriately.
+      if (image1.depth() == CV_8U) {
+        cv::Vec3b pixel = image1.at<cv::Vec3b>(r, c);
+        sumLeft[0] += pixel[0];
+        sumLeft[1] += pixel[1];
+        sumLeft[2] += pixel[2];
+      } else if (image1.depth() == CV_32F) {
+        cv::Vec3f pixel = image1.at<cv::Vec3f>(r, c);
+        sumLeft[0] += pixel[0];
+        sumLeft[1] += pixel[1];
+        sumLeft[2] += pixel[2];
       }
+      countLeft++;
     }
   }
 
-  // Make sure we collected samples from both sides.
+  // ----- Process image2 (sampling from the right side of the seam) -----
+  // Only examine the middle 50% of image2's rows.
+  int startRow2 = image2.rows / 4;
+  int endRow2 = (3 * image2.rows) / 4;
+  for (int r = startRow2; r < endRow2; r++) {
+    // Map image2’s local row (r) to the seam mask’s row coordinate.
+    int globalRow = topLeft2.y + r;
+    if (globalRow < 0 || globalRow >= seam.rows)
+      continue;
+
+    // Define the horizontal span of image2 in the seam mask.
+    int colStart = topLeft2.x;
+    int colEnd = topLeft2.x + image2.cols;
+
+    // Find the seam boundary in image2’s region of the seam mask.
+    int seamGlobalCol = -1;
+    for (int c = colStart; c < colEnd; c++) {
+      if (c < 0 || c >= seam.cols)
+        continue;
+      if (seam.at<uchar>(globalRow, c) == 1) {
+        seamGlobalCol = c;
+        break;
+      }
+    }
+    if (seamGlobalCol == -1)
+      continue; // No seam boundary found in this row.
+
+    // Convert the global seam column to image2’s local coordinate.
+    int seamLocalCol = seamGlobalCol - topLeft2.x;
+
+    // Sample up to N pixels immediately to the right of the seam boundary.
+    int sampleEnd = std::min(image2.cols, seamLocalCol + N);
+    for (int c = seamLocalCol; c < sampleEnd; c++) {
+      if (c < 0 || c >= image2.cols)
+        continue;
+
+      if (image2.depth() == CV_8U) {
+        cv::Vec3b pixel = image2.at<cv::Vec3b>(r, c);
+        sumRight[0] += pixel[0];
+        sumRight[1] += pixel[1];
+        sumRight[2] += pixel[2];
+      } else if (image2.depth() == CV_32F) {
+        cv::Vec3f pixel = image2.at<cv::Vec3f>(r, c);
+        sumRight[0] += pixel[0];
+        sumRight[1] += pixel[1];
+        sumRight[2] += pixel[2];
+      }
+      countRight++;
+    }
+  }
+
+  // Check that we have collected samples from both images.
   if (countLeft == 0 || countRight == 0) {
-    std::cerr << "Error: Not enough seam pixels found for adjustment." << std::endl;
+    std::cerr << "Error: Not enough seam samples collected for adjustment." << std::endl;
     return;
   }
 
-  // Compute the per-channel averages.
+  // Compute per-channel averages.
   cv::Scalar avgLeft = sumLeft * (1.0 / countLeft);
   cv::Scalar avgRight = sumRight * (1.0 / countRight);
+  std::cout << "Average values (Image1, left side): " << avgLeft << std::endl;
+  std::cout << "Average values (Image2, right side): " << avgRight << std::endl;
 
-  std::cout << "Average from image1 (left of seam): " << avgLeft << std::endl;
-  std::cout << "Average from image2 (right of seam): " << avgRight << std::endl;
-
-  // Compute an offset per channel. Here we choose the average of the difference so that:
-  //   image1 will be adjusted down by half the difference and
-  //   image2 will be adjusted up by half the difference.
+  // Compute an offset per channel (half the difference).
+  // The idea is to subtract this offset from image1 and add it to image2.
   cv::Scalar offset = (avgLeft - avgRight) * 0.5;
-  std::cout << "Per-channel offset: " << offset << std::endl;
+  std::cout << "Offset: " << offset << std::endl;
 
-  // A helper lambda that applies a per-channel adjustment to an image.
-  auto adjustImage = [&](cv::Mat& image, cv::Scalar adjustment) {
-    // If the image is 8-bit, convert it to float for arithmetic and convert back afterward.
-    if (image.depth() == CV_8U) {
-      cv::Mat floatImage;
-      image.convertTo(floatImage, CV_32F);
+  // Helper lambda: adjusts an image by a per-channel amount.
+  auto adjustImage = [&](cv::Mat& img, cv::Scalar adjustment) {
+    if (img.depth() == CV_8U) {
+      cv::Mat floatImg;
+      img.convertTo(floatImg, CV_32F);
       std::vector<cv::Mat> channels;
-      cv::split(floatImage, channels);
-      for (int c = 0; c < 3; ++c) {
-        channels[c] = channels[c] + static_cast<float>(adjustment[c]);
+      cv::split(floatImg, channels);
+      for (int i = 0; i < 3; i++) {
+        channels[i] += static_cast<float>(adjustment[i]);
       }
-      cv::merge(channels, floatImage);
-      // Clamp the result between 0 and 255.
-      cv::min(floatImage, 255.0, floatImage);
-      cv::max(floatImage, 0.0, floatImage);
-      floatImage.convertTo(image, CV_8U);
-    }
-    // For float images, do the adjustment directly.
-    else if (image.depth() == CV_32F) {
+      cv::merge(channels, floatImg);
+      // Clamp the adjusted values to the valid range [0,255].
+      cv::min(floatImg, 255.0, floatImg);
+      cv::max(floatImg, 0.0, floatImg);
+      floatImg.convertTo(img, CV_8U);
+    } else if (img.depth() == CV_32F) {
       std::vector<cv::Mat> channels;
-      cv::split(image, channels);
-      for (int c = 0; c < 3; ++c) {
-        channels[c] = channels[c] + static_cast<float>(adjustment[c]);
+      cv::split(img, channels);
+      for (int i = 0; i < 3; i++) {
+        channels[i] += static_cast<float>(adjustment[i]);
       }
-      cv::merge(channels, image);
+      cv::merge(channels, img);
     }
   };
 
-  // Adjust the images:
-  // Subtract the offset from image1 so its seam side becomes darker (if needed)
-  // and add the offset to image2 so its seam side becomes brighter.
+  // Adjust the images: subtract the offset from image1 and add it to image2.
   adjustImage(image1, -offset);
   adjustImage(image2, offset);
 }
@@ -223,66 +270,10 @@ void displayScaledImage(const std::string& label, cv::Mat image, float scale = 1
     show_image(std::string(#_mat$), (_mat$)->download(), /*wait=*/true); \
   } while (false)
 
-#define SHOW_SMALL(_mat$)                                                             \
-  do {                                                                                \
-    displayScaledImage(std::string(#_mat$), (_mat$)->download(), 0.1, /*wait=*/true); \
+#define SHOW_SMALL(_mat$)                                                              \
+  do {                                                                                 \
+    displayScaledImage(std::string(#_mat$), (_mat$)->download(), 0.05, /*wait=*/true); \
   } while (false)
-
-// A structure to hold TIFF information
-struct TiffInfo {
-  // Resolution information
-  bool validResolution = false;
-  float xResolution = 0.0f;
-  float yResolution = 0.0f;
-  // Resolution unit (e.g., RESUNIT_INCH, RESUNIT_CENTIMETER)
-  uint16_t resolutionUnit = 0;
-
-  // GeoTIFF Tiepoints (each group of 6 values maps image to model coordinates)
-  bool hasGeoTiePoints = false;
-  float xPosition{0};
-  float yPosition{0};
-};
-
-// Function that takes a file name and returns the TIFF information.
-TiffInfo getTiffInfo(const std::string& filename) {
-  TiffInfo info;
-  TIFF* tif = TIFFOpen(filename.c_str(), "r");
-  if (!tif) {
-    std::cerr << "Error: Could not open file " << filename << std::endl;
-    return info;
-  }
-
-  // --- Get Resolution Information ---
-  float xres = 0.0f, yres = 0.0f;
-  if (TIFFGetField(tif, TIFFTAG_XRESOLUTION, &xres) && TIFFGetField(tif, TIFFTAG_YRESOLUTION, &yres)) {
-    info.xResolution = xres;
-    info.yResolution = yres;
-    info.validResolution = true;
-  }
-
-  uint16_t resUnit = 0;
-  if (TIFFGetField(tif, TIFFTAG_RESOLUTIONUNIT, &resUnit)) {
-    info.resolutionUnit = resUnit;
-  }
-
-  float xpos = 0.0f, ypos = 0.0f;
-  if (TIFFGetField(tif, TIFFTAG_XPOSITION, &xpos)) {
-    std::cout << "X Position: " << xpos << std::endl;
-    info.xPosition = xpos;
-  } else {
-    std::cout << "No X Position information found." << std::endl;
-  }
-
-  if (TIFFGetField(tif, TIFFTAG_YPOSITION, &ypos)) {
-    std::cout << "Y Position: " << ypos << std::endl;
-    info.yPosition = ypos;
-  } else {
-    std::cout << "No Y Position information found." << std::endl;
-  }
-
-  TIFFClose(tif);
-  return info;
-}
 
 namespace {
 
@@ -363,17 +354,27 @@ std::pair<double, double> get_min_max(const cv::Mat& mat) {
   return std::make_pair(minVal, maxVal);
 }
 
-int countUniqueValues(cv::Mat mat) {
-  std::set<int> uniqueValues;
+template <typename T>
+std::set<T> get_unique_values(const cv::Mat& mat, const std::unordered_set<T>& ignore = {}) {
+  std::set<T> unique_values;
 
-  // Assume the matrix type is CV_32S (32-bit signed integer)
-  for (int i = 0; i < mat.cols; ++i) {
-    for (int j = 0; j < mat.rows; ++j) {
-      uniqueValues.insert(mat.at<float>(i, j));
+  // Check if the data type of the matrix matches the template type
+  if (mat.type() != cv::DataType<T>::type) {
+    throw std::invalid_argument("Matrix data type does not match the template type T");
+  }
+
+  // Iterate over each element in the matrix
+  for (int i = 0; i < mat.rows; ++i) {
+    for (int j = 0; j < mat.cols; ++j) {
+      T value = mat.at<T>(i, j);
+      // Add to set if not in ignore set
+      if (ignore.find(value) == ignore.end()) {
+        unique_values.insert(value);
+      }
     }
   }
 
-  return uniqueValues.size();
+  return unique_values;
 }
 
 cv::Mat load_position_mask(const std::string& filename, double* minVal, double* maxVal) {
@@ -417,10 +418,9 @@ struct Remapper {
   int xpos{0}; // This will be set by the blend logic.
 };
 
-class MaskConverter {
+class CanvasManager {
  public:
   // Canvas and blending parameters.
-  CanvasInfo _canvas_info;
 
   // Two remappers (for example, for two image streams).
   Remapper _remapper_1;
@@ -428,31 +428,30 @@ class MaskConverter {
 
   // Additional members for blending logic.
   int _x1{0}, _y1{0}, _x2{0}, _y2{0};
-  int _overlapping_width{0};
   // The padded blended box, stored as [x1, y1, x2, y2].
   std::vector<int> _padded_blended_tlbr;
 
   // Constructor (if needed)
-  MaskConverter(bool minimize_blend, int overlap_pad = 128)
+  CanvasManager(CanvasInfo canvas_info, bool minimize_blend, int overlap_pad = 128)
       : _x1(0),
         _y1(0),
         _x2(0),
         _y2(0),
+        canvas_info_(canvas_info),
         _overlapping_width(0),
         _minimize_blend(minimize_blend),
         _overlap_pad(overlap_pad) {}
 
   // This function updates blending parameters if _minimize_blend is true.
   void updateMinimizeBlend(const cv::Size& remapped_size_1, const cv::Size& remapped_size_2) {
-
     // Ensure that canvas positions are available.
-    assert(_canvas_info.positions.size() >= 2);
+    assert(canvas_info_.positions.size() >= 2);
 
     // Unpack positions from the canvas.
-    _x1 = _canvas_info.positions[0].x;
-    _y1 = _canvas_info.positions[0].y;
-    _x2 = _canvas_info.positions[1].x;
-    _y2 = _canvas_info.positions[1].y;
+    _x1 = canvas_info_.positions[0].x;
+    _y1 = canvas_info_.positions[0].y;
+    _x2 = canvas_info_.positions[1].x;
+    _y2 = canvas_info_.positions[1].y;
 
     int width_1 = _remapper_1.width;
     _overlapping_width = width_1 - _x2;
@@ -469,12 +468,12 @@ class MaskConverter {
       int box_y1 = std::max(0, std::min(_y1, _y2) - _overlap_pad);
       int box_x2 = width_1 + _overlap_pad;
       int box_y2 =
-          std::min(_canvas_info.height, std::max(_y1 + _remapper_1.height, _y2 + _remapper_2.height) + _overlap_pad);
+          std::min(canvas_info_.height, std::max(_y1 + _remapper_1.height, _y2 + _remapper_2.height) + _overlap_pad);
       _padded_blended_tlbr = {box_x1, box_y1, box_x2, box_y2};
 
       // Validate the computed coordinates.
       assert(box_x1 >= 0);
-      assert(box_x2 <= _canvas_info.width);
+      assert(box_x2 <= canvas_info_.width);
 
       // Compute ROIs
       partial_size_1 = cv::Size(_x2 + _overlap_pad, _remapper_1.height);
@@ -499,13 +498,13 @@ class MaskConverter {
     int mheight = mask.rows;
 
     // The mask should not be larger than the canvas.
-    assert(mwidth <= _canvas_info.width);
-    assert(mheight <= _canvas_info.height);
+    assert(mwidth <= canvas_info_.width);
+    assert(mheight <= canvas_info_.height);
 
-    if (mwidth < _canvas_info.width)
-      padw = _canvas_info.width - mwidth;
-    if (mheight < _canvas_info.height)
-      padh = _canvas_info.height - mheight;
+    if (mwidth < canvas_info_.width)
+      padw = canvas_info_.width - mwidth;
+    if (mheight < canvas_info_.height)
+      padh = canvas_info_.height - mheight;
 
     cv::Mat paddedMask;
     if (padw > 0 || padh > 0) {
@@ -516,22 +515,22 @@ class MaskConverter {
     }
 
     // Check that the padded mask matches the canvas dimensions.
-    assert(paddedMask.cols == _canvas_info.width);
-    assert(paddedMask.rows == _canvas_info.height);
+    assert(paddedMask.cols == canvas_info_.width);
+    assert(paddedMask.rows == canvas_info_.height);
 
     if (_minimize_blend) {
       // Update blending parameters.
       // updateMinimizeBlend();
       // In the original Python code, the mask is cropped horizontally:
       //   mask[..., positions[1].x - overlap_pad : remapper_1.width + overlap_pad]
-      int x_start = _canvas_info.positions[1].x - _overlap_pad;
+      int x_start = canvas_info_.positions[1].x - _overlap_pad;
       int x_end = _remapper_1.width + _overlap_pad;
       // Validate the crop region.
       assert(x_start >= 0 && x_end <= paddedMask.cols);
       cv::Rect roi(x_start, 0, x_end - x_start, paddedMask.rows);
       return paddedMask(roi);
     }
-    return paddedMask.clone();
+    return paddedMask;
   }
 
   cv::Size partial_size_1;
@@ -553,7 +552,21 @@ class MaskConverter {
     return _overlap_pad;
   }
 
+  constexpr int overlapping_width() const {
+    return _overlapping_width;
+  }
+
+  constexpr int canvas_width() const {
+    return canvas_info_.width;
+  }
+
+  constexpr int canvas_height() const {
+    return canvas_info_.height;
+  }
+
  private:
+  CanvasInfo canvas_info_;
+  int _overlapping_width{0};
   bool _minimize_blend{false};
   int _overlap_pad{0};
 };
@@ -609,7 +622,7 @@ class CudaStitchPano {
       const CudaMat<T>& sampleImage1,
       const CudaMat<T>& sampleImage2,
       StitchingContext<T, T_compute>& stitch_context,
-      MaskConverter& mask_converter,
+      CanvasManager& canvas_manager,
       cudaStream_t stream,
       std::unique_ptr<CudaMat<T>>&& canvas) {
     CudaStatus cuerr;
@@ -617,14 +630,17 @@ class CudaStitchPano {
     assert(canvas);
 
     int zero = 0;
-    // int y1 = mask_converter._y1;
-    // int y2 = mask_converter._y2;
+    // int y1 = canvas_manager._y1;
+    // int y2 = canvas_manager._y2;
 
     auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
     // auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
 
     if (!stitch_context.is_hard_seam()) {
-#if 1
+      //
+      // SOFT SEAM LEFT
+      //
+#if 0
       //
       // Image 1
       //
@@ -643,14 +659,14 @@ class CudaStitchPano {
           /*batchSize=*/stitch_context.batch_size(),
           stitch_context.remap_1_x->width(),
           stitch_context.remap_1_x->height(),
-          /*offsetX=*/mask_converter._x1,
-          /*offsetY=*/mask_converter._y1,
+          /*offsetX=*/canvas_manager._x1,
+          /*offsetY=*/canvas_manager._y1,
           stream);
       // CUDA_RETURN_IF_ERROR(cuerr);
-      // SHOW_IMAGE(canvas);
+      // SHOW_SMALL(canvas);
 #endif
 
-#if 1
+#if 0
       //
       // Now copy the blending portion of remapped image 1 from the canvas onto the blend image
       //
@@ -659,18 +675,18 @@ class CudaStitchPano {
           canvas->data_raw(),
           canvas->width(),
           canvas->height(),
-          /*region_width=*/roi_width(mask_converter.roi_blend_1),
-          /*region_height=*/stitch_context.cudaBlendSoftSeam->height() /*roi_height(mask_converter.roi_blend_1)*/,
+          /*region_width=*/roi_width(canvas_manager.roi_blend_1),
+          /*region_height=*/stitch_context.cudaBlendSoftSeam->height() /*roi_height(canvas_manager.roi_blend_1)*/,
           /*channels=*/3,
           // Batch of masks (optional)
           nullptr,
           0,
           0,
           0,
-          mask_converter.roi_blend_1.x,
-          // mask_converter.roi_blend_1.y,
+          canvas_manager.roi_blend_1.x,
+          // canvas_manager.roi_blend_1.y,
           0 /* we've already applied our Y offset */,
-          mask_converter._remapper_1.xpos,
+          canvas_manager._remapper_1.xpos,
           // y1,
           zero,
           stitch_context.cudaBlendSoftSeam->width(),
@@ -684,6 +700,10 @@ class CudaStitchPano {
       // SHOW_IMAGE(stitch_context.cudaFull1);
 #endif
     } else {
+      //
+      // HARD SEAM LEFT
+      //
+#if 0
       cuerr = batched_remap_kernel_ex_offset_with_dest_map(
           sampleImage1.data(),
           sampleImage1.width(),
@@ -700,16 +720,20 @@ class CudaStitchPano {
           /*batchSize=*/stitch_context.batch_size(),
           stitch_context.remap_1_x->width(),
           stitch_context.remap_1_x->height(),
-          /*offsetX=*/mask_converter._x1,
-          /*offsetY=*/mask_converter._y1,
+          /*offsetX=*/canvas_manager._x1,
+          /*offsetY=*/canvas_manager._y1,
           stream);
-      // SHOW_IMAGE(canvas);
+      SHOW_SMALL(canvas);
+#endif
     }
     //
     // Image 2
     //
     if (!stitch_context.is_hard_seam()) {
-#if 1
+      //
+      // SOFT SEAM RIGHT
+      //
+#if 0
       //
       // Remap image 2 directly onto the canvas (will overwrite the overlappign portion of image 1)
       //
@@ -726,34 +750,34 @@ class CudaStitchPano {
           /*batchSize=*/stitch_context.batch_size(),
           stitch_context.remap_2_x->width(),
           stitch_context.remap_2_x->height(),
-          /*offsetX=*/mask_converter._x2,
-          /*offsetY=*/mask_converter._y2,
+          /*offsetX=*/canvas_manager._x2,
+          /*offsetY=*/canvas_manager._y2,
           stream);
       CUDA_RETURN_IF_ERROR(cuerr);
-      // SHOW_IMAGE(stitch_context.cudaFull1);
+      // SHOW_SMALL(canvas);
 #endif
 
-#if 1
+#if 0
       //
       // Now copy the blending portion of remapped image 2 from the canvas onto the blend image
       //
-      // assert(stitch_context.cudaBlendSoftSeam->height() == roi_height(mask_converter.roi_blend_2));
+      // assert(stitch_context.cudaBlendSoftSeam->height() == roi_height(canvas_manager.roi_blend_2));
       cuerr = simple_make_full_batch<BaseScalar_t<T_compute>, BaseScalar_t<T_compute>, unsigned char>(
           // Image 1 (float image)
           canvas->data_raw(),
           canvas->width(),
           canvas->height(),
-          /*region_width=*/roi_width(mask_converter.roi_blend_2),
-          /*region_height=*/stitch_context.cudaBlendSoftSeam->height() /*roi_height(mask_converter.roi_blend_2)*/,
+          /*region_width=*/roi_width(canvas_manager.roi_blend_2),
+          /*region_height=*/stitch_context.cudaBlendSoftSeam->height() /*roi_height(canvas_manager.roi_blend_2)*/,
           /*channels=*/3,
           // Batch of masks (optional)
           nullptr,
           0,
           0,
           0,
-          /*offsetX=*/mask_converter._x2,
-          /*offsetY=*/mask_converter._y2,
-          mask_converter._remapper_2.xpos,
+          /*offsetX=*/canvas_manager._x2,
+          /*offsetY=*/canvas_manager._y2,
+          canvas_manager._remapper_2.xpos,
           // y2,
           zero,
           stitch_context.cudaBlendSoftSeam->width(),
@@ -767,7 +791,12 @@ class CudaStitchPano {
       // SHOW_IMAGE(stitch_context.cudaFull2);
 #endif
     } else {
-      // Hard seam
+      //
+      // HARD SEAM RIGHT
+      //
+#if 1
+      assert(canvas_manager._x2 + stitch_context.remap_2_x->width() <= canvas->width());
+      assert(canvas_manager._y2 + stitch_context.remap_2_x->height() <= canvas->height());
       cuerr = batched_remap_kernel_ex_offset_with_dest_map(
           sampleImage2.data(),
           sampleImage2.width(),
@@ -784,14 +813,17 @@ class CudaStitchPano {
           /*batchSize=*/stitch_context.batch_size(),
           stitch_context.remap_2_x->width(),
           stitch_context.remap_2_x->height(),
-          /*offsetX=*/mask_converter._x2,
-          /*offsetY=*/mask_converter._y2,
+          /*offsetX=*/canvas_manager._x2,
+          /*offsetY=*/canvas_manager._y2,
           stream);
-      // SHOW_IMAGE(canvas);
+         //SHOW_SMALL(&sampleImage2);
+      SHOW_SMALL(canvas);
+      // SHOW_SMALL(stitch_context.cudaBlendHardSeam);
+#endif
     }
     if (!stitch_context.is_hard_seam()) {
       CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
-#if 1
+#if 0
       //
       // BLEND THE IMAGES (overlapping portions + some padding)
       //
@@ -807,7 +839,7 @@ class CudaStitchPano {
       // SHOW_IMAGE(&cudaBlendedFull);
 #endif
 
-#if 1
+#if 0
       //
       // Copy the blended portion (overlapping portion + some padding) onto
       // the canvas over some of the remapped image 1 and image 2
@@ -823,7 +855,7 @@ class CudaStitchPano {
           canvas->data(),
           canvas->width(),
           canvas->height(),
-          /*offsetX=*/mask_converter._x2 - mask_converter.overlap_padding(),
+          /*offsetX=*/canvas_manager._x2 - canvas_manager.overlap_padding(),
           /*offsetY=*/0,
           /*channels=*/1, // <-- 1 when using stuff like float3
           /*batchSize=*/stitch_context.batch_size(),
@@ -909,6 +941,62 @@ struct ControlMasks {
     return SpatialTiff{.xpos = info.xPosition * info.xResolution, .ypos = info.yPosition * info.yResolution};
   }
 
+  // A structure to hold TIFF information
+  struct TiffInfo {
+    // Resolution information
+    bool validResolution = false;
+    float xResolution = 0.0f;
+    float yResolution = 0.0f;
+    // Resolution unit (e.g., RESUNIT_INCH, RESUNIT_CENTIMETER)
+    uint16_t resolutionUnit = 0;
+
+    // GeoTIFF Tiepoints (each group of 6 values maps image to model coordinates)
+    bool hasGeoTiePoints = false;
+    float xPosition{0};
+    float yPosition{0};
+  };
+
+  // Function that takes a file name and returns the TIFF information.
+  static TiffInfo getTiffInfo(const std::string& filename) {
+    TiffInfo info;
+    TIFF* tif = TIFFOpen(filename.c_str(), "r");
+    if (!tif) {
+      std::cerr << "Error: Could not open file " << filename << std::endl;
+      return info;
+    }
+
+    // --- Get Resolution Information ---
+    float xres = 0.0f, yres = 0.0f;
+    if (TIFFGetField(tif, TIFFTAG_XRESOLUTION, &xres) && TIFFGetField(tif, TIFFTAG_YRESOLUTION, &yres)) {
+      info.xResolution = xres;
+      info.yResolution = yres;
+      info.validResolution = true;
+    }
+
+    uint16_t resUnit = 0;
+    if (TIFFGetField(tif, TIFFTAG_RESOLUTIONUNIT, &resUnit)) {
+      info.resolutionUnit = resUnit;
+    }
+
+    float xpos = 0.0f, ypos = 0.0f;
+    if (TIFFGetField(tif, TIFFTAG_XPOSITION, &xpos)) {
+      std::cout << "X Position: " << xpos << std::endl;
+      info.xPosition = xpos;
+    } else {
+      std::cout << "No X Position information found." << std::endl;
+    }
+
+    if (TIFFGetField(tif, TIFFTAG_YPOSITION, &ypos)) {
+      std::cout << "Y Position: " << ypos << std::endl;
+      info.yPosition = ypos;
+    } else {
+      std::cout << "No Y Position information found." << std::endl;
+    }
+
+    TIFFClose(tif);
+    return info;
+  }
+
  public:
   cv::Mat img1_col;
   cv::Mat img1_row;
@@ -924,6 +1012,10 @@ int main(int argc, char** argv) {
     std::cerr << "Usage: " << argv[0] << " <game-id>" << std::endl;
     return -1;
   }
+
+  cudaSetDevice(0);
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
 
   RenderSet display;
 
@@ -952,17 +1044,13 @@ int main(int argc, char** argv) {
   control_masks.load(game_dir);
 
   // Compute canvas size
-  const size_t canvas_width = std::max(
+  const int canvas_width = std::max(
       control_masks.positions[0].xpos + control_masks.img1_col.cols,
       control_masks.positions[1].xpos + control_masks.img2_col.cols);
-  const size_t canvas_height = std::max(
+  const int canvas_height = std::max(
       control_masks.positions[0].ypos + control_masks.img1_col.rows,
       control_masks.positions[1].ypos + control_masks.img2_col.rows);
   std::cout << "Canvas size: " << canvas_width << " x " << canvas_height << std::endl;
-
-  cudaSetDevice(0);
-  cudaStream_t stream;
-  cudaStreamCreate(&stream);
 
 // Configurable parameter: number of pyramid levels.
 #ifdef __aarch64__
@@ -995,38 +1083,40 @@ int main(int argc, char** argv) {
 #define CV_T_COMPUTE3 CV_16FC3
 #endif
 
-  constexpr int kBatchSize = 1;
-  // constexpr int kBatchSize = 2;
+  // constexpr int kBatchSize = 1;
+  constexpr int kBatchSize = 2;
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
 
   //
-  // MaskConverter
+  // CanvasManager
   //
-  MaskConverter mask_converter(/*minimize_blend=*/!stitch_context.is_hard_seam());
-  mask_converter._canvas_info.width = canvas_width;
-  mask_converter._canvas_info.height = canvas_height;
-  mask_converter._canvas_info.positions.emplace_back(
-      cv::Point(control_masks.positions[0].xpos, control_masks.positions[0].ypos));
-  mask_converter._canvas_info.positions.emplace_back(
-      cv::Point(control_masks.positions[1].xpos, control_masks.positions[1].ypos));
-  mask_converter._remapper_1.width = control_masks.img1_col.cols;
-  mask_converter._remapper_1.height = control_masks.img1_col.rows;
-  mask_converter._remapper_2.width = control_masks.img2_col.cols;
-  mask_converter._remapper_2.height = control_masks.img2_col.rows;
+  CanvasManager canvas_manager(
+      CanvasInfo{
+          .width = canvas_width,
+          .height = canvas_height,
+          .positions =
+              {cv::Point(control_masks.positions[0].xpos, control_masks.positions[0].ypos),
+               cv::Point(control_masks.positions[1].xpos, control_masks.positions[1].ypos)}},
+      /*minimize_blend=*/!stitch_context.is_hard_seam());
+  canvas_manager._remapper_1.width = control_masks.img1_col.cols;
+  canvas_manager._remapper_1.height = control_masks.img1_col.rows;
+  canvas_manager._remapper_2.width = control_masks.img2_col.cols;
+  canvas_manager._remapper_2.height = control_masks.img2_col.rows;
 
-  mask_converter.updateMinimizeBlend(control_masks.img1_col.size(), control_masks.img2_col.size());
+  canvas_manager.updateMinimizeBlend(control_masks.img1_col.size(), control_masks.img2_col.size());
 
-  cv::Mat blend_seam = mask_converter.convertMaskMat(control_masks.whole_seam_mask_image);
+  cv::Mat blend_seam = canvas_manager.convertMaskMat(control_masks.whole_seam_mask_image);
   assert(!blend_seam.empty());
   blend_seam = blend_seam.clone();
 
   auto canvas = std::make_unique<CudaMat<T>>(
-      stitch_context.batch_size(), control_masks.whole_seam_mask_image.cols, control_masks.whole_seam_mask_image.rows);
+      stitch_context.batch_size(), canvas_manager.canvas_width(), canvas_manager.canvas_height());
 
   assert(control_masks.img1_col.type() == CV_16U);
   stitch_context.remap_1_x = std::make_unique<CudaMat<uint16_t>>(control_masks.img1_col);
   stitch_context.remap_1_y = std::make_unique<CudaMat<uint16_t>>(control_masks.img1_row);
+
   stitch_context.remap_2_x = std::make_unique<CudaMat<uint16_t>>(control_masks.img2_col);
   stitch_context.remap_2_y = std::make_unique<CudaMat<uint16_t>>(control_masks.img2_row);
 
@@ -1044,33 +1134,42 @@ int main(int argc, char** argv) {
         numLevels,
         /*batch_size=*/stitch_context.batch_size());
   } else {
-    assert(control_masks.whole_seam_mask_image.type() == CV_8U);
-    stitch_context.cudaBlendHardSeam = std::make_unique<CudaMat<unsigned char>>(control_masks.whole_seam_mask_image);
+    assert(blend_seam.type() == CV_8U);
+    stitch_context.cudaBlendHardSeam = std::make_unique<CudaMat<unsigned char>>(blend_seam);
   }
 
   //
-  // The actual incoming imaged
+  // The actual incoming images
   //
+
+  // matchSeamImages(
+  //     sample_img_left,
+  //     sample_img_left,
+  //     control_masks.whole_seam_mask_image,
+  //     /*N=*/10,
+  //     cv::Point(canvas_manager.canvas_info_.positions[0].x, canvas_manager.canvas_info_.positions[0].y),
+  //     cv::Point(canvas_manager.canvas_info_.positions[1].x, canvas_manager.canvas_info_.positions[1].y));
+
   CudaMat<T> sampleImage1(as_batch(sample_img_left, kBatchSize));
   CudaMat<T> sampleImage2(as_batch(sample_img_right, kBatchSize));
 
   auto blendedCanvasResult = CudaStitchPano<T, T_compute>::process(
-      sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::move(canvas));
+      sampleImage1, sampleImage2, stitch_context, canvas_manager, stream, std::move(canvas));
   if (!blendedCanvasResult.ok()) {
     std::cerr << blendedCanvasResult.status().message() << std::endl;
     return blendedCanvasResult.status().code();
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
-  SHOW_SMALL(blendedCanvas);
+  // SHOW_SMALL(blendedCanvas);
 
-  // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
+  // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
   // SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 1 /* perf test */
+#if 0 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
@@ -1078,7 +1177,7 @@ int main(int argc, char** argv) {
   size_t frame_count = 100;
   for (size_t i = 0; i < frame_count; ++i) {
     blendedCanvas = CudaStitchPano<T, T_compute>::process(
-                        sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::move(blendedCanvas))
+                        sampleImage1, sampleImage2, stitch_context, canvas_manager, stream, std::move(blendedCanvas))
                         .ConsumeValueOrDie();
     cudaStreamSynchronize(stream);
   }
