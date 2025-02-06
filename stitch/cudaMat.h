@@ -1,29 +1,81 @@
 #pragma once
 
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include "imageFormat.h" // Assumed to define the jetson‑utils imageFormat enum (e.g. IMAGE_BGR8, etc.)
 
 /**
- * @file cvCudaConversions.h
+ * @file cudaMat.h
  * @brief Utilities for converting between OpenCV cv::Mat, jetson‑utils image formats,
- *        and CUDA pixel types.
+ *        and CUDA pixel types, plus a helper class for managing device memory.
  *
  * This header provides:
  *  - Functions to convert between cv::Mat and jetson‑utils imageFormat.
  *  - Functions to convert between cv::Mat and custom CUDA pixel types.
- *  - Template specializations to map CUDA pixel type enum values to actual CUDA vector types.
+ *  - Template specializations to map CUDA pixel type enum values to actual CUDA types.
  *  - A template class CudaMat to allocate and manage device memory for one or more images.
+ *  - A helper function to return the element size (in bytes) of a given CUDA pixel type.
  */
+
+/*----------------------------------------------------------------------------
+  Define additional types for half (float16) and bfloat16 vector types.
+  CUDA provides __half and __half4 in cuda_fp16.h, but not __half3.
+  Similarly, for bfloat16 we use __nv_bfloat16 and define our own 3- and 4-element types.
+-----------------------------------------------------------------------------*/
+
+#ifndef HALF3_DEFINED
+#define HALF3_DEFINED
+/**
+ * @brief 3-element vector of __half values.
+ */
+struct half3 {
+  __half x, y, z;
+};
+#endif
+
+#ifndef HALF4_DEFINED
+#define HALF4_DEFINED
+/**
+ * @brief 3-element vector of __half values.
+ */
+struct half4 {
+  __half x, y, z, w;
+};
+#endif
+
+#ifndef BF16_3_DEFINED
+#define BF16_3_DEFINED
+/**
+ * @brief 3-element vector of __nv_bfloat16 values.
+ */
+struct bfloat16_3 {
+  __nv_bfloat16 x, y, z;
+};
+#endif
+
+#ifndef BF16_4_DEFINED
+#define BF16_4_DEFINED
+/**
+ * @brief 4-element vector of __nv_bfloat16 values.
+ */
+struct bfloat16_4 {
+  __nv_bfloat16 x, y, z, w;
+};
+#endif
+
+/*----------------------------------------------------------------------------
+  Non‑template function declarations (implemented in cudaMat.cpp)
+-----------------------------------------------------------------------------*/
 
 /**
  * @brief Converts an OpenCV cv::Mat to the corresponding jetson‑utils imageFormat.
  *
- * This function inspects the cv::Mat’s depth and number of channels and returns the matching
- * image format. For example, an 8-bit 3-channel image (CV_8UC3) is mapped to IMAGE_BGR8.
+ * Inspects the cv::Mat’s depth and channel count to determine the format.
  *
- * @param mat The input OpenCV image.
+ * @param mat The input cv::Mat.
  * @return The corresponding jetson‑utils imageFormat.
  */
 imageFormat cvMatToImageFormat(const cv::Mat& mat);
@@ -31,22 +83,21 @@ imageFormat cvMatToImageFormat(const cv::Mat& mat);
 /**
  * @brief Converts a jetson‑utils imageFormat to an OpenCV type constant.
  *
- * Given an image format (e.g. IMAGE_BGR8), this function returns the matching OpenCV type
- * (e.g. CV_8UC3). Returns -1 if the format is unknown.
+ * Maps formats (e.g. IMAGE_BGR8) to their corresponding OpenCV type (e.g. CV_8UC3).
  *
  * @param fmt The jetson‑utils image format.
- * @return The corresponding OpenCV type constant.
+ * @return The corresponding OpenCV type constant, or -1 if unknown.
  */
 int imageFormatToCvType(imageFormat fmt);
 
 /**
  * @brief Enumeration of CUDA pixel types.
  *
- * This enum defines a set of common CUDA pixel types that correspond to various image
- * data formats.
+ * This enum defines common CUDA pixel types, including support for 8-bit, 32-bit,
+ * 16-bit float (half) and bfloat16 types.
  */
 enum CudaPixelType {
-  CUDA_PIXEL_UNKNOWN = -1, ///< Unknown or unsupported pixel type.
+  CUDA_PIXEL_UNKNOWN = -1, ///< Unknown pixel type.
   CUDA_PIXEL_UCHAR1, ///< 8-bit, 1 channel (unsigned char).
   CUDA_PIXEL_UCHAR3, ///< 8-bit, 3 channels (uchar3).
   CUDA_PIXEL_UCHAR4, ///< 8-bit, 4 channels (uchar4).
@@ -55,16 +106,24 @@ enum CudaPixelType {
   CUDA_PIXEL_INT4, ///< 32-bit int, 4 channels (int4).
   CUDA_PIXEL_FLOAT1, ///< 32-bit float, 1 channel (float).
   CUDA_PIXEL_FLOAT3, ///< 32-bit float, 3 channels (float3).
-  CUDA_PIXEL_FLOAT4 ///< 32-bit float, 4 channels (float4).
+  CUDA_PIXEL_FLOAT4, ///< 32-bit float, 4 channels (float4).
+  CUDA_PIXEL_HALF1, ///< 16-bit float (half), 1 channel (__half).
+  CUDA_PIXEL_HALF3, ///< 16-bit float (half), 3 channels (half3).
+  CUDA_PIXEL_HALF4, ///< 16-bit float (half), 4 channels (__half4).
+  CUDA_PIXEL_BF16_1, ///< 16-bit bfloat, 1 channel (__nv_bfloat16).
+  CUDA_PIXEL_BF16_3, ///< 16-bit bfloat, 3 channels (bfloat16_3).
+  CUDA_PIXEL_BF16_4 ///< 16-bit bfloat, 4 channels (bfloat16_4).
 };
 
 /**
  * @brief Converts an OpenCV cv::Mat to a CudaPixelType.
  *
- * This function inspects the depth and number of channels of the input cv::Mat and returns the
- * corresponding CUDA pixel type. For example, CV_8UC3 is mapped to CUDA_PIXEL_UCHAR3.
+ * Determines the CUDA pixel type based on the cv::Mat’s depth and channel count.
+ * For example, CV_8UC3 is mapped to CUDA_PIXEL_UCHAR3. Additionally, if the cv::Mat
+ * has a depth corresponding to 16-bit floating point (CV_16F) then it is mapped to
+ * a half type; similar for bfloat16 if applicable.
  *
- * @param mat The input OpenCV image.
+ * @param mat The input cv::Mat.
  * @return The corresponding CudaPixelType.
  */
 CudaPixelType cvMatToCudaPixelType(const cv::Mat& mat);
@@ -72,7 +131,7 @@ CudaPixelType cvMatToCudaPixelType(const cv::Mat& mat);
 /**
  * @brief Converts a CudaPixelType to an OpenCV type constant.
  *
- * This function returns the OpenCV type (e.g. CV_8UC3) that corresponds to the given CUDA pixel type.
+ * Maps a CUDA pixel type (e.g. CUDA_PIXEL_UCHAR3) to its corresponding OpenCV type (e.g. CV_8UC3).
  *
  * @param fmt The CUDA pixel type.
  * @return The corresponding OpenCV type constant, or -1 if unknown.
@@ -80,79 +139,117 @@ CudaPixelType cvMatToCudaPixelType(const cv::Mat& mat);
 int cudaPixelTypeToCvType(CudaPixelType fmt);
 
 /**
+ * @brief Returns the element size in bytes for a given CUDA pixel type.
+ *
+ * For example, CUDA_PIXEL_UCHAR3 returns 3 bytes, CUDA_PIXEL_HALF4 returns 8 bytes, etc.
+ *
+ * @param fmt The CUDA pixel type.
+ * @return The size in bytes of one element, or 0 if unknown.
+ */
+size_t cudaPixelElementSize(CudaPixelType fmt);
+
+/*----------------------------------------------------------------------------
+  Template Specializations: Mapping from a CudaPixelType enumerator to the corresponding CUDA type.
+-----------------------------------------------------------------------------*/
+
+/**
  * @brief Template mapping from a CudaPixelType enumeration to the corresponding CUDA type.
  *
- * Specializations of this template define a nested type alias `type` corresponding to the actual
- * CUDA vector or scalar type.
+ * Specializations define a nested alias `type` corresponding to the actual CUDA vector or scalar type.
  *
- * @tparam T The enumerator from the CudaPixelType enum.
+ * @tparam T The enumerator from CudaPixelType.
  */
 template <CudaPixelType T>
 struct CudaPixelTypeToCudaType; // Primary template declaration (no definition).
 
-// --- Template Specializations --- //
+// Specializations:
 
-/** Specialization: 8-bit, 1-channel. */
 template <>
 struct CudaPixelTypeToCudaType<CUDA_PIXEL_UCHAR1> {
   using type = unsigned char;
 };
 
-/** Specialization: 8-bit, 3-channel. */
 template <>
 struct CudaPixelTypeToCudaType<CUDA_PIXEL_UCHAR3> {
   using type = uchar3;
 };
 
-/** Specialization: 8-bit, 4-channel. */
 template <>
 struct CudaPixelTypeToCudaType<CUDA_PIXEL_UCHAR4> {
   using type = uchar4;
 };
 
-/** Specialization: 32-bit int, 1-channel. */
 template <>
 struct CudaPixelTypeToCudaType<CUDA_PIXEL_INT1> {
   using type = int;
 };
 
-/** Specialization: 32-bit int, 3-channel. */
 template <>
 struct CudaPixelTypeToCudaType<CUDA_PIXEL_INT3> {
   using type = int3;
 };
 
-/** Specialization: 32-bit int, 4-channel. */
 template <>
 struct CudaPixelTypeToCudaType<CUDA_PIXEL_INT4> {
   using type = int4;
 };
 
-/** Specialization: 32-bit float, 1-channel. */
 template <>
 struct CudaPixelTypeToCudaType<CUDA_PIXEL_FLOAT1> {
   using type = float;
 };
 
-/** Specialization: 32-bit float, 3-channel. */
 template <>
 struct CudaPixelTypeToCudaType<CUDA_PIXEL_FLOAT3> {
   using type = float3;
 };
 
-/** Specialization: 32-bit float, 4-channel. */
 template <>
 struct CudaPixelTypeToCudaType<CUDA_PIXEL_FLOAT4> {
   using type = float4;
 };
 
+template <>
+struct CudaPixelTypeToCudaType<CUDA_PIXEL_HALF1> {
+  using type = __half;
+};
+
+template <>
+struct CudaPixelTypeToCudaType<CUDA_PIXEL_HALF3> {
+  using type = half3;
+};
+
+template <>
+struct CudaPixelTypeToCudaType<CUDA_PIXEL_HALF4> {
+  using type = half4;
+};
+
+template <>
+struct CudaPixelTypeToCudaType<CUDA_PIXEL_BF16_1> {
+  using type = __nv_bfloat16;
+};
+
+template <>
+struct CudaPixelTypeToCudaType<CUDA_PIXEL_BF16_3> {
+  using type = bfloat16_3;
+};
+
+template <>
+struct CudaPixelTypeToCudaType<CUDA_PIXEL_BF16_4> {
+  using type = bfloat16_4;
+};
+
+/*----------------------------------------------------------------------------
+  Template Class: CudaMat
+  ----------------------------------------------------------------------------*/
+
 /**
  * @brief Templated class to manage CUDA device memory for one or more images.
  *
- * The CudaMat class allocates device memory for an image (or a batch of images) and provides
- * functionality to download the device memory back to a cv::Mat.
+ * CudaMat allocates device memory for an image (or batch of images) and provides functionality
+ * to download the device memory back to a cv::Mat.
  *
- * @tparam T The type stored in device memory (default is float3).
+ * @tparam T The CUDA pixel type stored in device memory (default is float3).
  */
 template <typename T = float3>
 class CudaMat {
@@ -174,7 +271,7 @@ class CudaMat {
   /**
    * @brief Constructs a CudaMat from a batch of cv::Mat images.
    *
-   * Allocates device memory to hold all images in the batch and (optionally) copies the data.
+   * Allocates device memory for all images in the batch and (optionally) copies the data.
    *
    * @param mat_batch A vector of cv::Mat images.
    * @param copy If true, the data is copied to device memory.
@@ -212,11 +309,11 @@ class CudaMat {
   constexpr int batch_size() const;
 
  private:
-  T* d_data; ///< Pointer to the device memory.
+  T* d_data; ///< Pointer to device memory.
   size_t size; ///< Total size (in bytes) allocated on the device.
-  int rows_, cols_, type_; ///< Dimensions and OpenCV type of the image.
+  int rows_, cols_, type_; ///< Image dimensions and OpenCV type.
   int batch_size_; ///< Number of images in the batch.
 };
 
-// Include the inline implementations of the template methods.
+// Include inline implementations for template methods.
 #include "cudaMat.inl"

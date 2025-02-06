@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cudaMat.h"
+
 #include <cuda_runtime.h>
 #include <cassert>
 
@@ -10,7 +12,7 @@
  *
  * @tparam T The CUDA pixel type.
  * @param mat The input cv::Mat.
- * @param copy If true, the data is copied to device memory.
+ * @param copy If true, copies the data to device memory.
  */
 template <typename T>
 CudaMat<T>::CudaMat(const cv::Mat& mat, bool copy)
