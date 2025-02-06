@@ -65,6 +65,7 @@ int imageFormatToCvType(imageFormat fmt) {
  * Determines the CUDA pixel type based on the cv::Mat’s depth and channel count.
  * For example, CV_8UC3 is mapped to CUDA_PIXEL_UCHAR3.
  * For half-precision data (CV_16F) the mapping is to CUDA_PIXEL_HALF*.
+ * For 16-bit unsigned images (CV_16U) the mapping is to CUDA_PIXEL_USHORT*.
  *
  * @param mat The input cv::Mat.
  * @return The corresponding CudaPixelType.
@@ -73,7 +74,7 @@ CudaPixelType cvMatToCudaPixelType(const cv::Mat& mat) {
   int depth = mat.depth();
   int channels = mat.channels();
 
-  // Map 8-bit unsigned
+  // Map 8-bit unsigned.
   if (depth == CV_8U) {
     if (channels == 1)
       return CUDA_PIXEL_UCHAR1;
@@ -81,6 +82,15 @@ CudaPixelType cvMatToCudaPixelType(const cv::Mat& mat) {
       return CUDA_PIXEL_UCHAR3;
     else if (channels == 4)
       return CUDA_PIXEL_UCHAR4;
+  }
+  // Map 16-bit unsigned.
+  else if (depth == CV_16U) {
+    if (channels == 1)
+      return CUDA_PIXEL_USHORT1;
+    else if (channels == 3)
+      return CUDA_PIXEL_USHORT3;
+    else if (channels == 4)
+      return CUDA_PIXEL_USHORT4;
   }
   // Map 32-bit signed int.
   else if (depth == CV_32S) {
@@ -100,7 +110,7 @@ CudaPixelType cvMatToCudaPixelType(const cv::Mat& mat) {
     else if (channels == 4)
       return CUDA_PIXEL_FLOAT4;
   }
-  // Map 16-bit float (half precision). OpenCV uses CV_16F if available.
+  // Map 16-bit float (half precision). OpenCV uses CV_16F.
   else if (depth == CV_16F) {
     if (channels == 1)
       return CUDA_PIXEL_HALF1;
@@ -109,7 +119,7 @@ CudaPixelType cvMatToCudaPixelType(const cv::Mat& mat) {
     else if (channels == 4)
       return CUDA_PIXEL_HALF4;
   }
-  // (Optionally, you might add a mapping for bfloat16 if you encode it in a cv::Mat.)
+  // (Mapping for bfloat16 could be added if desired.)
   return CUDA_PIXEL_UNKNOWN;
 }
 
@@ -129,6 +139,12 @@ int cudaPixelTypeToCvType(CudaPixelType fmt) {
       return CV_8UC3;
     case CUDA_PIXEL_UCHAR4:
       return CV_8UC4;
+    case CUDA_PIXEL_USHORT1:
+      return CV_16UC1;
+    case CUDA_PIXEL_USHORT3:
+      return CV_16UC3;
+    case CUDA_PIXEL_USHORT4:
+      return CV_16UC4;
     case CUDA_PIXEL_INT1:
       return CV_32SC1;
     case CUDA_PIXEL_INT3:
@@ -175,6 +191,12 @@ size_t cudaPixelElementSize(CudaPixelType fmt) {
       return 3;
     case CUDA_PIXEL_UCHAR4:
       return 4;
+    case CUDA_PIXEL_USHORT1:
+      return 2;
+    case CUDA_PIXEL_USHORT3:
+      return 6;
+    case CUDA_PIXEL_USHORT4:
+      return 8;
     case CUDA_PIXEL_INT1:
       return 4;
     case CUDA_PIXEL_INT3:

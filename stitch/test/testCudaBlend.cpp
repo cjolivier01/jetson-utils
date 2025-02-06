@@ -823,13 +823,13 @@ int main(int argc, char** argv) {
   //  blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
-  // SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 1 /* perf test */
+#if 0 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();

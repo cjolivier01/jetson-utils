@@ -1,9 +1,51 @@
 #pragma once
 
-#include "cudaMat.h"
-
 #include <cuda_runtime.h>
 #include <cassert>
+
+// Helper: Returns the number of channels expected for a given CUDA pixel type.
+static inline int cudaPixelTypeChannels(CudaPixelType fmt) {
+  switch (fmt) {
+    case CUDA_PIXEL_UCHAR1:
+      return 1;
+    case CUDA_PIXEL_UCHAR3:
+      return 3;
+    case CUDA_PIXEL_UCHAR4:
+      return 4;
+    case CUDA_PIXEL_USHORT1:
+      return 1;
+    case CUDA_PIXEL_USHORT3:
+      return 3;
+    case CUDA_PIXEL_USHORT4:
+      return 4;
+    case CUDA_PIXEL_INT1:
+      return 1;
+    case CUDA_PIXEL_INT3:
+      return 3;
+    case CUDA_PIXEL_INT4:
+      return 4;
+    case CUDA_PIXEL_FLOAT1:
+      return 1;
+    case CUDA_PIXEL_FLOAT3:
+      return 3;
+    case CUDA_PIXEL_FLOAT4:
+      return 4;
+    case CUDA_PIXEL_HALF1:
+      return 1;
+    case CUDA_PIXEL_HALF3:
+      return 3;
+    case CUDA_PIXEL_HALF4:
+      return 4;
+    case CUDA_PIXEL_BF16_1:
+      return 1;
+    case CUDA_PIXEL_BF16_3:
+      return 3;
+    case CUDA_PIXEL_BF16_4:
+      return 4;
+    default:
+      return 0;
+  }
+}
 
 /**
  * @brief Constructs a CudaMat from a single cv::Mat.
@@ -15,9 +57,13 @@
  * @param copy If true, copies the data to device memory.
  */
 template <typename T>
-CudaMat<T>::CudaMat(const cv::Mat& mat, bool copy)
-    : rows_(mat.rows), cols_(mat.cols), type_(mat.type()), batch_size_(1) {
-  size = mat.total() * mat.elemSize();
+CudaMat<T>::CudaMat(const cv::Mat& mat, bool copy) : rows_(mat.rows), cols_(mat.cols), batch_size_(1) {
+  // Convert the cv::Mat type (an int) to a CudaPixelType.
+  type_ = cvMatToCudaPixelType(mat);
+  size_t expectedElemSize = cudaPixelElementSize(type_);
+  // Verify that the cv::Mat's element size matches what we expect.
+  assert(mat.elemSize() == expectedElemSize);
+  size = mat.total() * expectedElemSize;
   cudaMalloc(&d_data, size);
   assert(mat.isContinuous());
   if (copy) {
@@ -41,18 +87,47 @@ CudaMat<T>::CudaMat(const std::vector<cv::Mat>& mat_batch, bool copy)
   const cv::Mat& first = mat_batch.at(0);
   rows_ = first.rows;
   cols_ = first.cols;
-  type_ = first.type();
-  size_t size_each = first.total() * first.elemSize();
+  type_ = cvMatToCudaPixelType(first);
+  size_t expectedElemSize = cudaPixelElementSize(type_);
+  assert(first.elemSize() == expectedElemSize);
+  size_t size_each = first.total() * expectedElemSize;
   size = size_each * batch_size_;
   cudaMalloc(&d_data, size);
   if (copy) {
     uint8_t* p = reinterpret_cast<uint8_t*>(d_data);
     for (const cv::Mat& mat : mat_batch) {
       assert(mat.isContinuous());
+      // It is assumed that each mat in the batch has the same dimensions and type.
+      assert(mat.rows == rows_ && mat.cols == cols_);
+      assert(mat.elemSize() == expectedElemSize);
       cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
       p += size_each;
     }
   }
+}
+
+/**
+ * @brief Constructs a CudaMat with explicit dimensions and pixel type.
+ *
+ * Allocates device memory for a batch of images with dimensions B×W×H.
+ * The provided channel count C must match the expected channel count for the given pixel type.
+ *
+ * @tparam T The CUDA pixel type.
+ * @param B Batch size.
+ * @param W Image width.
+ * @param H Image height.
+ * @param C Number of channels.
+ * @param type The CUDA pixel type.
+ */
+template <typename T>
+CudaMat<T>::CudaMat(int B, int W, int H, int C, CudaPixelType type) : batch_size_(B), rows_(H), cols_(W), type_(type) {
+  int expectedChannels = cudaPixelTypeChannels(type_);
+  assert(expectedChannels == C);
+  size_t elemSize = cudaPixelElementSize(type_);
+  // Ensure that the template type T matches the expected element size.
+  assert(sizeof(T) == elemSize);
+  size = static_cast<size_t>(B * W * H) * elemSize;
+  cudaMalloc(&d_data, size);
 }
 
 /**
@@ -81,8 +156,11 @@ CudaMat<T>::~CudaMat() {
 template <typename T>
 cv::Mat CudaMat<T>::download(int batch_item) const {
   assert(batch_item >= 0 && batch_item < batch_size_);
-  cv::Mat mat(rows_, cols_, type_);
-  size_t size_each = mat.total() * mat.elemSize();
+  // Convert our stored CudaPixelType to an OpenCV type.
+  int cvType = cudaPixelTypeToCvType(type_);
+  cv::Mat mat(rows_, cols_, cvType);
+  size_t elemSize = cudaPixelElementSize(type_);
+  size_t size_each = static_cast<size_t>(rows_ * cols_) * elemSize;
   const uint8_t* src_ptr = reinterpret_cast<const uint8_t*>(d_data) + batch_item * size_each;
   cudaMemcpy(mat.data, src_ptr, size_each, cudaMemcpyDeviceToHost);
   return mat;
@@ -133,14 +211,16 @@ constexpr int CudaMat<T>::height() const {
 }
 
 /**
- * @brief Returns the OpenCV type of the image.
+ * @brief Returns the OpenCV type corresponding to this CudaMat.
+ *
+ * Uses cudaPixelTypeToCvType() to convert the stored CudaPixelType.
  *
  * @tparam T The CUDA pixel type.
  * @return OpenCV type constant.
  */
 template <typename T>
 constexpr int CudaMat<T>::type() const {
-  return type_;
+  return cudaPixelTypeToCvType(type_);
 }
 
 /**
