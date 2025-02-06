@@ -1,12 +1,15 @@
-#include <opencv2/opencv.hpp>
-
 #include "cudaBlend.h"
 #include "cudaMakeFull.h"
 #include "cudaRemap.h"
+#include "cudaMat.h"
 #include "cudaStatus.h"
 #include "glDisplay.h"
 #include "imageFormat.h"
+#include "imageFormat.h" // Assumed to define the jetson‑utils imageFormat enum
 #include "videoOutput.h"
+
+#include <cuda_runtime.h> // for CUDA vector types
+#include <opencv2/opencv.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -130,88 +133,6 @@ TiffInfo getTiffInfo(const std::string& filename) {
 }
 
 namespace {
-
-template <typename T = float3>
-class CudaMat {
- private:
-  T* d_data{nullptr};
-  size_t size; // total size (in bytes) allocated on the device
-  int rows_, cols_, type_;
-  int batch_size_{1};
-
- public:
-  // Delete copy and move constructors
-  CudaMat(const CudaMat&) = delete;
-  CudaMat(CudaMat&&) = delete;
-
-  // Single image constructor
-  CudaMat(const cv::Mat& mat, bool copy = true) : rows_(mat.rows), cols_(mat.cols), type_(mat.type()) {
-    size = mat.total() * mat.elemSize();
-    cudaMalloc(&d_data, size);
-    assert(mat.isContinuous());
-    if (copy) {
-      cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
-    }
-  }
-
-  // Batch of images constructor
-  CudaMat(const std::vector<cv::Mat>& mat_batch, bool copy = true) : batch_size_(static_cast<int>(mat_batch.size())) {
-    assert(batch_size_ > 0);
-    const cv::Mat& first = mat_batch.at(0);
-    rows_ = first.rows;
-    cols_ = first.cols;
-    type_ = first.type();
-    const size_t size_each = first.total() * first.elemSize();
-    size = size_each * batch_size_;
-    cudaMalloc(&d_data, size);
-    if (copy) {
-      uint8_t* p = reinterpret_cast<uint8_t*>(d_data);
-      for (const cv::Mat& mat : mat_batch) {
-        assert(mat.isContinuous());
-        cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
-        p += size_each;
-      }
-    }
-  }
-
-  ~CudaMat() {
-    if (d_data) {
-      cudaFree(d_data);
-    }
-  }
-
-  // Download the image corresponding to the given batch index
-  cv::Mat download(int batch_item = 0) const {
-    assert(batch_item >= 0 && batch_item < batch_size_);
-    cv::Mat mat(rows_, cols_, type_);
-    // Calculate the number of bytes in one image
-    size_t size_each = mat.total() * mat.elemSize();
-    // Compute the pointer offset for the selected batch item
-    const uint8_t* src_ptr = reinterpret_cast<const uint8_t*>(d_data) + batch_item * size_each;
-    cudaMemcpy(mat.data, src_ptr, size_each, cudaMemcpyDeviceToHost);
-    return mat;
-  }
-
-  // Accessor functions
-  T* data() {
-    return d_data;
-  }
-  const T* data() const {
-    return d_data;
-  }
-  constexpr int width() const {
-    return cols_;
-  }
-  constexpr int height() const {
-    return rows_;
-  }
-  constexpr int type() const {
-    return type_;
-  }
-  constexpr int batch_size() const {
-    return batch_size_;
-  }
-};
 
 // imageFormat get_image_format(const int cv_type) {
 //   switch (cv_type) {
