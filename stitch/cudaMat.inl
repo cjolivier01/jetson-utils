@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 #include <cassert>
+#include "cudaMat.h"
 
 // Helper: Returns the number of channels expected for a given CUDA pixel type.
 static inline int cudaPixelTypeChannels(CudaPixelType fmt) {
