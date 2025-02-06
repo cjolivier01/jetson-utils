@@ -600,7 +600,7 @@ class CudaStitchPano {
         canvas->height(),
         /*offsetX=*/mask_converter._x2 - mask_converter._overlap_pad,
         /*offsetY=*/0,
-        /*channels=*/1,
+        /*channels=*/1,  // <-- 1 when using stuff like float3
         /*batchSize=*/stitch_context.batch_size(),
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
