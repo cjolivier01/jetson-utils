@@ -445,6 +445,7 @@ class CudaStitchPano {
 
     assert(canvas);
 
+    int zero = 0;
     int y1 = mask_converter._y1;
     int y2 = mask_converter._y2;
 
@@ -473,7 +474,7 @@ class CudaStitchPano {
         /*offsetX=*/mask_converter._x1,
         /*offsetY=*/mask_converter._y1,
         stream);
-    CUDA_RETURN_IF_ERROR(cuerr);
+    // CUDA_RETURN_IF_ERROR(cuerr);
     // SHOW_IMAGE(canvas);
 #endif
 
@@ -487,7 +488,7 @@ class CudaStitchPano {
         canvas->width(),
         canvas->height(),
         /*region_width=*/roi_width(mask_converter.roi_blend_1),
-        /*region_height=*/roi_height(mask_converter.roi_blend_1),
+        /*region_height=*/stitch_context.cudaBlendSeam->height() /*roi_height(mask_converter.roi_blend_1)*/,
         /*channels=*/3,
         // Batch of masks (optional)
         nullptr,
@@ -495,9 +496,11 @@ class CudaStitchPano {
         0,
         0,
         mask_converter.roi_blend_1.x,
-        mask_converter.roi_blend_1.y,
+        // mask_converter.roi_blend_1.y,
+        0 /* we've already applied our Y offset */,
         mask_converter._remapper_1.xpos,
-        y1,
+        // y1,
+        zero,
         stitch_context.cudaBlendSeam->width(),
         stitch_context.cudaBlendSeam->height(),
         /*adjust_origin=*/false,
@@ -508,7 +511,9 @@ class CudaStitchPano {
     CUDA_RETURN_IF_ERROR(cuerr);
     // SHOW_IMAGE(stitch_context.cudaFull1);
 #endif
-
+    //
+    // Image 2
+    //
 #if 1
     //
     // Remap image 2 directly onto the canvas (will overwrite the overlappign portion of image 1)
@@ -537,13 +542,14 @@ class CudaStitchPano {
     //
     // Now copy the blending portion of remapped image 2 from the canvas onto the blend image
     //
+    // assert(stitch_context.cudaBlendSeam->height() == roi_height(mask_converter.roi_blend_2));
     cuerr = simple_make_full_batch<BaseScalar_t<T_compute>, BaseScalar_t<T_compute>, unsigned char>(
         // Image 1 (float image)
         canvas->data_raw(),
         canvas->width(),
         canvas->height(),
         /*region_width=*/roi_width(mask_converter.roi_blend_2),
-        /*region_height=*/roi_height(mask_converter.roi_blend_2),
+        /*region_height=*/stitch_context.cudaBlendSeam->height() /*roi_height(mask_converter.roi_blend_2)*/,
         /*channels=*/3,
         // Batch of masks (optional)
         nullptr,
@@ -553,7 +559,8 @@ class CudaStitchPano {
         /*offsetX=*/mask_converter._x2,
         /*offsetY=*/mask_converter._y2,
         mask_converter._remapper_2.xpos,
-        y2,
+        // y2,
+        zero,
         stitch_context.cudaBlendSeam->width(),
         stitch_context.cudaBlendSeam->height(),
         /*adjust_origin=*/false,
@@ -704,8 +711,11 @@ int main(int argc, char** argv) {
   std::string game_id = argv[1];
   std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id + "/";
 
-  std::string sample_img_left_path = game_dir + "GX010100.png";
-  std::string sample_img_right_path = game_dir + "GX010019.png";
+  // std::string sample_img_left_path = game_dir + "GX010100.png";
+  // std::string sample_img_right_path = game_dir + "GX010019.png";
+
+  std::string sample_img_left_path = game_dir + "GX010097.png";
+  std::string sample_img_right_path = game_dir + "GX010016.png";
 
   cv::Mat sample_img_left = cv::imread(sample_img_left_path, cv::IMREAD_COLOR);
   assert(!sample_img_left.empty());
@@ -818,7 +828,7 @@ int main(int argc, char** argv) {
     return blendedCanvasResult.status().code();
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
-  // SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
   //  blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
@@ -828,7 +838,7 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 1 /* perf test */
+#if 0 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();

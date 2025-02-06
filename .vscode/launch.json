@@ -43,7 +43,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/bazel-bin/stitch/test/test_cuda_blend",
       "args": [
-        "stitch-fix",
+        //"stitch-fix",
+        "mlk-heat-1",
         "${workspaceRoot}/output.png",
       ],
       "sourceMap": {
