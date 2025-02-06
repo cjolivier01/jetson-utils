@@ -22,8 +22,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_blend_cuda_lib",
-        "//image",
-        # TODO: remove opencv dependency
+        "//image:image_format",
         "@opencv_linux//:opencv",
     ],
 )
@@ -54,9 +53,6 @@ cuda_library(
     includes = ["."],
     visibility = ["//visibility:private"],
     deps = [
-        "//cuda:colorspace_cuda_lib",
-        "//cuda:cuda_lib_headers",
-        "//image",
         "@local_cuda//:cuda_runtime",
     ],
 )
