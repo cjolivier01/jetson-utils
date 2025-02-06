@@ -726,9 +726,10 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
       size_t sz = context.widths[last] * context.heights[last] * 3 * sizeof(T) * context.batchSize;
       CUDA_CHECK(cudaMalloc((void**)&d_reconstruct, sz));
       context.allocation_size += sz;
-      context.d_resonstruct[last] = d_reconstruct;
     } else {
       d_reconstruct = d_output;
+      assert(last == 0);
+      context.d_resonstruct[last] = d_reconstruct;
     }
   } else {
     assert(last >= 0);
