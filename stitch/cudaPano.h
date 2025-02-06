@@ -1,12 +1,22 @@
 #pragma once
 
-#include "cudaMat.h"
 #include "cudaBlend.h"
+#include "cudaMat.h"
 
 #include <memory>
 namespace hm {
 namespace cuda {
 
+/**
+ *   _____ _   _  _        _     _              _____             _               _
+ *  / ____| | (_)| |      | |   (_)            / ____|           | |             | |
+ * | (___ | |_ _ | |_  ___| |__  _ _ __   __ _| |      ___  _ __ | |_  ___ __  __| |_
+ *  \___ \| __| || __|/ __| '_ \| | '_ \ / _` | |     / _ \| '_ \| __|/ _ \\ \/ /| __|
+ *  ____) | |_| || |_| (__| | | | | | | | (_| | |____| (_) | | | | |_|  __/ >  < | |_
+ * |_____/ \__|_| \__|\___|_| |_|_|_| |_|\__, |\_____|\___/|_| |_|\__|\___|/_/\_\ \__|
+ *                                        __/ |
+ *                                       |___/
+ */
 template <typename T, typename T_compute>
 struct StitchingContext {
   StitchingContext(int batch_size, bool is_hard_seam) : batch_size_(batch_size), is_hard_seam_(is_hard_seam) {}
