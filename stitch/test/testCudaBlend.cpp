@@ -822,11 +822,13 @@ int main(int argc, char** argv) {
 // Configurable parameter: number of pyramid levels.
 #ifdef __aarch64__
   // Lower compute, quick and dirty
-  int numLevels = 1;
+  int numLevels = 0;
+  int numLevels = 6;
 #else
   //int numLevels = 6;
-  int numLevels = 1;
+  //int numLevels = 1;
   //int numLevels = 6;
+  int numLevels = 0;
 #endif
 
 #if 1
