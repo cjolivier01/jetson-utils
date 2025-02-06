@@ -71,6 +71,120 @@ struct bfloat16_4 {
 };
 #endif
 
+//------------------------------------------------------------------------------
+// Trait templates to convert a pointer to a CUDA vector type into a pointer
+// to its base scalar type.
+//------------------------------------------------------------------------------
+
+/**
+ * @brief Primary template for BaseScalar.
+ *
+ * This template should be specialized for each CUDA vector or scalar type.
+ */
+template <typename T>
+struct BaseScalar; // no definition for the primary template
+
+// --- 1-channel types ---
+template <>
+struct BaseScalar<unsigned char> {
+  using type = unsigned char;
+};
+
+template <>
+struct BaseScalar<unsigned short> {
+  using type = unsigned short;
+};
+
+template <>
+struct BaseScalar<int> {
+  using type = int;
+};
+
+template <>
+struct BaseScalar<float> {
+  using type = float;
+};
+
+template <>
+struct BaseScalar<__half> {
+  using type = __half;
+};
+
+template <>
+struct BaseScalar<__nv_bfloat16> {
+  using type = __nv_bfloat16;
+};
+
+// --- 3-channel types ---
+template <>
+struct BaseScalar<uchar3> {
+  using type = unsigned char;
+};
+
+template <>
+struct BaseScalar<ushort3> {
+  using type = unsigned short;
+};
+
+template <>
+struct BaseScalar<int3> {
+  using type = int;
+};
+
+template <>
+struct BaseScalar<float3> {
+  using type = float;
+};
+
+template <>
+struct BaseScalar<half3> {
+  using type = __half;
+};
+
+template <>
+struct BaseScalar<bfloat16_3> {
+  using type = __nv_bfloat16;
+};
+
+// --- 4-channel types ---
+template <>
+struct BaseScalar<uchar4> {
+  using type = unsigned char;
+};
+
+template <>
+struct BaseScalar<ushort4> {
+  using type = unsigned short;
+};
+
+template <>
+struct BaseScalar<int4> {
+  using type = int;
+};
+
+template <>
+struct BaseScalar<float4> {
+  using type = float;
+};
+
+template <>
+struct BaseScalar<half4> {
+  using type = __half;
+};
+
+template <>
+struct BaseScalar<bfloat16_4> {
+  using type = __nv_bfloat16;
+};
+
+/**
+ * @brief Helper alias to obtain the base scalar type.
+ *
+ * For example, BaseScalar_t<float3> is float, and BaseScalar_t<half4> is __half.
+ */
+template <typename T>
+using BaseScalar_t = typename BaseScalar<T>::type;
+
 /*----------------------------------------------------------------------------
   Non‑template function declarations (implemented in cudaMat.cpp)
 -----------------------------------------------------------------------------*/
@@ -447,6 +561,23 @@ class CudaMat {
   constexpr int type() const;
   /// @brief Returns the number of images in the batch.
   constexpr int batch_size() const;
+
+  /**
+   * @brief Returns a pointer to the raw underlying data.
+   *
+   * This returns a pointer of type BaseScalar_t<T>* which points to the underlying
+   * base scalar data. For example, if T is float3, this returns a pointer of type float*.
+   *
+   * @return A pointer to the raw base scalar data.
+   */
+  BaseScalar_t<T>* data_raw();
+
+  /**
+   * @brief Returns a const pointer to the raw underlying data.
+   *
+   * @return A const pointer to the raw base scalar data.
+   */
+  const BaseScalar_t<T>* data_raw() const;
 
  private:
   T* d_data; ///< Pointer to device memory.

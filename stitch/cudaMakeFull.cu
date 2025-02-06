@@ -468,3 +468,20 @@ template cudaError_t copyRoiBatchedInterface<__half, float>(
     int,
     int,
     cudaStream_t);
+
+template cudaError_t copyRoiBatchedInterface<float3, float3>(
+    const float3* d_src,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    float3* d_dest,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    cudaStream_t);

@@ -1,7 +1,7 @@
 #include "cudaBlend.h"
 #include "cudaMakeFull.h"
-#include "cudaRemap.h"
 #include "cudaMat.h"
+#include "cudaRemap.h"
 #include "cudaStatus.h"
 #include "glDisplay.h"
 #include "imageFormat.h"
@@ -420,7 +420,7 @@ struct StitchingContext {
   std::unique_ptr<CudaMat<T_compute>> cudaFull2;
 
   // Laplacian Blend Scratch context
-  std::unique_ptr<CudaBatchLaplacianBlendContext<T_compute>> laplacian_blend_context;
+  std::unique_ptr<CudaBatchLaplacianBlendContext<BaseScalar_t<T_compute>>> laplacian_blend_context;
 
   constexpr int batch_size() const {
     return batch_size_;
@@ -458,10 +458,10 @@ class CudaStitchPano {
     // Remap image 1 ontp the canvas
     //
     cuerr = batched_remap_kernel_ex_offset(
-        (const float3*)sampleImage1.data(),
+        sampleImage1.data(),
         sampleImage1.width(),
         sampleImage1.height(),
-        (float3*)canvas->data(),
+        canvas->data(),
         canvas->width(),
         canvas->height(),
         stitch_context.remap_1_x->data(),
@@ -474,15 +474,16 @@ class CudaStitchPano {
         /*offsetY=*/mask_converter._y1,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
+    // SHOW_IMAGE(canvas);
 #endif
 
 #if 1
     //
     // Now copy the blending portion of remapped image 1 from the canvas onto the blend image
     //
-    cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
+    cuerr = simple_make_full_batch<BaseScalar_t<T_compute>, BaseScalar_t<T_compute>, unsigned char>(
         // Image 1 (float image)
-        canvas->data(),
+        canvas->data_raw(),
         canvas->width(),
         canvas->height(),
         /*region_width=*/roi_width(mask_converter.roi_blend_1),
@@ -501,10 +502,11 @@ class CudaStitchPano {
         stitch_context.cudaBlendSeam->height(),
         /*adjust_origin=*/false,
         /*batchSize=*/stitch_context.batch_size(),
-        stitch_context.cudaFull1->data(),
+        stitch_context.cudaFull1->data_raw(),
         /*d_full_masks=*/nullptr,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
+    // SHOW_IMAGE(stitch_context.cudaFull1);
 #endif
 
 #if 1
@@ -528,15 +530,16 @@ class CudaStitchPano {
         /*offsetY=*/mask_converter._y2,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
+    // SHOW_IMAGE(stitch_context.cudaFull1);
 #endif
 
 #if 1
     //
     // Now copy the blending portion of remapped image 2 from the canvas onto the blend image
     //
-    cuerr = simple_make_full_batch<T_compute, T_compute, unsigned char>(
+    cuerr = simple_make_full_batch<BaseScalar_t<T_compute>, BaseScalar_t<T_compute>, unsigned char>(
         // Image 1 (float image)
-        canvas->data(),
+        canvas->data_raw(),
         canvas->width(),
         canvas->height(),
         /*region_width=*/roi_width(mask_converter.roi_blend_2),
@@ -555,10 +558,11 @@ class CudaStitchPano {
         stitch_context.cudaBlendSeam->height(),
         /*adjust_origin=*/false,
         /*batchSize=*/stitch_context.batch_size(),
-        stitch_context.cudaFull2->data(),
+        stitch_context.cudaFull2->data_raw(),
         /*d_full_masks=*/nullptr,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
+    // SHOW_IMAGE(stitch_context.cudaFull2);
 #endif
 
     CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
@@ -567,14 +571,15 @@ class CudaStitchPano {
     // BLEND THE IMAGES (overlapping portions + some padding)
     //
     cuerr = cudaBatchedLaplacianBlendWithContext(
-        stitch_context.cudaFull1->data(),
-        stitch_context.cudaFull2->data(),
-        stitch_context.cudaBlendSeam->data(),
+        stitch_context.cudaFull1->data_raw(),
+        stitch_context.cudaFull2->data_raw(),
+        stitch_context.cudaBlendSeam->data_raw(),
         // Put output in full-1 memory
-        cudaBlendedFull.data(),
+        cudaBlendedFull.data_raw(),
         *stitch_context.laplacian_blend_context,
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
+    // SHOW_IMAGE(&cudaBlendedFull);
 #endif
 
 #if 1
@@ -595,10 +600,11 @@ class CudaStitchPano {
         canvas->height(),
         /*offsetX=*/mask_converter._x2 - mask_converter._overlap_pad,
         /*offsetY=*/0,
-        /*channels=*/3,
+        /*channels=*/1,
         /*batchSize=*/stitch_context.batch_size(),
         stream);
     CUDA_RETURN_IF_ERROR(cuerr);
+    SHOW_IMAGE(canvas);
 #endif
     return std::move(canvas);
   };
@@ -756,8 +762,12 @@ int main(int argc, char** argv) {
 #endif
 
 #if 1
-  using T = float;
-  using T_compute = float;
+  using T = float3;
+  using T_compute = float3;
+
+  // using T = float;
+  // using T_compute = float;
+
 #define CV_T_PIPELINE CV_32FC3
 #define CV_T_COMPUTE3 CV_32FC3
 #else
@@ -784,12 +794,16 @@ int main(int argc, char** argv) {
   blend_seam.convertTo(blend_seam, CV_T_COMPUTE3);
   stitch_context.cudaBlendSeam = std::make_unique<CudaMat<T_compute>>(blend_seam);
 
-  stitch_context.cudaFull1 = std::make_unique<CudaMat<T_compute>>(
-      as_batch(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
+  // stitch_context.cudaFull1 = std::make_unique<CudaMat<T_compute>>(
+  //     as_batch(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
+
+  stitch_context.cudaFull1 =
+      std::make_unique<CudaMat<T_compute>>(stitch_context.batch_size(), blend_seam.cols, blend_seam.rows);
+
   stitch_context.cudaFull2 = std::make_unique<CudaMat<T_compute>>(
       as_batch(cv::Mat(blend_seam.size(), CV_T_COMPUTE3), stitch_context.batch_size()), /*copy=*/false);
 
-  stitch_context.laplacian_blend_context = std::make_unique<CudaBatchLaplacianBlendContext<T_compute>>(
+  stitch_context.laplacian_blend_context = std::make_unique<CudaBatchLaplacianBlendContext<BaseScalar_t<T_compute>>>(
       stitch_context.cudaBlendSeam->width(),
       stitch_context.cudaBlendSeam->height(),
       numLevels,
@@ -801,14 +815,18 @@ int main(int argc, char** argv) {
   CudaMat<T> sampleImage1(as_batch(sample_img_left, kBatchSize));
   CudaMat<T> sampleImage2(as_batch(sample_img_right, kBatchSize));
 
-  auto blendedCanvas = CudaStitchPano<T, T_compute>::process(
-                           sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::move(canvas))
-                           .ConsumeValueOrDie();
+  auto blendedCanvasResult = CudaStitchPano<T, T_compute>::process(
+      sampleImage1, sampleImage2, stitch_context, mask_converter, stream, std::move(canvas));
+  if (!blendedCanvasResult.ok()) {
+    std::cerr << blendedCanvasResult.status().message() << std::endl;
+    return blendedCanvasResult.status().code();
+  }
+  auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
   // SHOW_IMAGE(blendedCanvas);
   //  blendedCanvas.reset();
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
-  SHOW_IMAGE(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
 
   // cudaStreamSynchronize(stream);
 

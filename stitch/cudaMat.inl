@@ -139,7 +139,7 @@ CudaMat<T>::CudaMat(int B, int W, int H, int C)
       type_(CudaTypeToPixelType<T>::value) // automatically inferred from T
 {
   int expectedChannels = cudaPixelTypeChannels(type_);
-  assert(expectedChannels == C);
+  assert(expectedChannels == C * sizeof(T) / sizeof(typename BaseScalar<T>::type));
   size_t elemSize = cudaPixelElementSize(type_);
   assert(sizeof(T) == elemSize);
   size = static_cast<size_t>(B * W * H) * elemSize;
@@ -248,4 +248,14 @@ constexpr int CudaMat<T>::type() const {
 template <typename T>
 constexpr int CudaMat<T>::batch_size() const {
   return batch_size_;
+}
+
+template <typename T>
+BaseScalar_t<T>* CudaMat<T>::data_raw() {
+  return reinterpret_cast<BaseScalar_t<T>*>(d_data);
+}
+
+template <typename T>
+const BaseScalar_t<T>* CudaMat<T>::data_raw() const {
+  return reinterpret_cast<const BaseScalar_t<T>*>(d_data);
 }
