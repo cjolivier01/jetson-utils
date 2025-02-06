@@ -683,9 +683,13 @@ cudaError_t cudaBatchedLaplacianBlendWithContext(
   // 4. Reconstruct final image.
   T* d_reconstruct = nullptr;
   if (!context.initialized) {
-    cudaMalloc(
-        (void**)&d_reconstruct, context.widths[last] * context.heights[last] * 3 * sizeof(T) * context.batchSize);
-    context.d_resonstruct[last] = d_reconstruct;
+    if (context.numLevels > 1) {
+      cudaMalloc(
+          (void**)&d_reconstruct, context.widths[last] * context.heights[last] * 3 * sizeof(T) * context.batchSize);
+      context.d_resonstruct[last] = d_reconstruct;
+    } else {
+      d_reconstruct = d_output;
+    }
   } else {
     assert(last);
     d_reconstruct = context.d_resonstruct[last];
