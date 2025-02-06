@@ -8,7 +8,33 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Templated Device Kernels
 ////////////////////////////////////////////////////////////////////////////////
+namespace {
 
+template <typename F>
+__device__ inline long round_to_uchar(F x) {
+  if (x <= 0) {
+    return 0;
+  }
+  if (x >= 255) {
+    return 255;
+  }
+  return static_cast<unsigned char>(x + 0.5);
+}
+
+template <typename T_dest, typename T_src>
+__device__ inline T_dest perform_cast(const T_src& src) {
+  return static_cast<T_dest>(src);
+}
+
+template <>
+__device__ inline uchar3 perform_cast(const float3& src) {
+  return uchar3{
+      .x = static_cast<unsigned char>(round_to_uchar(src.x)),
+      .y = static_cast<unsigned char>(round_to_uchar(src.y)),
+      .z = static_cast<unsigned char>(round_to_uchar(src.z)),
+  };
+}
+} // namespace
 /**
  * @brief Templated batched kernel to fill an image (or batch of images) with a constant value.
  *
@@ -95,7 +121,8 @@ __global__ void copyRoiKernelBatched(
         int destOffset = b * (destWidth * destHeight * channels);
         int destIdx = (destY * destWidth + destX) * channels;
         for (int c = 0; c < channels; ++c) {
-          dest[destOffset + destIdx + c] = static_cast<T_out>(src[srcOffset + srcIdx + c]);
+          dest[destOffset + destIdx + c] = perform_cast<T_out>(src[srcOffset + srcIdx + c]);
+          // dest[destOffset + destIdx + c] = static_cast<T_out>(src[srcOffset + srcIdx + c]);
         }
       }
     }
@@ -378,6 +405,9 @@ INSTANTIATE_COPY_ROI_KERNEL_BATCHED(__half, float)
 // --- Host functions ---
 
 // simple_make_full_batch instantiations:
+INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(unsigned char, float, unsigned char)
+INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(unsigned char, __half, unsigned char)
+INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(unsigned char, __nv_bfloat16, unsigned char)
 INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(float, float, unsigned char)
 INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(unsigned char, unsigned char, unsigned char)
 INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(__half, __half, unsigned char)
@@ -386,8 +416,12 @@ INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(__nv_bfloat16, __nv_bfloat16, unsigned char)
 // copyRoiBatchedInterface instantiations:
 
 // Same–type instantiations:
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(unsigned char, float)
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(unsigned char, __half)
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(unsigned char, __nv_bfloat16)
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(float, float)
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(float3, float3)
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(float3, uchar3)
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(uchar3, uchar3)
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(__half, __half)
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(__nv_bfloat16, __nv_bfloat16)

@@ -672,7 +672,7 @@ class CudaStitchPano {
       //
       // Now copy the blending portion of remapped image 1 from the canvas onto the blend image
       //
-      cuerr = simple_make_full_batch<BaseScalar_t<T_compute>, BaseScalar_t<T_compute>, unsigned char>(
+      cuerr = simple_make_full_batch<BaseScalar_t<T>, BaseScalar_t<T_compute>, unsigned char>(
           // Image 1 (float image)
           canvas->data_raw(),
           canvas->width(),
@@ -763,7 +763,7 @@ class CudaStitchPano {
       // Now copy the blending portion of remapped image 2 from the canvas onto the blend image
       //
       // assert(stitch_context.cudaBlendSoftSeam->height() == roi_height(canvas_manager.roi_blend_2));
-      cuerr = simple_make_full_batch<BaseScalar_t<T_compute>, BaseScalar_t<T_compute>, unsigned char>(
+      cuerr = simple_make_full_batch<BaseScalar_t<T>, BaseScalar_t<T_compute>, unsigned char>(
           // Image 1 (float image)
           canvas->data_raw(),
           canvas->width(),
@@ -1057,15 +1057,16 @@ int main(int argc, char** argv) {
   // int numLevels = 6;
 #else
   // int numLevels = 6;
-  int numLevels = 1;
+  // int numLevels = 2;
   // int numLevels = 6;
-  // int numLevels = 0;
+  int numLevels = 0;
 #endif
 
 #if 1
 #if 1
   using T = uchar3;
-  using T_compute = uchar3;
+  // using T_compute = uchar3;
+  using T_compute = float3;
 #else
   using T = float3;
   using T_compute = float3;
