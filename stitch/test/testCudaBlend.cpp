@@ -19,6 +19,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <type_traits>
 #include <unordered_set>
 
 #include <cuda_bf16.h>
@@ -723,7 +724,8 @@ class CudaStitchPano {
           /*offsetX=*/canvas_manager._x1,
           /*offsetY=*/canvas_manager._y1,
           stream);
-      // SHOW_SMALL(canvas);
+      //SHOW_SMALL(&sampleImage1);
+      SHOW_SMALL(canvas);
 #endif
     }
     //
@@ -1037,9 +1039,6 @@ int main(int argc, char** argv) {
   cv::Mat sample_img_right = cv::imread(sample_img_right_path, cv::IMREAD_COLOR);
   assert(!sample_img_right.empty());
 
-  sample_img_left.convertTo(sample_img_left, CV_32FC3, 1.0 / 255.0);
-  sample_img_right.convertTo(sample_img_right, CV_32FC3, 1.0 / 255.0);
-
   ControlMasks control_masks;
   control_masks.load(game_dir);
 
@@ -1065,23 +1064,32 @@ int main(int argc, char** argv) {
 #endif
 
 #if 1
-#if 0
+#if 1
   using T = uchar3;
   using T_compute = uchar3;
-#define CV_T_PIPELINE CV_8UC3
-#define CV_T_COMPUTE3 CV_8UC3
+// #define CV_T_PIPELINE CV_8UC3
+// #define CV_T_COMPUTE3 CV_8UC3
 #else
   using T = float3;
   using T_compute = float3;
-#define CV_T_PIPELINE CV_32FC3
-#define CV_T_COMPUTE3 CV_32FC3
+// #define CV_T_PIPELINE CV_32FC3
+// #define CV_T_COMPUTE3 CV_32FC3
 #endif
 #else
   using T = float;
   using T_compute = __half;
-#define CV_T_PIPELINE CV_32FC3
-#define CV_T_COMPUTE3 CV_16FC3
+// #define CV_T_PIPELINE CV_32FC3
+// #define CV_T_COMPUTE3 CV_16FC3
 #endif
+
+  const int CV_T_PIPELINE = cudaPixelTypeToCvType(CudaTypeToPixelType<T>::value);
+  const int CV_T_COMPUTE3 = cudaPixelTypeToCvType(CudaTypeToPixelType<T_compute>::value);
+
+  if (std::is_floating_point_v<BaseScalar_t<T>>) {
+    sample_img_left.convertTo(sample_img_left, CV_T_PIPELINE, 1.0 / 255.0);
+    sample_img_right.convertTo(sample_img_right, CV_T_PIPELINE, 1.0 / 255.0);
+  }
+
 
   // constexpr int kBatchSize = 1;
   constexpr int kBatchSize = 2;
@@ -1160,7 +1168,7 @@ int main(int argc, char** argv) {
     return blendedCanvasResult.status().code();
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
-  SHOW_SMALL(blendedCanvas);
+  // SHOW_SMALL(blendedCanvas);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
   // SHOW_IMAGE(blendedCanvas);

@@ -590,11 +590,11 @@ class CudaMat {
   const BaseScalar_t<T>* data_raw() const;
 
  private:
-  T* d_data; ///< Pointer to device memory.
-  size_t size; ///< Total size (in bytes) allocated on the device.
-  int rows_, cols_; ///< Image dimensions.
-  CudaPixelType type_; ///< CUDA pixel type for the image.
-  int batch_size_; ///< Number of images in the batch.
+  T* d_data{nullptr}; ///< Pointer to device memory.
+  size_t size{0}; ///< Total size (in bytes) allocated on the device.
+  int rows_{0}, cols_{0}; ///< Image dimensions.
+  CudaPixelType type_{CUDA_PIXEL_UNKNOWN}; ///< CUDA pixel type for the image.
+  int batch_size_{0}; ///< Number of images in the batch.
   bool owns_{true};
 };
 
