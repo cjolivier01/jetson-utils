@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 #include <cassert>
 
+#ifdef WITH_JETSON_UTILS
 /**
  * @brief Converts an OpenCV cv::Mat to the corresponding jetson‑utils imageFormat.
  *
@@ -58,6 +59,7 @@ int imageFormatToCvType(imageFormat fmt) {
       return -1; // Unknown format
   }
 }
+#endif // WITH_JETSON_UTILS
 
 /**
  * @brief Converts an OpenCV cv::Mat to a CudaPixelType.

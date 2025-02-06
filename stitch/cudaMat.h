@@ -5,7 +5,10 @@
 #include <cuda_runtime.h>
 #include <opencv2/opencv.hpp>
 #include <vector>
+
+#ifdef WITH_JETSON_UTILS
 #include "imageFormat.h" // Assumed to define the jetson‑utils imageFormat enum (e.g. IMAGE_BGR8, etc.)
+#endif
 
 /**
  * @file cudaMat.h
@@ -193,7 +196,7 @@ using BaseScalar_t = typename BaseScalar<T>::type;
 /*----------------------------------------------------------------------------
   Non‑template function declarations (implemented in cudaMat.cpp)
 -----------------------------------------------------------------------------*/
-
+#ifdef WITH_JETSON_UTILS
 /**
  * @brief Converts an OpenCV cv::Mat to the corresponding jetson‑utils imageFormat.
  *
@@ -213,6 +216,7 @@ imageFormat cvMatToImageFormat(const cv::Mat& mat);
  * @return The corresponding OpenCV type constant, or -1 if unknown.
  */
 int imageFormatToCvType(imageFormat fmt);
+#endif // WITH_JETSON_UTILS
 
 /**
  * @brief Enumeration of CUDA pixel types.

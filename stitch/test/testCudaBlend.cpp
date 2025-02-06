@@ -1064,9 +1064,9 @@ int main(int argc, char** argv) {
   // int numLevels = 6;
 #else
   // int numLevels = 6;
-  // int numLevels = 2;
+  int numLevels = 1;
   // int numLevels = 6;
-  int numLevels = 0;
+  // int numLevels = 0;
 #endif
 
 #if 1
@@ -1169,6 +1169,7 @@ int main(int argc, char** argv) {
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
   // SHOW_SMALL(blendedCanvas);
   //SHOW_IMAGE(blendedCanvas);
+  SHOW_SCALED(blendedCanvas, 0.25);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
 
