@@ -825,14 +825,14 @@ int main(int argc, char** argv) {
   int numLevels = 0;
   // int numLevels = 6;
 #else
-  // int numLevels = 6;
+  int numLevels = 6;
   // int numLevels = 1;
   // int numLevels = 6;
-  int numLevels = 0;
+  // int numLevels = 0;
 #endif
 
 #if 1
-#if 1
+#if 0
   using T = uchar3;
   using T_compute = uchar3;
 #define CV_T_PIPELINE CV_8UC3
