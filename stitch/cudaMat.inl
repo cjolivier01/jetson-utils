@@ -155,7 +155,7 @@ CudaMat<T>::CudaMat(int B, int W, int H, int C)
  */
 template <typename T>
 CudaMat<T>::~CudaMat() {
-  if (d_data) {
+  if (d_data && owns_) {
     cudaFree(d_data);
   }
 }

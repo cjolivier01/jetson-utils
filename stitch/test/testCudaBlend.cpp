@@ -134,21 +134,6 @@ TiffInfo getTiffInfo(const std::string& filename) {
 
 namespace {
 
-// imageFormat get_image_format(const int cv_type) {
-//   switch (cv_type) {
-//     case CV_8UC3:
-//       return imageFormat::IMAGE_RGB8;
-//     case CV_8UC4:
-//       return imageFormat::IMAGE_RGBA8;
-//     case CV_32FC3:
-//       return imageFormat::IMAGE_RGB32F;
-//     case CV_32FC4:
-//       return imageFormat::IMAGE_RGBA32F;
-//     default:
-//       assert(false);
-//   }
-// }
-
 template <typename T>
 struct CudaSurface {
   CudaSurface(int w, int h, imageFormat format, void* data)

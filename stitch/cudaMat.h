@@ -454,6 +454,7 @@ class CudaMat {
   int rows_, cols_; ///< Image dimensions.
   CudaPixelType type_; ///< CUDA pixel type for the image.
   int batch_size_; ///< Number of images in the batch.
+  bool owns_{true};
 };
 
 // Include inline implementations for template methods.
