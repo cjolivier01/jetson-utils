@@ -823,7 +823,7 @@ int main(int argc, char** argv) {
 #ifdef __aarch64__
   // Lower compute, quick and dirty
   int numLevels = 0;
-  int numLevels = 6;
+  // int numLevels = 6;
 #else
   //int numLevels = 6;
   //int numLevels = 1;
