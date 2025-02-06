@@ -1,85 +1,130 @@
 #include "cudaMat.h"
-
-#include <cassert>
 #include <cuda_runtime.h>
+#include <cassert>
 
-template <typename T>
-CudaMat<T>::CudaMat(const cv::Mat& mat, bool copy)
-    : rows_(mat.rows), cols_(mat.cols), type_(mat.type()), batch_size_(1)
-{
-    size = mat.total() * mat.elemSize();
-    cudaMalloc(&d_data, size);
-    assert(mat.isContinuous());
-    if (copy) {
-        cudaMemcpy(d_data, mat.data, size, cudaMemcpyHostToDevice);
-    }
+/**
+ * @brief Converts an OpenCV cv::Mat to the corresponding jetson‑utils imageFormat.
+ *
+ * Inspects the cv::Mat’s depth and channel count to determine the appropriate image format.
+ *
+ * @param mat The input cv::Mat.
+ * @return The corresponding jetson‑utils imageFormat.
+ */
+imageFormat cvMatToImageFormat(const cv::Mat& mat) {
+  int depth = mat.depth(); // e.g. CV_8U, CV_32F, etc.
+  int channels = mat.channels(); // e.g. 1, 3, or 4
+
+  if (depth == CV_8U) {
+    if (channels == 1)
+      return IMAGE_GRAY8;
+    else if (channels == 3)
+      return IMAGE_BGR8; // (or IMAGE_RGB8 if channels are swapped)
+    else if (channels == 4)
+      return IMAGE_BGRA8;
+  } else if (depth == CV_32F) {
+    if (channels == 1)
+      return IMAGE_GRAY32F;
+    else if (channels == 3)
+      return IMAGE_BGR32F;
+    else if (channels == 4)
+      return IMAGE_BGRA32F;
+  }
+  return IMAGE_UNKNOWN;
 }
 
-template <typename T>
-CudaMat<T>::CudaMat(const std::vector<cv::Mat>& mat_batch, bool copy)
-    : batch_size_(static_cast<int>(mat_batch.size()))
-{
-    assert(batch_size_ > 0);
-    const cv::Mat& first = mat_batch.at(0);
-    rows_ = first.rows;
-    cols_ = first.cols;
-    type_ = first.type();
-    size_t size_each = first.total() * first.elemSize();
-    size = size_each * batch_size_;
-    cudaMalloc(&d_data, size);
-    if (copy) {
-        uint8_t* p = reinterpret_cast<uint8_t*>(d_data);
-        for (const cv::Mat& mat : mat_batch) {
-            assert(mat.isContinuous());
-            cudaMemcpy(p, mat.data, size_each, cudaMemcpyHostToDevice);
-            p += size_each;
-        }
-    }
+/**
+ * @brief Converts a jetson‑utils imageFormat to an OpenCV type constant.
+ *
+ * Maps the provided imageFormat to an OpenCV type such as CV_8UC3.
+ *
+ * @param fmt The jetson‑utils image format.
+ * @return The corresponding OpenCV type constant, or -1 if unknown.
+ */
+int imageFormatToCvType(imageFormat fmt) {
+  switch (fmt) {
+    case IMAGE_GRAY8:
+      return CV_8UC1;
+    case IMAGE_BGR8:
+      return CV_8UC3;
+    case IMAGE_BGRA8:
+      return CV_8UC4;
+    case IMAGE_GRAY32F:
+      return CV_32FC1;
+    case IMAGE_BGR32F:
+      return CV_32FC3;
+    case IMAGE_BGRA32F:
+      return CV_32FC4;
+    default:
+      return -1; // Unknown format
+  }
 }
 
-template <typename T>
-CudaMat<T>::~CudaMat() {
-    if (d_data) {
-        cudaFree(d_data);
-    }
+/**
+ * @brief Converts an OpenCV cv::Mat to a CudaPixelType.
+ *
+ * Determines the CUDA pixel type based on the cv::Mat’s depth and channel count.
+ *
+ * @param mat The input cv::Mat.
+ * @return The corresponding CudaPixelType.
+ */
+CudaPixelType cvMatToCudaPixelType(const cv::Mat& mat) {
+  int depth = mat.depth();
+  int channels = mat.channels();
+
+  if (depth == CV_8U) {
+    if (channels == 1)
+      return CUDA_PIXEL_UCHAR1;
+    else if (channels == 3)
+      return CUDA_PIXEL_UCHAR3; // Maps to CUDA’s uchar3.
+    else if (channels == 4)
+      return CUDA_PIXEL_UCHAR4;
+  } else if (depth == CV_32S) {
+    if (channels == 1)
+      return CUDA_PIXEL_INT1;
+    else if (channels == 3)
+      return CUDA_PIXEL_INT3;
+    else if (channels == 4)
+      return CUDA_PIXEL_INT4;
+  } else if (depth == CV_32F) {
+    if (channels == 1)
+      return CUDA_PIXEL_FLOAT1;
+    else if (channels == 3)
+      return CUDA_PIXEL_FLOAT3; // Maps to CUDA’s float3.
+    else if (channels == 4)
+      return CUDA_PIXEL_FLOAT4; // Maps to CUDA’s float4.
+  }
+  return CUDA_PIXEL_UNKNOWN;
 }
 
-template <typename T>
-cv::Mat CudaMat<T>::download(int batch_item) const {
-    assert(batch_item >= 0 && batch_item < batch_size_);
-    cv::Mat mat(rows_, cols_, type_);
-    size_t size_each = mat.total() * mat.elemSize();
-    const uint8_t* src_ptr = reinterpret_cast<const uint8_t*>(d_data) + batch_item * size_each;
-    cudaMemcpy(mat.data, src_ptr, size_each, cudaMemcpyDeviceToHost);
-    return mat;
-}
-
-template <typename T>
-T* CudaMat<T>::data() {
-    return d_data;
-}
-
-template <typename T>
-const T* CudaMat<T>::data() const {
-    return d_data;
-}
-
-template <typename T>
-constexpr int CudaMat<T>::width() const {
-    return cols_;
-}
-
-template <typename T>
-constexpr int CudaMat<T>::height() const {
-    return rows_;
-}
-
-template <typename T>
-constexpr int CudaMat<T>::type() const {
-    return type_;
-}
-
-template <typename T>
-constexpr int CudaMat<T>::batch_size() const {
-    return batch_size_;
+/**
+ * @brief Converts a CudaPixelType to an OpenCV type constant.
+ *
+ * Maps the given CUDA pixel type (e.g. CUDA_PIXEL_UCHAR3) to the corresponding OpenCV type (e.g. CV_8UC3).
+ *
+ * @param fmt The CUDA pixel type.
+ * @return The corresponding OpenCV type constant, or -1 if unknown.
+ */
+int cudaPixelTypeToCvType(CudaPixelType fmt) {
+  switch (fmt) {
+    case CUDA_PIXEL_UCHAR1:
+      return CV_8UC1;
+    case CUDA_PIXEL_UCHAR3:
+      return CV_8UC3;
+    case CUDA_PIXEL_UCHAR4:
+      return CV_8UC4;
+    case CUDA_PIXEL_INT1:
+      return CV_32SC1;
+    case CUDA_PIXEL_INT3:
+      return CV_32SC3;
+    case CUDA_PIXEL_INT4:
+      return CV_32SC4;
+    case CUDA_PIXEL_FLOAT1:
+      return CV_32FC1;
+    case CUDA_PIXEL_FLOAT3:
+      return CV_32FC3;
+    case CUDA_PIXEL_FLOAT4:
+      return CV_32FC4;
+    default:
+      return -1;
+  }
 }

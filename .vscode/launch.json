@@ -41,11 +41,9 @@
         // "envFile": "${workspaceFolder}/${config:mesonbuild.buildFolder}/meson-vscode.env",
       },
       "cwd": "${workspaceFolder}",
-      "program": "${workspaceFolder}/bazel-bin/cuda/test_cuda_blend",
+      "program": "${workspaceFolder}/bazel-bin/stitch/test/test_cuda_blend",
       "args": [
-        "${env:HOME}/src/hm/left_ready.png",
-        "${env:HOME}/src/hm/right_ready.png",
-        "${env:HOME}/src/hm/seam_mask_ready.png",
+        "stitch-fix",
         "${workspaceRoot}/output.png",
       ],
       "sourceMap": {
@@ -69,8 +67,8 @@
       "request": "launch",
       "cwd": "${workspaceFolder}",
       "debuggerPath": "/usr/local/cuda/bin/cuda-gdb",
-      "program": "${workspaceFolder}/bazel-bin/cuda/test_cuda_blend",
-      "args": "${env:HOME}/src/hm/left_ready.png ${env:HOME}/src/hm/right_ready.png ${env:HOME}/src/hm/seam_mask_ready.png ${workspaceRoot}/output.png",
+      "program": "${workspaceFolder}/bazel-bin/stitch/test/test_cuda_blend",
+      "args": "stitch-fix ${workspaceRoot}/output.png",
       "initCommands": [
         "directory ${workspaceFolder}",
       ],
