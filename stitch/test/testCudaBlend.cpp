@@ -613,7 +613,7 @@ class CudaStitchPano {
           canvas->width(),
           canvas->height(),
           stitch_context.remap_2_x->data(),
-          stitch_co`ntext.remap_2_y->data(),
+          stitch_context.remap_2_y->data(),
           make_float3(0, 0, 0),
           /*this_image_index=*/
           0 /* <-- we inverted the mask at load-time to make it a weight, so image 1 is actually 0 in the mask */,
@@ -624,7 +624,7 @@ class CudaStitchPano {
           /*offsetX=*/mask_converter._x2,
           /*offsetY=*/mask_converter._y2,
           stream);
-      SHOW_IMAGE(canvas);
+      // SHOW_IMAGE(canvas);
     }
     if (!stitch_context.is_hard_seam()) {
       CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
@@ -824,17 +824,14 @@ int main(int argc, char** argv) {
   // Lower compute, quick and dirty
   int numLevels = 1;
 #else
-  int numLevels = 1;
-  // int numLevels = 6;
+  //int numLevels = 6;
+  //int numLevels = 1;
+  int numLevels = 6;
 #endif
 
 #if 1
   using T = float3;
   using T_compute = float3;
-
-  // using T = float;
-  // using T_compute = float;
-
 #define CV_T_PIPELINE CV_32FC3
 #define CV_T_COMPUTE3 CV_32FC3
 #else
@@ -847,7 +844,7 @@ int main(int argc, char** argv) {
   // constexpr int kBatchSize = 1;
   constexpr int kBatchSize = 2;
 
-  StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels <= 1);
+  StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
 
   auto canvas = std::make_unique<CudaMat<T>>(
       stitch_context.batch_size(), control_masks.whole_seam_mask_image.cols, control_masks.whole_seam_mask_image.rows);
@@ -889,7 +886,7 @@ int main(int argc, char** argv) {
     return blendedCanvasResult.status().code();
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
-  // SHOW_IMAGE(blendedCanvas);
+  SHOW_IMAGE(blendedCanvas);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
   // SHOW_IMAGE(blendedCanvas);

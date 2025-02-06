@@ -69,7 +69,7 @@
       "cwd": "${workspaceFolder}",
       "debuggerPath": "/usr/local/cuda/bin/cuda-gdb",
       "program": "${workspaceFolder}/bazel-bin/stitch/test/test_cuda_blend",
-      "args": "stitch-fix ${workspaceRoot}/output.png",
+      "args": "mlk-heat-1 ${workspaceRoot}/output.png",
       "initCommands": [
         "directory ${workspaceFolder}",
       ],
