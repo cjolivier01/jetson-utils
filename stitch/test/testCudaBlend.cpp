@@ -72,9 +72,29 @@ void show_image(const std::string& label, const cv::Mat& img, bool wait = true) 
   cv::waitKey(wait ? 0 : 1);
 }
 
-#define SHOW_IMAGE(_mat$)                                                 \
-  do {                                                                    \
-    show_image(std::string(#_mat$), (_mat$)->download(), /*waitr=*/true); \
+void displayScaledImage(const std::string& label, cv::Mat image, float scale = 1.0, bool wait = true) {
+  if (scale != 1.0f) {
+    // Calculate new dimensions
+    int newWidth = static_cast<int>(image.cols * scale);
+    int newHeight = static_cast<int>(image.rows * scale);
+
+    // Resize the image
+    cv::resize(image, image, cv::Size(newWidth, newHeight));
+  }
+
+  // Display the image
+  cv::imshow(label, image);
+  cv::waitKey(wait ? 0 : 1); // Wait for a keystroke in the window
+}
+
+#define SHOW_IMAGE(_mat$)                                                \
+  do {                                                                   \
+    show_image(std::string(#_mat$), (_mat$)->download(), /*wait=*/true); \
+  } while (false)
+
+#define SHOW_SMALL(_mat$)                                                 \
+  do {                                                                           \
+    displayScaledImage(std::string(#_mat$), (_mat$)->download(), 0.25, /*wait=*/true); \
   } while (false)
 
 // A structure to hold TIFF information
@@ -770,8 +790,12 @@ int main(int argc, char** argv) {
   // std::string sample_img_left_path = game_dir + "GX010100.png";
   // std::string sample_img_right_path = game_dir + "GX010019.png";
 
-  std::string sample_img_left_path = game_dir + "GX010097.png";
-  std::string sample_img_right_path = game_dir + "GX010016.png";
+  // std::string sample_img_left_path = game_dir + "GX010097.png";
+  // std::string sample_img_right_path = game_dir + "GX010016.png";
+
+  // PDP
+  std::string sample_img_left_path = game_dir + "GX010087.png";
+  std::string sample_img_right_path = game_dir + "GX010003.png";
 
   cv::Mat sample_img_left = cv::imread(sample_img_left_path, cv::IMREAD_COLOR);
   assert(!sample_img_left.empty());
@@ -895,7 +919,7 @@ int main(int argc, char** argv) {
     return blendedCanvasResult.status().code();
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
-  SHOW_IMAGE(blendedCanvas);
+  SHOW_SMALL(blendedCanvas);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, mask_converter, stream);
   // SHOW_IMAGE(blendedCanvas);
