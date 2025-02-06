@@ -1091,7 +1091,7 @@ int main(int argc, char** argv) {
   }
 
   constexpr int kBatchSize = 1;
-  //constexpr int kBatchSize = 2;
+  // constexpr int kBatchSize = 2;
 
   StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
 
@@ -1141,7 +1141,7 @@ int main(int argc, char** argv) {
         numLevels,
         /*batch_size=*/stitch_context.batch_size());
   } else {
-    assert(blend_seam.type() == CV_8U);3
+    assert(blend_seam.type() == CV_8U);
     stitch_context.cudaBlendHardSeam = std::make_unique<CudaMat<unsigned char>>(blend_seam);
   }
 
@@ -1168,7 +1168,7 @@ int main(int argc, char** argv) {
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
   // SHOW_SMALL(blendedCanvas);
-  SHOW_IMAGE(blendedCanvas);
+  //SHOW_IMAGE(blendedCanvas);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
 
@@ -1176,7 +1176,7 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
