@@ -35,10 +35,12 @@ cc_library(
     srcs = [
         "canvasManager.cpp",
         "controlMasks.cpp",
+        "showImage.cpp",
     ],
     hdrs = [
         "canvasManager.h",
         "controlMasks.h",
+        "showImage.h",
     ],
     copts = [
     ],
