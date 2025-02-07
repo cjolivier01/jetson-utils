@@ -309,16 +309,14 @@ int main(int argc, char** argv) {
 
 // Configurable parameter: number of pyramid levels.
 #ifdef __aarch64__
-  // Lower compute, quick and dirty
   int numLevels = 0;
-  // int numLevels = 6;
+  using T = uchar3;
+  using T_compute = uchar3;
 #else
   int numLevels = 6;
-  // int numLevels = 2;
-  // int numLevels = 6;
-  // int numLevels = 0;
-#endif
-
+// int numLevels = 2;
+// int numLevels = 6;
+// int numLevels = 0;
 #if 1
 #if 1
   using T = uchar3;
@@ -332,6 +330,7 @@ int main(int argc, char** argv) {
 #else
   using T = float;
   using T_compute = __half;
+#endif
 #endif
 
   const int CV_T_PIPELINE = cudaPixelTypeToCvType(CudaTypeToPixelType<T>::value);
