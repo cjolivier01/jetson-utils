@@ -8,17 +8,29 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Templated Device Kernels
 ////////////////////////////////////////////////////////////////////////////////
+
+#ifndef HALF3_DEFINED
+#define HALF3_DEFINED
+/**
+ * @brief 3-element vector of __half values.
+ */
+struct half3 {
+  __half x, y, z;
+};
+#endif
+
 namespace {
 
 template <typename F>
-__device__ inline long round_to_uchar(F x) {
-  if (x <= 0) {
+__device__ inline unsigned char round_to_uchar(const F& x) {
+  F x_rounded = x + F(0.5); // Add 0.5 in the type's precision
+  if (x_rounded <= F(0.0)) {
     return 0;
   }
-  if (x >= 255) {
+  if (x_rounded >= F(255.0)) {
     return 255;
   }
-  return static_cast<unsigned char>(x + 0.5);
+  return static_cast<unsigned char>(x_rounded); // Cast result to unsigned char
 }
 
 template <typename T_dest, typename T_src>
@@ -29,6 +41,24 @@ __device__ inline T_dest perform_cast(const T_src& src) {
 template <>
 __device__ inline uchar3 perform_cast(const float3& src) {
   return uchar3{
+      .x = static_cast<unsigned char>(round_to_uchar(src.x)),
+      .y = static_cast<unsigned char>(round_to_uchar(src.y)),
+      .z = static_cast<unsigned char>(round_to_uchar(src.z)),
+  };
+}
+
+template <>
+__device__ inline uchar3 perform_cast(const half3& src) {
+  return uchar3{
+      .x = static_cast<unsigned char>(round_to_uchar(src.x)),
+      .y = static_cast<unsigned char>(round_to_uchar(src.y)),
+      .z = static_cast<unsigned char>(round_to_uchar(src.z)),
+  };
+}
+
+template <>
+__device__ inline half3 perform_cast(const uchar3& src) {
+  return half3{
       .x = static_cast<unsigned char>(round_to_uchar(src.x)),
       .y = static_cast<unsigned char>(round_to_uchar(src.y)),
       .z = static_cast<unsigned char>(round_to_uchar(src.z)),
@@ -395,6 +425,7 @@ INSTANTIATE_FILL_KERNEL_BATCHED(__nv_bfloat16)
 INSTANTIATE_COPY_ROI_KERNEL_BATCHED(float, float)
 INSTANTIATE_COPY_ROI_KERNEL_BATCHED(float3, float3)
 INSTANTIATE_COPY_ROI_KERNEL_BATCHED(uchar3, uchar3)
+INSTANTIATE_COPY_ROI_KERNEL_BATCHED(uchar3, half3)
 INSTANTIATE_COPY_ROI_KERNEL_BATCHED(__half, __half)
 INSTANTIATE_COPY_ROI_KERNEL_BATCHED(__nv_bfloat16, __nv_bfloat16)
 
@@ -418,6 +449,7 @@ INSTANTIATE_SIMPLE_MAKE_FULL_BATCH(__nv_bfloat16, __nv_bfloat16, unsigned char)
 // Same–type instantiations:
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(unsigned char, float)
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(unsigned char, __half)
+INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(half3, uchar3)
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(unsigned char, __nv_bfloat16)
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(float, float)
 INSTANTIATE_COPY_ROI_BATCHED_INTERFACE(float3, float3)
