@@ -409,8 +409,10 @@ int main(int argc, char** argv) {
   //     /*N=*/10,
   //     cv::Point(canvas_manager.canvas_info_.positions[0].x, canvas_manager.canvas_info_.positions[0].y),
   //     cv::Point(canvas_manager.canvas_info_.positions[1].x, canvas_manager.canvas_info_.positions[1].y));
+
   // assert(sample_img_left.type() == CV_8UC3);
   // assert(sample_img_right.type() == CV_8UC3);
+
   CudaMat<T> sampleImage1(as_batch(sample_img_left, kBatchSize));
   CudaMat<T> sampleImage2(as_batch(sample_img_right, kBatchSize));
 
@@ -423,7 +425,7 @@ int main(int argc, char** argv) {
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
   // SHOW_SMALL(blendedCanvas);
   //  SHOW_IMAGE(blendedCanvas);
-  SHOW_SCALED(blendedCanvas, 0.25);
+  // SHOW_SCALED(blendedCanvas, 0.25);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
 
