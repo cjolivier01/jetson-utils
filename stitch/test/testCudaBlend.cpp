@@ -826,7 +826,7 @@ int main(int argc, char** argv) {
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
   // SHOW_SMALL(blendedCanvas);
   // SHOW_IMAGE(blendedCanvas);
-  SHOW_SCALED(blendedCanvas, 0.25);
+  // SHOW_SCALED(blendedCanvas, 0.25);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
 
@@ -834,14 +834,14 @@ int main(int argc, char** argv) {
 
   // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
 
-#if 0 /* perf test */
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
 
   size_t frame_count = 100;
   for (size_t i = 0; i < frame_count; ++i) {
-    blendedCanvas = CudaStitchPano<T, T_compute>::process(
+    blendedCanvas = hm::cuda::CudaStitchPano<T, T_compute>::process(
                         sampleImage1, sampleImage2, stitch_context, canvas_manager, stream, std::move(blendedCanvas))
                         .ConsumeValueOrDie();
     cudaStreamSynchronize(stream);
