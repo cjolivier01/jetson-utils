@@ -728,8 +728,8 @@ int main(int argc, char** argv) {
 #if 1
   using T = uchar3;
   //using T_compute = uchar3;
-  //using T_compute = float3;
-  using T_compute = half3;
+  using T_compute = float3;
+  //using T_compute = half3;
 #else
   using T = float3;
   using T_compute = float3;
@@ -827,7 +827,7 @@ int main(int argc, char** argv) {
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
   //SHOW_SMALL(blendedCanvas);
   // SHOW_IMAGE(blendedCanvas);
-  SHOW_SCALED(blendedCanvas, 0.25);
+  // SHOW_SCALED(blendedCanvas, 0.25);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
 
