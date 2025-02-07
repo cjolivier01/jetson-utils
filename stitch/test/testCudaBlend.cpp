@@ -336,7 +336,7 @@ std::pair<double, double> get_min_max(const cv::Mat& mat) {
 
   // Get the minimum and maximum values and their locations
   cv::minMaxLoc(mat, &minVal, &maxVal, &minLoc, &maxLoc);
-  return std::make_pair(minVal, maxVal);
+  return {minVal, maxVal};
 }
 
 template <typename T>
@@ -725,7 +725,7 @@ int main(int argc, char** argv) {
 #endif
 
 #if 1
-#if 1
+#if 0
   using T = uchar3;
   //using T_compute = uchar3;
   using T_compute = float3;
