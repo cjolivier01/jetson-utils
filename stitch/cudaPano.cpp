@@ -1,5 +1,10 @@
 #include "cudaPano.h"
 
 namespace hm {
-namespace cuda {}
+namespace pano {
+namespace cuda {
+
+
+} // namespace cuda
+} // namespace pano
 } // namespace hm

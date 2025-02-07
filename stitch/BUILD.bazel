@@ -62,6 +62,7 @@ cc_library(
     ],
     hdrs = [
         "cudaPano.h",
+        "cudaPano.inl",
     ],
     copts = [
     ],
@@ -84,6 +85,7 @@ cuda_library(
         "cudaBlend.h",
         "cudaMakeFull.h",
         "cudaRemap.h",
+        "cudaStatus.h",
     ],
     copts = [
         "-std=c++17",

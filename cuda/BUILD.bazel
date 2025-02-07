@@ -183,7 +183,6 @@ cc_library(
         "cudaVector.h",
         "cudaWarp.h",
         "cudaYUV.h",
-        "cudaStatus.h",
     ],
     includes = [
         ".",

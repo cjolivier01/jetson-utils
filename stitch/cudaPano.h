@@ -1,10 +1,14 @@
 #pragma once
 
+#include "canvasManager.h"
 #include "cudaBlend.h"
 #include "cudaMat.h"
+#include "cudaStatus.h"
 
 #include <memory>
+
 namespace hm {
+namespace pano {
 namespace cuda {
 
 /**
@@ -48,5 +52,31 @@ struct StitchingContext {
   bool is_hard_seam_;
 };
 
+/**
+ *   _____           _        _____ _   _  _        _     _____
+ *  / ____|         | |      / ____| | (_)| |      | |   |  __ \
+ * | |     _   _  __| | __ _| (___ | |_ _ | |_  ___| |__ | |__) |__ _ _ __   ___
+ * | |    | | | |/ _` |/ _` |\___ \| __| || __|/ __| '_ \|  ___// _` | '_ \ / _ \
+ * | |____| |_| | (_| | (_| |____) | |_| || |_| (__| | | | |   | (_| | | | | (_) |
+ *  \_____|\__,_|\__,_|\__,_|_____/ \__|_| \__|\___|_| |_|_|    \__,_|_| |_|\___/
+ *
+ *
+ */
+template <typename T, typename T_compute>
+class CudaStitchPano {
+ public:
+  CudaStitchPano(int batch_size);
+  static CudaStatusOr<std::unique_ptr<CudaMat<T>>> process(
+      const CudaMat<T>& sampleImage1,
+      const CudaMat<T>& sampleImage2,
+      StitchingContext<T, T_compute>& stitch_context,
+      const CanvasManager& canvas_manager,
+      cudaStream_t stream,
+      std::unique_ptr<CudaMat<T>>&& canvas);
+};
+
 } // namespace cuda
+} // namespace pano
 } // namespace hm
+
+#include "cudaPano.inl"

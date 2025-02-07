@@ -13,14 +13,14 @@ void display_scaled_image(const std::string& label, cv::Mat image, float scale =
 std::pair<double, double> get_min_max(const cv::Mat& mat);
 cv::Mat make_fake_mask_like(const cv::Mat& mask);
 
-#define SHOW_IMAGE(_mat$)                                                           \
-  do {                                                                              \
-    hm::utils::show_image(std::string(#_mat$), (_mat$)->download(), /*wait=*/true); \
+#define SHOW_IMAGE(_mat$)                                                             \
+  do {                                                                                \
+    ::hm::utils::show_image(std::string(#_mat$), (_mat$)->download(), /*wait=*/true); \
   } while (false)
 
-#define SHOW_SCALED(_mat$, _scale$)                                                                  \
-  do {                                                                                               \
-    hm::utils::displayScaledImage(std::string(#_mat$), (_mat$)->download(), _scale$, /*wait=*/true); \
+#define SHOW_SCALED(_mat$, _scale$)                                                                      \
+  do {                                                                                                   \
+    ::hm::utils::display_scaled_image(std::string(#_mat$), (_mat$)->download(), _scale$, /*wait=*/true); \
   } while (false)
 
 #define SHOW_SMALL(_mat$)     \
