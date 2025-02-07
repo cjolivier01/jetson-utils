@@ -1,6 +1,5 @@
 #include "canvasManager.h"
 #include "controlMasks.h"
-// Additional CUDA/OpenGL/utility headers:
 #include "cudaBlend.h"
 #include "cudaMakeFull.h"
 #include "cudaMat.h"
@@ -9,9 +8,10 @@
 #include "cudaStatus.h"
 #include "glDisplay.h"
 #include "imageFormat.h"
+#include "imageFormat.h" // Assumed to define the jetson‑utils imageFormat enum
 #include "videoOutput.h"
 
-#include <cuda_runtime.h>
+#include <cuda_runtime.h> // for CUDA vector types
 #include <opencv2/opencv.hpp>
 
 #include <algorithm>
@@ -31,6 +31,7 @@
 
 #include <opencv4/opencv2/core/hal/interface.h>
 #include <opencv4/opencv2/highgui.hpp>
+
 #include <opencv4/opencv2/imgcodecs.hpp>
 
 #include <fcntl.h>
@@ -38,14 +39,6 @@
 #include <termios.h>
 #include <unistd.h>
 
-/**
- * @brief Checks whether a keyboard press is available in a non-blocking manner.
- *
- * This function temporarily switches stdin to noncanonical mode (no buffering)
- * and checks if a character is waiting. If yes, it returns 1; otherwise 0.
- *
- * @return 1 if a character is available, 0 otherwise.
- */
 int kbhit() {
   struct termios oldt, newt;
   int ch;
@@ -71,13 +64,6 @@ int kbhit() {
   return 0;
 }
 
-/**
- * @brief Waits until a keyboard press is detected.
- *
- * Internally uses `kbhit()` in a loop with a small sleep to avoid busy-waiting.
- *
- * @return The keyboard code read from stdin (if needed).
- */
 int wait_key() {
   int c;
   while (!(c = kbhit())) {
@@ -86,20 +72,12 @@ int wait_key() {
   return c;
 }
 
-/**
- * @brief Adjusts two images so that their color along a seam boundary aligns.
- *
- * It samples up to N pixels to the left side of the seam in `image1` and
- * up to N pixels to the right side of the seam in `image2`, computes average
- * color, and applies an offset to minimize color difference across the seam.
- *
- * @param image1    The first (left) image to be adjusted in-place.
- * @param image2    The second (right) image to be adjusted in-place.
- * @param seam      A binary mask (CV_8U) indicating seam boundary (1 at the boundary).
- * @param N         Number of pixels on either side of the seam to sample.
- * @param topLeft1  The top-left corner of `image1` in the seam mask.
- * @param topLeft2  The top-left corner of `image2` in the seam mask.
- */
+// Function parameters:
+//   - image1, image2: the two RGB images to be adjusted.
+//   - seam: the seam mask image (CV_8U) that is larger than both images.
+//   - N: number of pixels to sample on each side of the seam.
+//   - topLeft1, topLeft2: the (x,y) coordinates (relative to the seam mask)
+//                           of the top left corners of image1 and image2, respectively.
 void matchSeamImages(
     cv::Mat& image1,
     cv::Mat& image2,
@@ -107,53 +85,56 @@ void matchSeamImages(
     int N,
     const cv::Point& topLeft1,
     const cv::Point& topLeft2) {
-  // Ensure seam is 8-bit single channel.
+  // Ensure the seam mask is of type CV_8U.
   if (seam.type() != CV_8U) {
     std::cerr << "Error: Seam mask must be of type CV_8U." << std::endl;
     return;
   }
 
-  // Accumulators for averaging color.
-  cv::Scalar sumLeft(0, 0, 0);
-  cv::Scalar sumRight(0, 0, 0);
+  // Accumulators for summing per-channel pixel values.
+  cv::Scalar sumLeft(0, 0, 0); // For image1 samples (left of the seam).
+  cv::Scalar sumRight(0, 0, 0); // For image2 samples (right of the seam).
   int countLeft = 0, countRight = 0;
 
-  // ----- Sample the left side in image1 -----
+  // ----- Process image1 (sampling from the left side of the seam) -----
+  // Only examine the middle 50% of image1's rows.
   int startRow1 = image1.rows / 4;
   int endRow1 = (3 * image1.rows) / 4;
   for (int r = startRow1; r < endRow1; r++) {
+    // Map image1’s local row (r) to the seam mask’s row coordinate.
     int globalRow = topLeft1.y + r;
-    if (globalRow < 0 || globalRow >= seam.rows) {
-      continue;
-    }
+    if (globalRow < 0 || globalRow >= seam.rows)
+      continue; // Row is outside the seam mask.
+
+    // Define the horizontal span of image1 in the seam mask.
     int colStart = topLeft1.x;
     int colEnd = topLeft1.x + image1.cols;
 
-    // Find boundary where seam == 1 in the global seam mask space.
+    // Find the seam boundary: the first column (within image1’s span)
+    // where the seam mask pixel equals 1.
     int seamGlobalCol = -1;
     for (int c = colStart; c < colEnd; c++) {
-      if (c < 0 || c >= seam.cols) {
+      if (c < 0 || c >= seam.cols)
         continue;
-      }
       if (seam.at<uchar>(globalRow, c) == 1) {
         seamGlobalCol = c;
         break;
       }
     }
-    if (seamGlobalCol == -1) {
-      continue;
-    }
+    if (seamGlobalCol == -1)
+      continue; // No seam boundary found for this row.
 
-    // Convert global boundary to local coords in image1.
+    // Convert the global seam column to image1’s local coordinate.
     int seamLocalCol = seamGlobalCol - topLeft1.x;
 
-    // Sample up to N pixels left of the boundary.
+    // Sample up to N pixels immediately to the left of the seam boundary.
     int sampleStart = std::max(0, seamLocalCol - N);
     for (int c = sampleStart; c < seamLocalCol; c++) {
-      if (c < 0 || c >= image1.cols) {
+      // Safety check.
+      if (c < 0 || c >= image1.cols)
         continue;
-      }
-      // Read the pixel according to depth.
+
+      // Depending on the image depth, read the pixel appropriately.
       if (image1.depth() == CV_8U) {
         cv::Vec3b pixel = image1.at<cv::Vec3b>(r, c);
         sumLeft[0] += pixel[0];
@@ -169,39 +150,42 @@ void matchSeamImages(
     }
   }
 
-  // ----- Sample the right side in image2 -----
+  // ----- Process image2 (sampling from the right side of the seam) -----
+  // Only examine the middle 50% of image2's rows.
   int startRow2 = image2.rows / 4;
   int endRow2 = (3 * image2.rows) / 4;
   for (int r = startRow2; r < endRow2; r++) {
+    // Map image2’s local row (r) to the seam mask’s row coordinate.
     int globalRow = topLeft2.y + r;
-    if (globalRow < 0 || globalRow >= seam.rows) {
+    if (globalRow < 0 || globalRow >= seam.rows)
       continue;
-    }
+
+    // Define the horizontal span of image2 in the seam mask.
     int colStart = topLeft2.x;
     int colEnd = topLeft2.x + image2.cols;
 
+    // Find the seam boundary in image2’s region of the seam mask.
     int seamGlobalCol = -1;
     for (int c = colStart; c < colEnd; c++) {
-      if (c < 0 || c >= seam.cols) {
+      if (c < 0 || c >= seam.cols)
         continue;
-      }
       if (seam.at<uchar>(globalRow, c) == 1) {
         seamGlobalCol = c;
         break;
       }
     }
-    if (seamGlobalCol == -1) {
-      continue;
-    }
+    if (seamGlobalCol == -1)
+      continue; // No seam boundary found in this row.
 
+    // Convert the global seam column to image2’s local coordinate.
     int seamLocalCol = seamGlobalCol - topLeft2.x;
 
-    // Sample up to N pixels right of the boundary.
+    // Sample up to N pixels immediately to the right of the seam boundary.
     int sampleEnd = std::min(image2.cols, seamLocalCol + N);
     for (int c = seamLocalCol; c < sampleEnd; c++) {
-      if (c < 0 || c >= image2.cols) {
+      if (c < 0 || c >= image2.cols)
         continue;
-      }
+
       if (image2.depth() == CV_8U) {
         cv::Vec3b pixel = image2.at<cv::Vec3b>(r, c);
         sumRight[0] += pixel[0];
@@ -217,23 +201,24 @@ void matchSeamImages(
     }
   }
 
-  // If no samples were gathered, warn and exit.
+  // Check that we have collected samples from both images.
   if (countLeft == 0 || countRight == 0) {
     std::cerr << "Error: Not enough seam samples collected for adjustment." << std::endl;
     return;
   }
 
-  // Compute average color on each side.
+  // Compute per-channel averages.
   cv::Scalar avgLeft = sumLeft * (1.0 / countLeft);
   cv::Scalar avgRight = sumRight * (1.0 / countRight);
   std::cout << "Average values (Image1, left side): " << avgLeft << std::endl;
   std::cout << "Average values (Image2, right side): " << avgRight << std::endl;
 
-  // Compute a per-channel offset (half the difference).
+  // Compute an offset per channel (half the difference).
+  // The idea is to subtract this offset from image1 and add it to image2.
   cv::Scalar offset = (avgLeft - avgRight) * 0.5;
   std::cout << "Offset: " << offset << std::endl;
 
-  // Lambda to shift an image by a color offset.
+  // Helper lambda: adjusts an image by a per-channel amount.
   auto adjustImage = [&](cv::Mat& img, cv::Scalar adjustment) {
     if (img.depth() == CV_8U) {
       cv::Mat floatImg;
@@ -244,7 +229,7 @@ void matchSeamImages(
         channels[i] += static_cast<float>(adjustment[i]);
       }
       cv::merge(channels, floatImg);
-      // Clamp to [0, 255].
+      // Clamp the adjusted values to the valid range [0,255].
       cv::min(floatImg, 255.0, floatImg);
       cv::max(floatImg, 0.0, floatImg);
       floatImg.convertTo(img, CV_8U);
@@ -258,60 +243,41 @@ void matchSeamImages(
     }
   };
 
-  // Subtract offset from image1, add offset to image2 to meet in the middle.
+  // Adjust the images: subtract the offset from image1 and add it to image2.
   adjustImage(image1, -offset);
   adjustImage(image2, offset);
 }
 
-/**
- * @brief Displays an image in a named OpenCV window, optionally waiting for a keypress.
- *
- * @param label The name of the window.
- * @param img   The image to display.
- * @param wait  Whether to wait indefinitely for a keypress (default true).
- */
 void show_image(const std::string& label, const cv::Mat& img, bool wait = true) {
   cv::imshow(label, img);
   cv::waitKey(wait ? 0 : 1);
 }
 
-/**
- * @brief Displays a scaled version of an image in a named OpenCV window.
- *
- * @param label The name of the window.
- * @param image The image to display.
- * @param scale The scale factor (1.0 leaves the image as-is).
- * @param wait  Whether to wait indefinitely for a keypress (default true).
- */
 void displayScaledImage(const std::string& label, cv::Mat image, float scale = 1.0, bool wait = true) {
   if (scale != 1.0f) {
+    // Calculate new dimensions
     int newWidth = static_cast<int>(image.cols * scale);
     int newHeight = static_cast<int>(image.rows * scale);
+
+    // Resize the image
     cv::resize(image, image, cv::Size(newWidth, newHeight));
   }
+
+  // Display the image
   cv::imshow(label, image);
-  cv::waitKey(wait ? 0 : 1);
+  cv::waitKey(wait ? 0 : 1); // Wait for a keystroke in the window
 }
 
-/**
- * @brief Macro for showing a CudaMat by downloading it and displaying in a window (blocking).
- */
 #define SHOW_IMAGE(_mat$)                                                \
   do {                                                                   \
     show_image(std::string(#_mat$), (_mat$)->download(), /*wait=*/true); \
   } while (false)
 
-/**
- * @brief Macro for showing a scaled CudaMat by downloading and resizing before display (blocking).
- */
 #define SHOW_SCALED(_mat$, _scale$)                                                       \
   do {                                                                                    \
     displayScaledImage(std::string(#_mat$), (_mat$)->download(), _scale$, /*wait=*/true); \
   } while (false)
 
-/**
- * @brief Macro for showing a small (5%) scaled CudaMat.
- */
 #define SHOW_SMALL(_mat$)     \
   do {                        \
     SHOW_SCALED(_mat$, 0.05); \
@@ -319,44 +285,20 @@ void displayScaledImage(const std::string& label, cv::Mat image, float scale = 1
 
 namespace {
 
-/**
- * @brief Simple structure to encapsulate a GPU surface for rendering via glDisplay.
- *
- * @tparam T The pixel type in CUDA memory (e.g., uchar3, float3, etc.).
- */
 template <typename T>
 struct CudaSurface {
   CudaSurface(int w, int h, imageFormat format, void* data)
       : width(w), height(h), image_format(format), dataptr(data) {}
-
   CudaSurface(const CudaMat<T>& cm)
       : width(cm.width()), height(cm.height()), image_format(get_image_format(cm.type())), dataptr((void*)cm.data()) {}
-
-  int width{0}; ///< Surface width.
-  int height{0}; ///< Surface height.
-  imageFormat image_format; ///< Format enum (e.g., IMAGE_RGB8, IMAGE_FLOAT32).
-  void* dataptr{nullptr}; ///< Pointer to GPU memory.
+  int width{0};
+  int height{0};
+  imageFormat image_format;
+  void* dataptr{nullptr};
 };
 
-/**
- * @class RenderSet
- * @brief Manages multiple `glDisplay` output windows, each identified by a name.
- *
- * Calls to `render()` will create a new window if one by that name does not already exist.
- * This allows multiple GPU surfaces to be rendered simultaneously to separate windows.
- */
 class RenderSet {
  public:
-  /**
-   * @brief Renders a given CUDA surface in a named OpenGL display window.
-   *
-   * If the named window does not exist yet, it is automatically created.
-   *
-   * @tparam T The pixel type for the surface (e.g., `uchar3`, `float3`).
-   * @param name The identifier for the display window.
-   * @param surface The `CudaSurface` to render.
-   * @param stream  Optional CUDA stream for asynchronous rendering.
-   */
   template <typename T>
   void render(const std::string& name, const CudaSurface<T>& surface, cudaStream_t stream = 0) {
     get_video_output(name, surface.width, surface.height)
@@ -364,14 +306,6 @@ class RenderSet {
   }
 
  private:
-  /**
-   * @brief Creates a new video output using glDisplay with the given dimensions.
-   *
-   * @param name   The display window name.
-   * @param width  The initial width of the window.
-   * @param height The initial height of the window.
-   * @return A `std::unique_ptr<glDisplay>` pointing to the new display.
-   */
   static std::unique_ptr<glDisplay> create_video_output(const std::string& name, int width, int height) {
     videoOptions vo;
     vo.width = width;
@@ -381,15 +315,8 @@ class RenderSet {
     return video_output;
   }
 
-  /**
-   * @brief Returns the display by name, creating it if necessary.
-   *
-   * @param name   The display window name.
-   * @param width  The desired width of the window.
-   * @param height The desired height of the window.
-   */
   videoOutput* get_video_output(const std::string& name, int width, int height) {
-    std::unique_lock<std::mutex> lk(mu_);
+    std::unique_lock lk(mu_);
     auto found = video_outputs_.find(name);
     if (found == video_outputs_.end()) {
       found = video_outputs_.emplace(name, create_video_output(name, width, height)).first;
@@ -397,92 +324,77 @@ class RenderSet {
     return found->second.get();
   }
 
-  std::mutex mu_; ///< Protects the map of `glDisplay` outputs.
-  std::map<std::string, std::unique_ptr<glDisplay>> video_outputs_; ///< Map: name -> display instance.
+  std::mutex mu_;
+  std::map<std::string, std::unique_ptr<glDisplay>> video_outputs_;
 };
 
 } // namespace
 
-/**
- * @brief Finds the minimum and maximum values in an OpenCV matrix.
- *
- * @param mat Input matrix (single or multi-channel).
- * @return A pair (minVal, maxVal).
- */
 std::pair<double, double> get_min_max(const cv::Mat& mat) {
   double minVal, maxVal;
   cv::Point minLoc, maxLoc;
+
+  // Get the minimum and maximum values and their locations
   cv::minMaxLoc(mat, &minVal, &maxVal, &minLoc, &maxLoc);
   return std::make_pair(minVal, maxVal);
 }
 
-/**
- * @brief Returns all unique values of type T in an OpenCV matrix, excluding any in `ignore`.
- *
- * @tparam T The data type we expect in the matrix.
- * @param mat The input matrix.
- * @param ignore A set of values to skip.
- * @return A sorted `std::set` of unique values found.
- * @throws std::invalid_argument If the matrix type does not match `cv::DataType<T>::type`.
- */
 template <typename T>
 std::set<T> get_unique_values(const cv::Mat& mat, const std::unordered_set<T>& ignore = {}) {
   std::set<T> unique_values;
+
+  // Check if the data type of the matrix matches the template type
   if (mat.type() != cv::DataType<T>::type) {
     throw std::invalid_argument("Matrix data type does not match the template type T");
   }
+
+  // Iterate over each element in the matrix
   for (int i = 0; i < mat.rows; ++i) {
     for (int j = 0; j < mat.cols; ++j) {
       T value = mat.at<T>(i, j);
+      // Add to set if not in ignore set
       if (ignore.find(value) == ignore.end()) {
         unique_values.insert(value);
       }
     }
   }
+
   return unique_values;
 }
 
-/**
- * @brief Loads a position mask (e.g., a row/col mapping) from disk with optional min/max reporting.
- *
- * @param filename The file to read.
- * @param minVal   Optional pointer to store the minimum pixel value found.
- * @param maxVal   Optional pointer to store the maximum pixel value found.
- * @return The loaded `cv::Mat`. If empty, minVal/maxVal will be set to NaN.
- */
 cv::Mat load_position_mask(const std::string& filename, double* minVal, double* maxVal) {
   cv::Mat pos_mask = cv::imread(filename, cv::IMREAD_ANYDEPTH);
   if (!pos_mask.empty()) {
     if (minVal || maxVal) {
-      double min, max;
       cv::Point minLoc, maxLoc;
+      // Get the minimum and maximum values and their locations
+      double min, max;
       cv::minMaxLoc(pos_mask, &min, &max, &minLoc, &maxLoc);
-      if (minVal)
+      if (minVal) {
         *minVal = min;
-      if (maxVal)
+      }
+      if (maxVal) {
         *maxVal = max;
+      }
     }
   } else {
-    if (minVal)
+    if (minVal) {
       *minVal = std::nan("");
-    if (maxVal)
+    }
+    if (maxVal) {
       *maxVal = std::nan("");
+    }
   }
   return pos_mask;
 }
 
-/**
- * @brief Generates a synthetic 1/0 mask with a vertical split.
- *
- * Given a `mask` to define dimensions, returns a float matrix with the left half = 1,
- * right half = 0. Useful for testing blending logic.
- *
- * @param mask A reference mask from which to copy dimensions.
- * @return A new CV_32FC1 mask with a half-and-half split.
- */
 cv::Mat make_fake_mask_like(const cv::Mat& mask) {
   cv::Mat img(mask.rows, mask.cols, CV_32FC1, cv::Scalar(0));
+
+  // Define a region of interest (ROI) for the left half of the image.
   cv::Rect leftHalfROI(0, 0, mask.cols / 2, mask.rows);
+
+  // Set all pixels in the left half to 1.
   img(leftHalfROI).setTo(1.0f);
   return img;
 }
@@ -491,246 +403,273 @@ namespace hm {
 namespace cuda {
 
 /**
- * @class CudaStitchPano
- * @brief Example stitching pipeline that demonstrates how two images might be remapped and blended into a canvas.
+ *   _____           _        _____ _   _  _        _     _____
+ *  / ____|         | |      / ____| | (_)| |      | |   |  __ \
+ * | |     _   _  __| | __ _| (___ | |_ _ | |_  ___| |__ | |__) |__ _ _ __   ___
+ * | |    | | | |/ _` |/ _` |\___ \| __| || __|/ __| '_ \|  ___// _` | '_ \ / _ \
+ * | |____| |_| | (_| | (_| |____) | |_| || |_| (__| | | | |   | (_| | | | | (_) |
+ *  \_____|\__,_|\__,_|\__,_|_____/ \__|_| \__|\___|_| |_|_|    \__,_|_| |_|\___/
  *
- * This templated class is designed to work with various data types (e.g., `uchar3`, `float3`, or half-precision).
  *
- * @tparam T         The source pixel type for the input images (e.g., `uchar3`).
- * @tparam T_compute The computation pixel type (e.g., `float3`) used for blending.
  */
 template <typename T, typename T_compute>
 class CudaStitchPano {
  public:
-  /**
-   * @brief Constructs a CudaStitchPano object for a given batch size.
-   *
-   * @param batch_size How many images are processed concurrently in a single GPU call.
-   */
   CudaStitchPano(int batch_size) {}
 
-  /**
-   * @brief Main entry point for the stitching process: remap images, copy overlapping regions, and blend if needed.
-   *
-   * @param sampleImage1       The first input image on the GPU.
-   * @param sampleImage2       The second input image on the GPU.
-   * @param stitch_context     Holds GPU memory needed for the remap/ blending (e.g., x/y maps, seam mask).
-   * @param canvas_manager     Coordinates for final placement (canvas offsets, ROI, etc.).
-   * @param stream             The CUDA stream on which to enqueue operations.
-   * @param canvas             A pointer to the destination canvas on which images will be composited.
-   * @return A new pointer to the updated canvas if success, or an error code otherwise.
-   */
   static CudaStatusOr<std::unique_ptr<CudaMat<T>>> process(
       const CudaMat<T>& sampleImage1,
       const CudaMat<T>& sampleImage2,
       StitchingContext<T, T_compute>& stitch_context,
       const hm::pano::CanvasManager& canvas_manager,
       cudaStream_t stream,
-      std::unique_ptr<CudaMat<T>>&& canvas);
+      std::unique_ptr<CudaMat<T>>&& canvas) {
+    CudaStatus cuerr;
+
+    assert(canvas);
+
+    auto roi_width = [](const cv::Rect2i& roi) { return roi.width; };
+    // auto roi_height = [](const cv::Rect2i& roi) { return roi.height; };
+
+    if (!stitch_context.is_hard_seam()) {
+      //
+      // SOFT SEAM LEFT
+      //
+#if 1
+      //
+      // Image 1
+      //
+      // Remap image 1 onto the canvas
+      //
+      cuerr = batched_remap_kernel_ex_offset(
+          sampleImage1.data(),
+          sampleImage1.width(),
+          sampleImage1.height(),
+          canvas->data(),
+          canvas->width(),
+          canvas->height(),
+          stitch_context.remap_1_x->data(),
+          stitch_context.remap_1_y->data(),
+          {0, 0, 0},
+          /*batchSize=*/stitch_context.batch_size(),
+          stitch_context.remap_1_x->width(),
+          stitch_context.remap_1_x->height(),
+          /*offsetX=*/canvas_manager._x1,
+          /*offsetY=*/canvas_manager._y1,
+          stream);
+      // CUDA_RETURN_IF_ERROR(cuerr);
+      // SHOW_SMALL(canvas);
+#endif
+
+#if 1
+      //
+      // Now copy the blending portion of remapped image 1 from the canvas onto the blend image
+      //
+      cuerr = simple_make_full_batch<BaseScalar_t<T>, BaseScalar_t<T_compute>, unsigned char>(
+          // Image 1 (float image)
+          canvas->data_raw(),
+          canvas->width(),
+          canvas->height(),
+          /*region_width=*/roi_width(canvas_manager.roi_blend_1),
+          /*region_height=*/stitch_context.cudaBlendSoftSeam->height() /*roi_height(canvas_manager.roi_blend_1)*/,
+          /*channels=*/3,
+          // Batch of masks (optional)
+          nullptr,
+          0,
+          0,
+          0,
+          canvas_manager.roi_blend_1.x,
+          0 /* we've already applied our Y offset */,
+          /*destOffsetX=*/canvas_manager._remapper_1.xpos,
+          /*destOffsetY=*/0,
+          stitch_context.cudaBlendSoftSeam->width(),
+          stitch_context.cudaBlendSoftSeam->height(),
+          /*adjust_origin=*/false,
+          /*batchSize=*/stitch_context.batch_size(),
+          stitch_context.cudaFull1->data_raw(),
+          /*d_full_masks=*/nullptr,
+          stream);
+      CUDA_RETURN_IF_ERROR(cuerr);
+      // SHOW_IMAGE(stitch_context.cudaFull1);
+#endif
+    } else {
+      //
+      // HARD SEAM LEFT
+      //
+#if 1
+      cuerr = batched_remap_kernel_ex_offset_with_dest_map(
+          sampleImage1.data(),
+          sampleImage1.width(),
+          sampleImage1.height(),
+          canvas->data(),
+          canvas->width(),
+          canvas->height(),
+          stitch_context.remap_1_x->data(),
+          stitch_context.remap_1_y->data(),
+          {0, 0, 0},
+          /*this_image_index=*/
+          1 /* <-- we inverted the mask at load-time to make it a weight, so image 0 is actually 1 in the mask */,
+          stitch_context.cudaBlendHardSeam->data(),
+          /*batchSize=*/stitch_context.batch_size(),
+          stitch_context.remap_1_x->width(),
+          stitch_context.remap_1_x->height(),
+          /*offsetX=*/canvas_manager._x1,
+          /*offsetY=*/canvas_manager._y1,
+          stream);
+      // SHOW_SMALL(&sampleImage1);
+      // SHOW_IMAGE(canvas);
+#endif
+    }
+    //
+    // Image 2
+    //
+    if (!stitch_context.is_hard_seam()) {
+      //
+      // SOFT SEAM RIGHT
+      //
+#if 1
+      //
+      // Remap image 2 directly onto the canvas (will overwrite the overlappign portion of image 1)
+      //
+      cuerr = batched_remap_kernel_ex_offset(
+          sampleImage2.data(),
+          sampleImage2.width(),
+          sampleImage2.height(),
+          canvas->data(),
+          canvas->width(),
+          canvas->height(),
+          stitch_context.remap_2_x->data(),
+          stitch_context.remap_2_y->data(),
+          {0, 0, 0},
+          /*batchSize=*/stitch_context.batch_size(),
+          stitch_context.remap_2_x->width(),
+          stitch_context.remap_2_x->height(),
+          /*offsetX=*/canvas_manager._x2,
+          /*offsetY=*/canvas_manager._y2,
+          stream);
+      CUDA_RETURN_IF_ERROR(cuerr);
+      // SHOW_SMALL(canvas);
+#endif
+
+#if 1
+      //
+      // Now copy the blending portion of remapped image 2 from the canvas onto the blend image
+      //
+      // assert(stitch_context.cudaBlendSoftSeam->height() == roi_height(canvas_manager.roi_blend_2));
+      cuerr = simple_make_full_batch<BaseScalar_t<T>, BaseScalar_t<T_compute>, unsigned char>(
+          // Image 1 (float image)
+          canvas->data_raw(),
+          canvas->width(),
+          canvas->height(),
+          /*region_width=*/roi_width(canvas_manager.roi_blend_2),
+          /*region_height=*/stitch_context.cudaBlendSoftSeam->height() /*roi_height(canvas_manager.roi_blend_2)*/,
+          /*channels=*/3,
+          // Batch of masks (optional)
+          nullptr,
+          0,
+          0,
+          0,
+          /*offsetX=*/canvas_manager._x2,
+          /*offsetY=*/canvas_manager._y2,
+          /*destOffsetX=*/canvas_manager._remapper_2.xpos,
+          /*destOffsetY=*/0,
+          stitch_context.cudaBlendSoftSeam->width(),
+          stitch_context.cudaBlendSoftSeam->height(),
+          /*adjust_origin=*/false,
+          /*batchSize=*/stitch_context.batch_size(),
+          stitch_context.cudaFull2->data_raw(),
+          /*d_full_masks=*/nullptr,
+          stream);
+      CUDA_RETURN_IF_ERROR(cuerr);
+      // SHOW_IMAGE(stitch_context.cudaFull2);
+#endif
+    } else {
+      //
+      // HARD SEAM RIGHT
+      //
+#if 1
+      assert(canvas_manager._x2 + stitch_context.remap_2_x->width() <= canvas->width());
+      assert(canvas_manager._y2 + stitch_context.remap_2_x->height() <= canvas->height());
+      cuerr = batched_remap_kernel_ex_offset_with_dest_map(
+          sampleImage2.data(),
+          sampleImage2.width(),
+          sampleImage2.height(),
+          canvas->data(),
+          canvas->width(),
+          canvas->height(),
+          stitch_context.remap_2_x->data(),
+          stitch_context.remap_2_y->data(),
+          {0, 0, 0},
+          /*this_image_index=*/
+          0 /* <-- we inverted the mask at load-time to make it a weight, so image 1 is actually 0 in the mask */,
+          stitch_context.cudaBlendHardSeam->data(),
+          /*batchSize=*/stitch_context.batch_size(),
+          stitch_context.remap_2_x->width(),
+          stitch_context.remap_2_x->height(),
+          /*offsetX=*/canvas_manager._x2,
+          /*offsetY=*/canvas_manager._y2,
+          stream);
+      // SHOW_SMALL(&sampleImage2);
+      // SHOW_SMALL(canvas);
+      // SHOW_SMALL(stitch_context.cudaBlendHardSeam);
+#endif
+    }
+    if (!stitch_context.is_hard_seam()) {
+      CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
+#if 1
+      //
+      // BLEND THE IMAGES (overlapping portions + some padding)
+      //
+      cuerr = cudaBatchedLaplacianBlendWithContext(
+          stitch_context.cudaFull1->data_raw(),
+          stitch_context.cudaFull2->data_raw(),
+          stitch_context.cudaBlendSoftSeam->data_raw(),
+          // Put output in full-1 memory
+          cudaBlendedFull.data_raw(),
+          *stitch_context.laplacian_blend_context,
+          stream);
+      CUDA_RETURN_IF_ERROR(cuerr);
+      // SHOW_IMAGE(&cudaBlendedFull);
+#endif
+
+#if 1
+      //
+      // Copy the blended portion (overlapping portion + some padding) onto
+      // the canvas over some of the remapped image 1 and image 2
+      //
+      cuerr = copyRoiBatchedInterface(
+          cudaBlendedFull.data(),
+          cudaBlendedFull.width(),
+          cudaBlendedFull.height(),
+          cudaBlendedFull.width(),
+          cudaBlendedFull.height(),
+          0,
+          0,
+          canvas->data(),
+          canvas->width(),
+          canvas->height(),
+          /*offsetX=*/canvas_manager._x2 - canvas_manager.overlap_padding(),
+          /*offsetY=*/0,
+          /*channels=*/1, // <-- 1 when using stuff like float3
+          /*batchSize=*/stitch_context.batch_size(),
+          stream);
+      CUDA_RETURN_IF_ERROR(cuerr);
+      // SHOW_IMAGE(canvas);
+#endif
+    }
+    return std::move(canvas);
+  };
 };
-
-template <typename T, typename T_compute>
-CudaStatusOr<std::unique_ptr<CudaMat<T>>> CudaStitchPano<T, T_compute>::process(
-    const CudaMat<T>& sampleImage1,
-    const CudaMat<T>& sampleImage2,
-    StitchingContext<T, T_compute>& stitch_context,
-    const hm::pano::CanvasManager& canvas_manager,
-    cudaStream_t stream,
-    std::unique_ptr<CudaMat<T>>&& canvas) {
-  CudaStatus cuerr;
-
-  // Utility lambdas for ROI dimensions.
-  auto roi_width = [](const cv::Rect2i& roi) { return roi.width; };
-
-  // If using a soft seam, we do a multi-step blending; if hard seam, just map them with a binary mask.
-  if (!stitch_context.is_hard_seam()) {
-    // --- SOFT SEAM, LEFT IMAGE ---
-
-    // 1) Remap image1 onto the canvas.
-    cuerr = batched_remap_kernel_ex_offset(
-        sampleImage1.data(),
-        sampleImage1.width(),
-        sampleImage1.height(),
-        canvas->data(),
-        canvas->width(),
-        canvas->height(),
-        stitch_context.remap_1_x->data(),
-        stitch_context.remap_1_y->data(),
-        {0, 0, 0},
-        /*batchSize=*/stitch_context.batch_size(),
-        stitch_context.remap_1_x->width(),
-        stitch_context.remap_1_x->height(),
-        /*offsetX=*/canvas_manager._x1,
-        /*offsetY=*/canvas_manager._y1,
-        stream);
-
-    // 2) Copy the overlapping region from the canvas into a dedicated blend buffer (cudaFull1).
-    cuerr = simple_make_full_batch<BaseScalar_t<T>, BaseScalar_t<T_compute>, unsigned char>(
-        canvas->data_raw(),
-        canvas->width(),
-        canvas->height(),
-        /*region_width=*/roi_width(canvas_manager.roi_blend_1),
-        /*region_height=*/stitch_context.cudaBlendSoftSeam->height(),
-        /*channels=*/3,
-        nullptr,
-        0,
-        0,
-        0,
-        canvas_manager.roi_blend_1.x,
-        0,
-        /*destOffsetX=*/canvas_manager._remapper_1.xpos,
-        /*destOffsetY=*/0,
-        stitch_context.cudaBlendSoftSeam->width(),
-        stitch_context.cudaBlendSoftSeam->height(),
-        /*adjust_origin=*/false,
-        /*batchSize=*/stitch_context.batch_size(),
-        stitch_context.cudaFull1->data_raw(),
-        nullptr,
-        stream);
-    // Error checks omitted for brevity.
-  } else {
-    // --- HARD SEAM, LEFT IMAGE ---
-    cuerr = batched_remap_kernel_ex_offset_with_dest_map(
-        sampleImage1.data(),
-        sampleImage1.width(),
-        sampleImage1.height(),
-        canvas->data(),
-        canvas->width(),
-        canvas->height(),
-        stitch_context.remap_1_x->data(),
-        stitch_context.remap_1_y->data(),
-        {0, 0, 0},
-        /*this_image_index=*/1,
-        stitch_context.cudaBlendHardSeam->data(),
-        stitch_context.batch_size(),
-        stitch_context.remap_1_x->width(),
-        stitch_context.remap_1_x->height(),
-        canvas_manager._x1,
-        canvas_manager._y1,
-        stream);
-  }
-
-  // --- RIGHT IMAGE ---
-  if (!stitch_context.is_hard_seam()) {
-    // SOFT SEAM, RIGHT IMAGE
-    cuerr = batched_remap_kernel_ex_offset(
-        sampleImage2.data(),
-        sampleImage2.width(),
-        sampleImage2.height(),
-        canvas->data(),
-        canvas->width(),
-        canvas->height(),
-        stitch_context.remap_2_x->data(),
-        stitch_context.remap_2_y->data(),
-        {0, 0, 0},
-        stitch_context.batch_size(),
-        stitch_context.remap_2_x->width(),
-        stitch_context.remap_2_x->height(),
-        canvas_manager._x2,
-        canvas_manager._y2,
-        stream);
-
-    // Copy region from canvas to blend buffer (cudaFull2).
-    cuerr = simple_make_full_batch<BaseScalar_t<T>, BaseScalar_t<T_compute>, unsigned char>(
-        canvas->data_raw(),
-        canvas->width(),
-        canvas->height(),
-        roi_width(canvas_manager.roi_blend_2),
-        stitch_context.cudaBlendSoftSeam->height(),
-        3,
-        nullptr,
-        0,
-        0,
-        0,
-        canvas_manager._x2,
-        canvas_manager._y2,
-        /*destOffsetX=*/canvas_manager._remapper_2.xpos,
-        /*destOffsetY=*/0,
-        stitch_context.cudaBlendSoftSeam->width(),
-        stitch_context.cudaBlendSoftSeam->height(),
-        false,
-        stitch_context.batch_size(),
-        stitch_context.cudaFull2->data_raw(),
-        nullptr,
-        stream);
-
-    // Perform the Laplacian blend on the overlapping region:
-    CudaMat<T_compute>& cudaBlendedFull = *stitch_context.cudaFull1;
-    cuerr = cudaBatchedLaplacianBlendWithContext(
-        stitch_context.cudaFull1->data_raw(),
-        stitch_context.cudaFull2->data_raw(),
-        stitch_context.cudaBlendSoftSeam->data_raw(),
-        cudaBlendedFull.data_raw(),
-        *stitch_context.laplacian_blend_context,
-        stream);
-
-    // Copy the result back onto the canvas:
-    cuerr = copyRoiBatchedInterface(
-        cudaBlendedFull.data(),
-        cudaBlendedFull.width(),
-        cudaBlendedFull.height(),
-        cudaBlendedFull.width(),
-        cudaBlendedFull.height(),
-        0,
-        0,
-        canvas->data(),
-        canvas->width(),
-        canvas->height(),
-        canvas_manager._x2 - canvas_manager.overlap_padding(),
-        0,
-        /*channels=*/1,
-        stitch_context.batch_size(),
-        stream);
-  } else {
-    // HARD SEAM, RIGHT IMAGE
-    cuerr = batched_remap_kernel_ex_offset_with_dest_map(
-        sampleImage2.data(),
-        sampleImage2.width(),
-        sampleImage2.height(),
-        canvas->data(),
-        canvas->width(),
-        canvas->height(),
-        stitch_context.remap_2_x->data(),
-        stitch_context.remap_2_y->data(),
-        {0, 0, 0},
-        /*this_image_index=*/0,
-        stitch_context.cudaBlendHardSeam->data(),
-        stitch_context.batch_size(),
-        stitch_context.remap_2_x->width(),
-        stitch_context.remap_2_x->height(),
-        canvas_manager._x2,
-        canvas_manager._y2,
-        stream);
-  }
-
-  // Return the updated canvas.
-  return std::move(canvas);
-}
 
 } // namespace cuda
 } // namespace hm
 
-/**
- * @brief Helper to produce a repeated batch of the same Mat, if your pipeline is batch-based.
- *
- * @param mat The single `cv::Mat`.
- * @param batch_size Number of copies to produce.
- * @return Vector of identical `cv::Mat` objects.
- */
 std::vector<cv::Mat> as_batch(const cv::Mat& mat, int batch_size) {
   return std::vector<cv::Mat>(batch_size, mat);
 }
 
-/**
- * @brief Main entry point demonstrating how to load control masks, create a CanvasManager,
- * and run a stitching pipeline with Laplacian blending or a hard seam.
- *
- * Usage:
- *   ./myProgram <game-id>
- *
- * The code assumes a directory structure and file naming convention for input images.
- */
 int main(int argc, char** argv) {
+  // Usage check.
   if (argc < 2) {
     std::cerr << "Usage: " << argv[0] << " <game-id>" << std::endl;
     return -1;
@@ -745,21 +684,26 @@ int main(int argc, char** argv) {
   std::string game_id = argv[1];
   std::string game_dir = std::string(::getenv("HOME")) + "/Videos/" + game_id + "/";
 
-  // Example input images for left and right.
+  // stitch-fix
   std::string sample_img_left_path = game_dir + "GX010100.png";
   std::string sample_img_right_path = game_dir + "GX010019.png";
 
-  // Load test images in OpenCV.
+  // std::string sample_img_left_path = game_dir + "GX010097.png";
+  // std::string sample_img_right_path = game_dir + "GX010016.png";
+
+  // PDP
+  // std::string sample_img_left_path = game_dir + "GX010087.png";
+  // std::string sample_img_right_path = game_dir + "GX010003.png";
+
   cv::Mat sample_img_left = cv::imread(sample_img_left_path, cv::IMREAD_COLOR);
   assert(!sample_img_left.empty());
   cv::Mat sample_img_right = cv::imread(sample_img_right_path, cv::IMREAD_COLOR);
   assert(!sample_img_right.empty());
 
-  // Load control masks containing row/col maps and a seam mask.
   hm::pano::ControlMasks control_masks;
   control_masks.load(game_dir);
 
-  // Compute canvas size from image positions.
+  // Compute canvas size
   const int canvas_width = std::max(
       control_masks.positions[0].xpos + control_masks.img1_col.cols,
       control_masks.positions[1].xpos + control_masks.img2_col.cols);
@@ -768,23 +712,49 @@ int main(int argc, char** argv) {
       control_masks.positions[1].ypos + control_masks.img2_col.rows);
   std::cout << "Canvas size: " << canvas_width << " x " << canvas_height << std::endl;
 
-  // Decide how many pyramid levels for Laplacian blending (if not zero, we do soft seam).
+// Configurable parameter: number of pyramid levels.
+#ifdef __aarch64__
+  // Lower compute, quick and dirty
+  int numLevels = 0;
+  // int numLevels = 6;
+#else
   int numLevels = 6;
+  // int numLevels = 2;
+  // int numLevels = 6;
+  // int numLevels = 0;
+#endif
 
-  // Choose types for input and computation.
-  using T = uchar3; // e.g., for GPU-based BGR or RGB in 8u
-  using T_compute = float3; // use float3 for blending
+#if 1
+#if 1
+  using T = uchar3;
+  //using T_compute = uchar3;
+  using T_compute = float3;
+  //using T_compute = half3;
+#else
+  using T = float3;
+  using T_compute = float3;
+#endif
+#else
+  using T = float;
+  using T_compute = __half;
+#endif
 
-  // Possibly scale input images to floats if you want 0..1 range:
-  // sample_img_left.convertTo(sample_img_left, CV_32FC3, 1.0/255.0);
-  // sample_img_right.convertTo(sample_img_right, CV_32FC3, 1.0/255.0);
+  const int CV_T_PIPELINE = cudaPixelTypeToCvType(CudaTypeToPixelType<T>::value);
+  const int CV_T_COMPUTE3 = cudaPixelTypeToCvType(CudaTypeToPixelType<T_compute>::value);
+
+  if (std::is_floating_point_v<BaseScalar_t<T>>) {
+    sample_img_left.convertTo(sample_img_left, CV_T_PIPELINE, 1.0 / 255.0);
+    sample_img_right.convertTo(sample_img_right, CV_T_PIPELINE, 1.0 / 255.0);
+  }
 
   constexpr int kBatchSize = 1;
+  // constexpr int kBatchSize = 2;
 
-  // Create a stitching context: stores GPU buffers for remap, seam, etc.
-  hm::cuda::StitchingContext<T, T_compute> stitch_context(kBatchSize, /*is_hard_seam=*/(numLevels == 0));
+  hm::cuda::StitchingContext<T, T_compute> stitch_context(/*batch_size=*/kBatchSize, /*is_hard_seam=*/numLevels == 0);
 
-  // Build a CanvasManager to define how images fit on the canvas.
+  //
+  // CanvasManager
+  //
   hm::pano::CanvasManager canvas_manager(
       hm::pano::CanvasInfo{
           .width = canvas_width,
@@ -792,58 +762,62 @@ int main(int argc, char** argv) {
           .positions =
               {cv::Point(control_masks.positions[0].xpos, control_masks.positions[0].ypos),
                cv::Point(control_masks.positions[1].xpos, control_masks.positions[1].ypos)}},
-      /*minimize_blend=*/!stitch_context.is_hard_seam(),
-      /*overlap_pad=*/128);
-
+      /*minimize_blend=*/!stitch_context.is_hard_seam());
   canvas_manager._remapper_1.width = control_masks.img1_col.cols;
   canvas_manager._remapper_1.height = control_masks.img1_col.rows;
   canvas_manager._remapper_2.width = control_masks.img2_col.cols;
   canvas_manager._remapper_2.height = control_masks.img2_col.rows;
 
-  // Update internal blend logic in CanvasManager.
   canvas_manager.updateMinimizeBlend(control_masks.img1_col.size(), control_masks.img2_col.size());
 
-  // Crop/expand the seam mask to match the canvas region if needed.
   cv::Mat blend_seam = canvas_manager.convertMaskMat(control_masks.whole_seam_mask_image);
   assert(!blend_seam.empty());
   blend_seam = blend_seam.clone();
 
-  // Create a canvas on the GPU, sized to the entire output.
   auto canvas = std::make_unique<CudaMat<T>>(
       stitch_context.batch_size(), canvas_manager.canvas_width(), canvas_manager.canvas_height());
 
-  // Copy control data (x/y transformations, seam mask) onto GPU.
+  assert(control_masks.img1_col.type() == CV_16U);
   stitch_context.remap_1_x = std::make_unique<CudaMat<uint16_t>>(control_masks.img1_col);
   stitch_context.remap_1_y = std::make_unique<CudaMat<uint16_t>>(control_masks.img1_row);
+
   stitch_context.remap_2_x = std::make_unique<CudaMat<uint16_t>>(control_masks.img2_col);
   stitch_context.remap_2_y = std::make_unique<CudaMat<uint16_t>>(control_masks.img2_row);
 
   if (!stitch_context.is_hard_seam()) {
-    // Convert seam mask to float3 (for multi-channel blending).
-    blend_seam.convertTo(blend_seam, CV_32FC3); // or CV_T_COMPUTE3
+    blend_seam.convertTo(blend_seam, CV_T_COMPUTE3);
     stitch_context.cudaFull1 =
         std::make_unique<CudaMat<T_compute>>(stitch_context.batch_size(), blend_seam.cols, blend_seam.rows);
     stitch_context.cudaFull2 =
         std::make_unique<CudaMat<T_compute>>(stitch_context.batch_size(), blend_seam.cols, blend_seam.rows);
-    stitch_context.cudaBlendSoftSeam = std::make_unique<CudaMat<T_compute>>(blend_seam);
 
-    // Create a Laplacian blending context with `numLevels`.
+    stitch_context.cudaBlendSoftSeam = std::make_unique<CudaMat<T_compute>>(blend_seam);
     stitch_context.laplacian_blend_context = std::make_unique<CudaBatchLaplacianBlendContext<BaseScalar_t<T_compute>>>(
         stitch_context.cudaBlendSoftSeam->width(),
         stitch_context.cudaBlendSoftSeam->height(),
         numLevels,
-        stitch_context.batch_size());
+        /*batch_size=*/stitch_context.batch_size());
   } else {
-    // Hard seam: keep it as a single-channel 8-bit mask.
     assert(blend_seam.type() == CV_8U);
     stitch_context.cudaBlendHardSeam = std::make_unique<CudaMat<unsigned char>>(blend_seam);
   }
 
-  // Convert the input images into batch form, then upload them to GPU.
+  //
+  // The actual incoming images
+  //
+
+  // matchSeamImages(
+  //     sample_img_left,
+  //     sample_img_left,
+  //     control_masks.whole_seam_mask_image,
+  //     /*N=*/10,
+  //     cv::Point(canvas_manager.canvas_info_.positions[0].x, canvas_manager.canvas_info_.positions[0].y),
+  //     cv::Point(canvas_manager.canvas_info_.positions[1].x, canvas_manager.canvas_info_.positions[1].y));
+  // assert(sample_img_left.type() == CV_8UC3);
+  // assert(sample_img_right.type() == CV_8UC3);
   CudaMat<T> sampleImage1(as_batch(sample_img_left, kBatchSize));
   CudaMat<T> sampleImage2(as_batch(sample_img_right, kBatchSize));
 
-  // Run the stitching/blending pipeline once:
   auto blendedCanvasResult = hm::cuda::CudaStitchPano<T, T_compute>::process(
       sampleImage1, sampleImage2, stitch_context, canvas_manager, stream, std::move(canvas));
   if (!blendedCanvasResult.ok()) {
@@ -851,11 +825,17 @@ int main(int argc, char** argv) {
     return blendedCanvasResult.status().code();
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
-
-  // Optional: show the result in a scaled window (blocking).
+  //SHOW_SMALL(blendedCanvas);
+  // SHOW_IMAGE(blendedCanvas);
   // SHOW_SCALED(blendedCanvas, 0.25);
 
-  // Basic performance test: run the blend multiple times and measure throughput.
+  // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
+
+  // cudaStreamSynchronize(stream);
+
+  // display.render("cudaBlendedFull", CudaSurface(cudaBlendedFull), stream);
+
+#if 1 /* perf test */
   auto start_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
@@ -871,11 +851,12 @@ int main(int argc, char** argv) {
   auto stop_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
           .count();
-
   float ms = stop_ms - start_ms;
-  float sec_per_frame = (ms / 1000.0f) / (frame_count * stitch_context.batch_size());
-  std::cout << "Blend speed: " << (1.0f / sec_per_frame) << " fps" << std::endl;
+  float sec_per_frame = (ms / 1000) / (frame_count * stitch_context.batch_size());
+  std::cout << "Blend speed: " << (1.0 / sec_per_frame) << "fps" << std::endl;
+#endif
 
   cudaStreamDestroy(stream);
+
   return cudaSuccess;
 }
