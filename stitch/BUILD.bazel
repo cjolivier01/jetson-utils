@@ -13,10 +13,14 @@ config_setting(
 
 cc_library(
     name = "cuda_matrix",
-    srcs = ["cudaMat.cpp"],
+    srcs = [
+        "cudaMat.cpp",
+        "showImage.cpp",
+    ],
     hdrs = [
         "cudaMat.h",
         "cudaMat.inl",
+        "showImage.h",
     ],
     copts = [
         # "-DWITH_JETSON_UTILS=1",
@@ -35,12 +39,10 @@ cc_library(
     srcs = [
         "canvasManager.cpp",
         "controlMasks.cpp",
-        "showImage.cpp",
     ],
     hdrs = [
         "canvasManager.h",
         "controlMasks.h",
-        "showImage.h",
     ],
     copts = [
     ],

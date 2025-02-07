@@ -21,9 +21,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <set>
 #include <type_traits>
-#include <unordered_set>
 
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -261,75 +259,6 @@ class RenderSet {
 };
 
 } // namespace
-
-std::pair<double, double> get_min_max(const cv::Mat& mat) {
-  double minVal, maxVal;
-  cv::Point minLoc, maxLoc;
-
-  // Get the minimum and maximum values and their locations
-  cv::minMaxLoc(mat, &minVal, &maxVal, &minLoc, &maxLoc);
-  return std::make_pair(minVal, maxVal);
-}
-
-template <typename T>
-std::set<T> get_unique_values(const cv::Mat& mat, const std::unordered_set<T>& ignore = {}) {
-  std::set<T> unique_values;
-
-  // Check if the data type of the matrix matches the template type
-  if (mat.type() != cv::DataType<T>::type) {
-    throw std::invalid_argument("Matrix data type does not match the template type T");
-  }
-
-  // Iterate over each element in the matrix
-  for (int i = 0; i < mat.rows; ++i) {
-    for (int j = 0; j < mat.cols; ++j) {
-      T value = mat.at<T>(i, j);
-      // Add to set if not in ignore set
-      if (ignore.find(value) == ignore.end()) {
-        unique_values.insert(value);
-      }
-    }
-  }
-
-  return unique_values;
-}
-
-cv::Mat load_position_mask(const std::string& filename, double* minVal, double* maxVal) {
-  cv::Mat pos_mask = cv::imread(filename, cv::IMREAD_ANYDEPTH);
-  if (!pos_mask.empty()) {
-    if (minVal || maxVal) {
-      cv::Point minLoc, maxLoc;
-      // Get the minimum and maximum values and their locations
-      double min, max;
-      cv::minMaxLoc(pos_mask, &min, &max, &minLoc, &maxLoc);
-      if (minVal) {
-        *minVal = min;
-      }
-      if (maxVal) {
-        *maxVal = max;
-      }
-    }
-  } else {
-    if (minVal) {
-      *minVal = std::nan("");
-    }
-    if (maxVal) {
-      *maxVal = std::nan("");
-    }
-  }
-  return pos_mask;
-}
-
-cv::Mat make_fake_mask_like(const cv::Mat& mask) {
-  cv::Mat img(mask.rows, mask.cols, CV_32FC1, cv::Scalar(0));
-
-  // Define a region of interest (ROI) for the left half of the image.
-  cv::Rect leftHalfROI(0, 0, mask.cols / 2, mask.rows);
-
-  // Set all pixels in the left half to 1.
-  img(leftHalfROI).setTo(1.0f);
-  return img;
-}
 
 namespace hm {
 namespace cuda {
@@ -659,9 +588,9 @@ int main(int argc, char** argv) {
 #if 1
 #if 1
   using T = uchar3;
-  //using T_compute = uchar3;
+  // using T_compute = uchar3;
   using T_compute = float3;
-  //using T_compute = half3;
+  // using T_compute = half3;
 #else
   using T = float3;
   using T_compute = float3;
@@ -757,9 +686,9 @@ int main(int argc, char** argv) {
     return blendedCanvasResult.status().code();
   }
   auto blendedCanvas = blendedCanvasResult.ConsumeValueOrDie();
-  //SHOW_SMALL(blendedCanvas);
-  // SHOW_IMAGE(blendedCanvas);
-  // SHOW_SCALED(blendedCanvas, 0.25);
+  // SHOW_SMALL(blendedCanvas);
+  //  SHOW_IMAGE(blendedCanvas);
+  //  SHOW_SCALED(blendedCanvas, 0.25);
 
   // blendedCanvas = process(sampleImage1, sampleImage2, stitch_context, canvas_manager, stream);
 
