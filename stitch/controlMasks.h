@@ -5,7 +5,8 @@
 
 #include <opencv2/opencv.hpp>
 
-namespace hm { namespace pano { 
+namespace hm {
+namespace pano {
 
 struct SpatialTiff {
   // position in pixels
@@ -25,5 +26,5 @@ struct ControlMasks {
   std::vector<SpatialTiff> positions;
 };
 
-
-}}
+} // namespace pano
+} // namespace hm

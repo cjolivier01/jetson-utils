@@ -1,3 +1,4 @@
+#include "canvasManager.h"
 #include "controlMasks.h"
 #include "cudaBlend.h"
 #include "cudaMakeFull.h"
@@ -387,184 +388,6 @@ cv::Mat load_position_mask(const std::string& filename, double* minVal, double* 
   return pos_mask;
 }
 
-// Structure to hold canvas information.
-struct CanvasInfo {
-  int width{0};
-  int height{0};
-  // Assume positions[0] and positions[1] are valid cv::Point's with x and y coordinates.
-  std::vector<cv::Point> positions;
-};
-
-// Structure to hold remapper parameters.
-struct Remapper {
-  int width{0};
-  int height{0};
-  int xpos{0}; // This will be set by the blend logic.
-};
-
-/**
- *   _____                               __  __
- *  / ____|                             |  \/  |
- * | |      __ _ _ __ __   __ __ _  ___ | \  / | __ _ _ __   __ _  __ _  ___  _ __
- * | |     / _` | '_ \\ \ / // _` |/ __|| |\/| |/ _` | '_ \ / _` |/ _` |/ _ \| '__|
- * | |____| (_| | | | |\ V /| (_| |\__ \| |  | | (_| | | | | (_| | (_| |  __/| |
- *  \_____|\__,_|_| |_| \_/  \__,_||___/|_|  |_|\__,_|_| |_|\__,_|\__, |\___||_|
- *                                                                 __/ |
- *                                                                |___/
- */
-class CanvasManager {
- public:
-  // Canvas and blending parameters.
-
-  // Two remappers (for example, for two image streams).
-  Remapper _remapper_1;
-  Remapper _remapper_2;
-
-  // Additional members for blending logic.
-  int _x1{0}, _y1{0}, _x2{0}, _y2{0};
-  // The padded blended box, stored as [x1, y1, x2, y2].
-  std::vector<int> _padded_blended_tlbr;
-
-  // Constructor (if needed)
-  CanvasManager(CanvasInfo canvas_info, bool minimize_blend, int overlap_pad = 128)
-      : _x1(0),
-        _y1(0),
-        _x2(0),
-        _y2(0),
-        canvas_info_(canvas_info),
-        _overlapping_width(0),
-        _minimize_blend(minimize_blend),
-        _overlap_pad(overlap_pad) {}
-
-  // This function updates blending parameters if _minimize_blend is true.
-  void updateMinimizeBlend(const cv::Size& remapped_size_1, const cv::Size& remapped_size_2) {
-    // Ensure that canvas positions are available.
-    assert(canvas_info_.positions.size() >= 2);
-
-    // Unpack positions from the canvas.
-    _x1 = canvas_info_.positions[0].x;
-    _y1 = canvas_info_.positions[0].y;
-    _x2 = canvas_info_.positions[1].x;
-    _y2 = canvas_info_.positions[1].y;
-
-    int width_1 = _remapper_1.width;
-    _overlapping_width = width_1 - _x2;
-    // The first remapper's width must be greater than _x2.
-    assert(width_1 > _x2);
-
-    if (_minimize_blend) {
-      // Set remapper x positions.
-      _remapper_1.xpos = _x1;
-      _remapper_2.xpos = _x1 + _overlap_pad; // Start overlapping right away.
-
-      // Define the seam box (the region to be blended).
-      int box_x1 = _x2 - _overlap_pad;
-      int box_y1 = std::max(0, std::min(_y1, _y2) - _overlap_pad);
-      int box_x2 = width_1 + _overlap_pad;
-      int box_y2 =
-          std::min(canvas_info_.height, std::max(_y1 + _remapper_1.height, _y2 + _remapper_2.height) + _overlap_pad);
-      _padded_blended_tlbr = {box_x1, box_y1, box_x2, box_y2};
-
-      // Validate the computed coordinates.
-      assert(box_x1 >= 0);
-      assert(box_x2 <= canvas_info_.width);
-
-      // Compute ROIs
-      partial_size_1 = cv::Size(_x2 + _overlap_pad, _remapper_1.height);
-      roi_partial_1 = {0, 0, _x2 + _overlap_pad, partial_size_1.height};
-      roi_blend_1 = {_x2 - _overlap_pad, 0, remapped_size_1.width, remapped_size_1.height};
-
-      partial_size_2 = cv::Size{_remapper_2.width - (_overlapping_width - _overlap_pad), _remapper_2.height};
-      roi_partial_2 = {
-          _overlapping_width - _overlap_pad,
-          0,
-          _overlapping_width - _overlap_pad + partial_size_2.width,
-          partial_size_2.height};
-      roi_blend_2 = {0, 0, _overlapping_width + _overlap_pad, remapped_size_2.height};
-    }
-  }
-
-  // Example conversion function that returns a cv::Mat with the same size as the canvas.
-  // If _minimize_blend is true, it also updates the blend parameters and returns a cropped region.
-  cv::Mat convertMaskMat(const cv::Mat& mask) {
-    int padw = 0, padh = 0;
-    int mwidth = mask.cols;
-    int mheight = mask.rows;
-
-    // The mask should not be larger than the canvas.
-    assert(mwidth <= canvas_info_.width);
-    assert(mheight <= canvas_info_.height);
-
-    if (mwidth < canvas_info_.width)
-      padw = canvas_info_.width - mwidth;
-    if (mheight < canvas_info_.height)
-      padh = canvas_info_.height - mheight;
-
-    cv::Mat paddedMask;
-    if (padw > 0 || padh > 0) {
-      // Replicate border pixels on the right and bottom.
-      cv::copyMakeBorder(mask, paddedMask, 0, padh, 0, padw, cv::BORDER_REPLICATE);
-    } else {
-      paddedMask = mask;
-    }
-
-    // Check that the padded mask matches the canvas dimensions.
-    assert(paddedMask.cols == canvas_info_.width);
-    assert(paddedMask.rows == canvas_info_.height);
-
-    if (_minimize_blend) {
-      // Update blending parameters.
-      // updateMinimizeBlend();
-      // In the original Python code, the mask is cropped horizontally:
-      //   mask[..., positions[1].x - overlap_pad : remapper_1.width + overlap_pad]
-      int x_start = canvas_info_.positions[1].x - _overlap_pad;
-      int x_end = _remapper_1.width + _overlap_pad;
-      // Validate the crop region.
-      assert(x_start >= 0 && x_end <= paddedMask.cols);
-      cv::Rect roi(x_start, 0, x_end - x_start, paddedMask.rows);
-      return paddedMask(roi);
-    }
-    return paddedMask;
-  }
-
-  cv::Size partial_size_1;
-  cv::Size partial_size_2;
-  int4 roi_partial_1{
-      0,
-  };
-  int4 roi_partial_2{
-      0,
-  };
-  int4 roi_blend_1{
-      0,
-  };
-  int4 roi_blend_2{
-      0,
-  };
-
-  constexpr int overlap_padding() const {
-    return _overlap_pad;
-  }
-
-  constexpr int overlapping_width() const {
-    return _overlapping_width;
-  }
-
-  constexpr int canvas_width() const {
-    return canvas_info_.width;
-  }
-
-  constexpr int canvas_height() const {
-    return canvas_info_.height;
-  }
-
- private:
-  CanvasInfo canvas_info_;
-  int _overlapping_width{0};
-  bool _minimize_blend{false};
-  int _overlap_pad{0};
-};
-
 cv::Mat make_fake_mask_like(const cv::Mat& mask) {
   cv::Mat img(mask.rows, mask.cols, CV_32FC1, cv::Scalar(0));
 
@@ -598,15 +421,15 @@ class CudaStitchPano {
       const CudaMat<T>& sampleImage1,
       const CudaMat<T>& sampleImage2,
       StitchingContext<T, T_compute>& stitch_context,
-      const CanvasManager& canvas_manager,
+      const hm::pano::CanvasManager& canvas_manager,
       cudaStream_t stream,
       std::unique_ptr<CudaMat<T>>&& canvas) {
     CudaStatus cuerr;
 
     assert(canvas);
 
-    auto roi_width = [](const int4& roi) { return roi.z - roi.x; };
-    // auto roi_height = [](const int4& roi) { return roi.w - roi.y; };
+    auto roi_width = [](const cv::Rect2i& roi) { return roi.width; };
+    // auto roi_height = [](const cv::Rect2i& roi) { return roi.height; };
 
     if (!stitch_context.is_hard_seam()) {
       //
@@ -895,10 +718,10 @@ int main(int argc, char** argv) {
   int numLevels = 0;
   // int numLevels = 6;
 #else
-  // int numLevels = 6;
+  int numLevels = 6;
   // int numLevels = 2;
   // int numLevels = 6;
-  int numLevels = 0;
+  // int numLevels = 0;
 #endif
 
 #if 1
@@ -931,8 +754,8 @@ int main(int argc, char** argv) {
   //
   // CanvasManager
   //
-  CanvasManager canvas_manager(
-      CanvasInfo{
+  hm::pano::CanvasManager canvas_manager(
+      hm::pano::CanvasInfo{
           .width = canvas_width,
           .height = canvas_height,
           .positions =

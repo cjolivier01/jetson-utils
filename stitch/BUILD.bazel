@@ -33,20 +33,21 @@ cc_library(
 cc_library(
     name = "pano",
     srcs = [
+        "canvasManager.cpp",
         "controlMasks.cpp",
     ],
     hdrs = [
+        "canvasManager.h",
         "controlMasks.h",
     ],
     copts = [
     ],
-    linkopts = [
-
-    ],
     includes = ["."],
+    linkopts = [
+    ],
     visibility = ["//visibility:public"],
     deps = [
-      "@opencv_linux//:opencv",
+        "@opencv_linux//:opencv",
     ],
 )
 
