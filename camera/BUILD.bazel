@@ -1,5 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
+INCLUDE_PREFIX = "jetson-utils/camera"
+
 cc_library(
     name = "camera",
     srcs = [
@@ -26,6 +28,7 @@ cc_library(
         "v4l2Camera.h",
     ],
     includes = ["."],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         "//base:base_includes",

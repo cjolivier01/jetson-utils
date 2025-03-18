@@ -1,5 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
+INCLUDE_PREFIX = "jetson-utils/display"
+
 cc_library(
     name = "display",
     srcs = glob(["*.cpp"]),
@@ -31,6 +33,7 @@ cc_library(
     srcs = [],
     hdrs = glob(["*.h"]),
     includes = ["."],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         "//base:base_includes",
@@ -45,6 +48,7 @@ cc_library(
         "glUtility.h",
     ],
     includes = ["."],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
     ],
@@ -58,6 +62,7 @@ cc_library(
         "glBuffer.h",
     ],
     includes = ["."],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
     ],
