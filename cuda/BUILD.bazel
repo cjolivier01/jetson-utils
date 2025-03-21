@@ -1,6 +1,8 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_cuda//cuda:defs.bzl", "cuda_library")
 
+INCLUDE_PREFIX = "jetson-utils/cuda"
+
 config_setting(
     name = "aarch64-linux-gnu",
     constraint_values = ["@platforms//cpu:aarch64"],
@@ -41,6 +43,7 @@ cc_library(
         "-lnvbufsurftransform",
         "-lculibos",
     ],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         ":colorspace_lib",
@@ -80,6 +83,7 @@ cc_library(
         "-lnvbufsurftransform",
         "-lculibos",
     ],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         ":colorspace_cuda_lib",
@@ -120,6 +124,7 @@ cuda_library(
         "-g",
         "-O0",
     ],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         ":colorspace_cuda_lib",
@@ -187,6 +192,7 @@ cc_library(
     includes = [
         ".",
     ],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_utility",
@@ -215,6 +221,7 @@ cc_library(
     includes = [
         ".",
     ],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         "//base:base_includes",
