@@ -45,7 +45,7 @@ inline __device__ __host__ float dist(float x1, float y1, float x2, float y2)  {
 // Circle drawing (find if the distance to the circle <= radius)
 //----------------------------------------------------------------------------						 
 template<typename T>
-__global__ void gpuDrawCircle( T* img, int imgWidth, int imgHeight, int offset_x, int offset_y, int cx, int cy, float radius2, const float4 color ) 
+__global__ void gpuDrawCircle( T* img, int imgWidth, int imgHeight, int offset_x, int offset_y, int cx, int cy, float radius2, float innerRadius, const float4 color ) 
 {
 	const int x = blockIdx.x * blockDim.x + threadIdx.x + offset_x;
 	const int y = blockIdx.y * blockDim.y + threadIdx.y + offset_y;
@@ -57,7 +57,8 @@ __global__ void gpuDrawCircle( T* img, int imgWidth, int imgHeight, int offset_x
 	const int dy = y - cy;
 	
 	// if x,y is in the circle draw it
-	if( dx * dx + dy * dy < radius2 ) 
+  int64_t posval = dx * dx + dy * dy;
+	if( posval < radius2 && posval > innerRadius) 
 	{
 		const int idx = y * imgWidth + x;
 		img[idx] = cudaAlphaBlend(img[idx], color);
@@ -65,7 +66,7 @@ __global__ void gpuDrawCircle( T* img, int imgWidth, int imgHeight, int offset_x
 }
 
 // cudaDrawCircle
-cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, int cx, int cy, float radius, const float4& color, cudaStream_t stream )
+cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, int cx, int cy, float radius, float innerRadius, const float4& color, cudaStream_t stream )
 {
 	if( !input || !output || width == 0 || height == 0 || radius <= 0 )
 		return cudaErrorInvalidValue;
@@ -85,7 +86,7 @@ cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t heig
 	const dim3 gridDim(iDivUp(diameter,blockDim.x), iDivUp(diameter,blockDim.y));
 
 	#define LAUNCH_DRAW_CIRCLE(type) \
-		gpuDrawCircle<type><<<gridDim, blockDim, 0, stream>>>((type*)output, width, height, offset_x, offset_y, cx, cy, radius*radius, color)
+		gpuDrawCircle<type><<<gridDim, blockDim, 0, stream>>>((type*)output, width, height, offset_x, offset_y, cx, cy, radius*radius, innerRadius*innerRadius, color)
 	
 	if( format == IMAGE_RGB8 )
 		LAUNCH_DRAW_CIRCLE(uchar3);
@@ -104,6 +105,9 @@ cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t heig
 	return cudaGetLastError();
 }
 
+cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, int cx, int cy, float radius, const float4& color, cudaStream_t stream ) {
+  return cudaDrawCircle(input, output, width, height, format, cx, cy, radius, 0.0f, color, stream);
+}
 
 //----------------------------------------------------------------------------
 // Line drawing (find if the distance to the line <= line_width)

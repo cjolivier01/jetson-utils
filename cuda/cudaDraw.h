@@ -34,7 +34,10 @@
  */
 cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, 
                             int cx, int cy, float radius, const float4& color, cudaStream_t stream=0 );
-	
+
+cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, 
+                            int cx, int cy, float radius, float innerRadius, const float4& color, cudaStream_t stream=0 );
+
 /**
  * cudaDrawCircle
  * @ingroup drawing
@@ -55,6 +58,12 @@ inline cudaError_t cudaDrawCircle( void* image, size_t width, size_t height, ima
                                    int cx, int cy, float radius, const float4& color, cudaStream_t stream=0 )
 {
 	return cudaDrawCircle(image, image, width, height, format, cx, cy, radius, color, stream);
+}
+
+inline cudaError_t cudaDrawCircle( void* image, size_t width, size_t height, imageFormat format, 
+  int cx, int cy, float radius, float innerRadius, const float4& color, cudaStream_t stream=0 )
+{
+return cudaDrawCircle(image, image, width, height, format, cx, cy, radius, innerRadius, color, stream);
 }
 
 /**
