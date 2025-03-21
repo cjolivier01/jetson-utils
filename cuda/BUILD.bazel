@@ -145,6 +145,7 @@ cuda_library(
     ],
     hdrs = [
         "cudaFilterMode.cuh",
+        "cudaMisc.cuh",
     ],
     copts = [
         "-keep",

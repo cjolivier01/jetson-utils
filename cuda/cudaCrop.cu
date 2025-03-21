@@ -21,6 +21,7 @@
  */
 
 #include "cudaCrop.h"
+#include "cudaMisc.cuh"
 
 #include <cassert>
 
@@ -43,7 +44,8 @@ __global__ void gpuCropPitched(
 
   const int in_x = out_x + offsetX;
   const int in_y = out_y + offsetY;
-  ((T*)((size_t)(output) + out_y * outputPitch))[out_x] = ((T*)((size_t)(input) + in_y * inputPitch))[in_x];
+  cuda::misc::row_start(output, out_y, outputPitch)[out_x] = cuda::misc::row_start(input, in_y, inputPitch)[in_x];
+  // ((T*)((size_t)(output) + out_y * outputPitch))[out_x] = ((T*)((size_t)(input) + in_y * inputPitch))[in_x];
 }
 
 // launchCrop
