@@ -124,7 +124,6 @@ cuda_library(
         "-g",
         "-O0",
     ],
-    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         ":colorspace_cuda_lib",
