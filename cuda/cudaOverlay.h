@@ -24,7 +24,6 @@
 #define __CUDA_OVERLAY_H__
 
 
-#include "cudaUtility.h"
 #include "imageFormat.h"
 
 
