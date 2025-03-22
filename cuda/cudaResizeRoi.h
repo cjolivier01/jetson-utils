@@ -9,10 +9,7 @@
 #include "cudaFilterMode.cuh"
 #include "imageFormat.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+/* clang-format off */
 //------------------------------------------------------------------------------
 // ROI–based resize functions for various image data types.
 //
@@ -72,6 +69,4 @@ cudaError_t cudaResizeROI( void* input, size_t inputWidth, size_t inputHeight,
                            int dstX, int dstY, int dstWidth, int dstHeight,
                            imageFormat format, cudaFilterMode filter, cudaStream_t stream );
 
-#ifdef __cplusplus
-}
-#endif
+/* clang-format on */
