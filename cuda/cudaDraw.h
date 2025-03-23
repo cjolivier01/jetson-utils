@@ -131,6 +131,21 @@ cudaError_t cudaDrawRect( void* input, void* output, size_t width, size_t height
                           const float4& line_color=make_float4(0,0,0,0), float line_width=1.0f,
                           cudaStream_t stream=0 );
 
+cudaError_t cudaDrawRect( void* input, void* output, size_t width, size_t height, size_t pitch, imageFormat format, 
+                          int left, int top, int right, int bottom, const float4& color, 
+                          const float4& line_color=make_float4(0,0,0,0), float line_width=1.0f,
+                          cudaStream_t stream=0 );
+
+
+template<typename T> 
+cudaError_t cudaDrawRect( T* input, T* output, size_t width, size_t height, size_t pitch, 
+                          int left, int top, int right, int bottom, const float4& color,
+                          const float4& line_color=make_float4(0,0,0,0), float line_width=1.0f,
+                          cudaStream_t stream=0 )	
+{ 
+	return cudaDrawRect(input, output, width, height, pitch, imageFormatFromType<T>(), left, top, right, bottom, color, line_color, line_width, stream); 
+}
+
 /**
  * cudaDrawRect
  * @ingroup drawing

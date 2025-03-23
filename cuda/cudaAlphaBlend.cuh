@@ -48,6 +48,10 @@ __device__ inline T1 cudaAlphaBlend( const T1& src, const T2& dst )
 				     255);
 }
 
+template <typename T>
+inline __device__ T*start_of_row(T* image, size_t row, size_t pitch) {
+  return (T*)(((uint8_t*)image) + row * pitch);
+}
 
 #endif
 
