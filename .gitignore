@@ -3,3 +3,4 @@
 /bazel-*
 /output.png
 /compile_commands.json
+/.cache
