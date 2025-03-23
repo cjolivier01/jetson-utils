@@ -23,8 +23,8 @@
 #include "cudaAlphaBlend.cuh"
 #include "cudaFont.h"
 #include "cudaMappedMemory.h"
+#include "cudaOverlay.h"
 #include "cudaVector.h"
-
 
 #include "filesystem.h"
 #include "logging.h"
@@ -674,8 +674,7 @@ bool cudaFont::OverlayText(
 
   // draw background rects
   if (has_bg && numRects > 0) {
-    // CUDA(cudaDrawRect(image, image, width, height, format, mRectsGPU + mRectIndex, numRects, bg_color, stream));
-    std::cout << "Skipping background draw..." << std::endl;
+    CUDA(cudaRectFill(image, image, width, height, format, mRectsGPU + mRectIndex, numRects, bg_color, stream));
   }
 
   // draw text characters
@@ -835,8 +834,8 @@ bool cudaFont::OverlayText(
 
   // Draw background rects (assuming cudaRectFill supports pitched images, or modify as needed).
   if (has_bg && numRects > 0) {
-    // CUDA(cudaRectFill(image, image, width, height, format, mRectsGPU + mRectIndex, numRects, bg_color, stream));
-    std::cout << "Skippign background draw..." << std::endl;
+    CUDA(cudaRectFillPitch(
+        image, image, width, height, pitch, pitch, format, mRectsGPU + mRectIndex, numRects, bg_color, stream));
   }
 
   // Now call the new overlay function that uses pitch. Here we assume both input and output images have the same pitch.
