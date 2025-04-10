@@ -32,6 +32,9 @@
       "args": [],
       "cwd": "${workspaceFolder}",
       "preLaunchTask": "JU Build All",
+      "sourceMap": {
+        "/proc/self/cwd": "${workspaceFolder}",
+      },
     },
     {
       "name": "(LLDB) cudaBlend",
@@ -50,9 +53,9 @@
       ],
       "sourceMap": {
         "/proc/self/cwd": "${workspaceFolder}",
-        "~/src": "${env:HOME}/src",
-        "external/deepstream/sources": "${env:HOME}/src/hstream/external/deepstream/sources",
-        "home/colivier/src/jetson-utils": "${workspaceFolder}/src/external/jetson-utils",
+        // "~/src": "${env:HOME}/src",
+        // "external/deepstream/sources": "${env:HOME}/src/hstream/external/deepstream/sources",
+        // "home/colivier/src/jetson-utils": "${workspaceFolder}/src/external/jetson-utils",
       },
       //"stopOnEntry": true,
       "env": {
