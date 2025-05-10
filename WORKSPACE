@@ -54,20 +54,19 @@ http_archive(
 
 new_local_repository(
     name = "glibconfig_x86",
-    build_file = "//buildfiles:third_party/glibconfig.BUILD",
+    build_file = "@//buildfiles:third_party/glibconfig.BUILD",
     path = "/usr/lib/x86_64-linux-gnu/glib-2.0/include",
 )
 
 new_local_repository(
     name = "glibconfig_aarch64",
-    build_file = "//buildfiles:third_party/glibconfig.BUILD",
+    build_file = "@//buildfiles:third_party/glibconfig.BUILD",
     path = "/usr/lib/aarch64-linux-gnu/glib-2.0/include",
 )
 
 new_local_repository(
     name = "glib",
     build_file = "@//buildfiles:third_party/glib_nobuild.BUILD",
-    # path = "/usr/local",
     path = "/usr",
 )
 
@@ -80,7 +79,6 @@ new_local_repository(
 new_local_repository(
     name = "gstreamer",
     build_file = "@//buildfiles:third_party/gstreamer_nobuild.BUILD",
-    # path = "/usr/local",
     path = "/usr",
 )
 
