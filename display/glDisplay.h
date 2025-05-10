@@ -617,6 +617,7 @@ protected:
 	bool		   mInitialShow;
 	bool		   mRendering;
 	bool		   mResizedToFeed;
+  bool       mDelayedResetViewport{false};
 	Atom		   mWindowClosedMsg;
 	DragMode	   mDragMode;
 
