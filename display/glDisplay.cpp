@@ -1008,7 +1008,7 @@ void glDisplay::SetSize(uint32_t width, uint32_t height) {
   // ResizeWindow(mWindowX, mDisplayX, mOptions.width, mOptions.height);
 
   ResetViewport();
--}
+}
 
 // SetCursor
 void glDisplay::SetCursor(uint32_t cursor) {
