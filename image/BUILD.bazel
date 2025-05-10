@@ -1,5 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
+INCLUDE_PREFIX = "jetson-utils/image"
+
 cc_library(
     name = "image",
     srcs = [
@@ -35,6 +37,7 @@ cc_library(
         "stb/stb_truetype.h",
     ],
     includes = ["."],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         "//base:base_includes",
@@ -53,6 +56,7 @@ cc_library(
         "-Wno-error=switch",
     ],
     includes = ["."],
+    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         "//base:base_includes",
