@@ -114,7 +114,7 @@ cuda_library(
         "cudaAlphaBlend.cuh",
     ],
     copts = [
-        "-std=c++17",
+        # "-std=c++17",
         "-Xcompiler=-fPIC",
         "-Xcompiler=-g",
         "-Xcompiler=-O0",
