@@ -25,6 +25,8 @@
 
 #include "imageFormat.h"
 
+#include "cudaUtility.h"
+
 /**
  * Crop a uint8 grayscale image to the specified region of interest (ROI).
  *

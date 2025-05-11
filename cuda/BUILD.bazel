@@ -128,6 +128,7 @@ cuda_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":cuda_utility",
         ":colorspace_cuda_lib",
         ":cuda_lib_headers",
         "//image",
