@@ -28,7 +28,6 @@ cuda_library(
     srcs = glob(["*.cu"]),
     hdrs = glob(["*.h"]),
     copts = [
-        "-std=c++17",
         "-Xcompiler=-fPIC",
         "-Xcompiler=-g",
         "-g",
