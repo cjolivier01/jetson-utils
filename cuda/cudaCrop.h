@@ -23,7 +23,6 @@
 #ifndef __CUDA_CROP_H__
 #define __CUDA_CROP_H__
 
-#include "cudaUtility.h"
 #include "imageFormat.h"
 
 /**
