@@ -114,14 +114,12 @@ cuda_library(
         "cudaAlphaBlend.cuh",
     ],
     copts = [
-        # "-std=c++17",
         "-Xcompiler=-fPIC",
         "-Xcompiler=-g",
         "-Xcompiler=-O0",
         "-Xcompiler=-rdynamic",
         "-G",
         "-keep",
-        # "-keep-dir=/tmp/cuda_temp",
         "-g",
         "-O0",
     ],
@@ -150,8 +148,6 @@ cuda_library(
     ],
     copts = [
         "-keep",
-        # "-keep-dir=/tmp/cuda_temp",
-        "-std=c++17",
         "-Xcompiler=-fPIC",
         "-Xcompiler=-g",
         "-Xcompiler=-O0",
