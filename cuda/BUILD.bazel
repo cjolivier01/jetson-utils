@@ -25,7 +25,7 @@ cc_library(
         "-fPIC",
         "-Wno-error=deprecated-declarations",
         "-g",
-        "-O0",
+        # "-O0",
     ],
     linkopts = select({
         ":aarch64-linux-gnu": [
@@ -121,7 +121,7 @@ cuda_library(
         "-G",
         "-keep",
         "-g",
-        "-O0",
+        # "-O0",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -154,7 +154,7 @@ cuda_library(
         "-Xcompiler=-rdynamic",
         "-G",
         "-g",
-        "-O0",
+        # "-O0",
     ],
     visibility = ["//visibility:public"],
     deps = [
