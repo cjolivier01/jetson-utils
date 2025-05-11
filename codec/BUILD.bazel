@@ -74,6 +74,7 @@ cc_library(
         ":gst_utility",
         "//base",
         "//network",
+        "//video:video_source",
     ],
 )
 
@@ -86,7 +87,7 @@ cc_library(
         "gstUtility.h",
         "nvbuf_utils.h",
     ],
-    copts=[
+    copts = [
         "-Wno-error=switch",
         "-Wno-error=unused-function",
     ],

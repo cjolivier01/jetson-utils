@@ -26,8 +26,6 @@
 #include <npp.h>
 #include <nppi.h>
 
-#include <iostream>
-
 static cudaError_t fillNppStreamContext(NppStreamContext& ctx, cudaStream_t stream) {
   int device;
   cudaDeviceProp deviceProp;

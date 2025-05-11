@@ -18,6 +18,7 @@ cc_library(
         ":image_format",
         ":image_includes",
         "//cuda:cuda_lib_headers",
+        "//cuda:colorspace_lib",
         "//threads",
         "//video:video_includes",
     ],
