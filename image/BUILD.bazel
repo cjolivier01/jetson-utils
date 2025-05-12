@@ -7,6 +7,9 @@ cc_library(
     srcs = [
         "imageWriter.cpp",
     ],
+    hdrs = [
+        "imageWriter.h",
+    ],
     copts = [
         "-Wno-error=switch",
         "-Wno-deprecated-declarations",
@@ -14,10 +17,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":image_format",
-        ":image_includes",
         ":image_loader",
-        "//cuda:cuda_lib_headers",
         "//cuda:colorspace_lib",
+        "//cuda:cuda_lib_headers",
         "//threads",
         "//video:video_output",
     ],
@@ -45,6 +47,21 @@ cc_library(
 )
 
 cc_library(
+    name = "load_image",
+    srcs = [
+    ],
+    hdrs = [
+        "loadImage.h",
+    ],
+    copts = [
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "image_loader",
+    ],
+)
+
+cc_library(
     name = "stb_image",
     srcs = [],
     hdrs = [
@@ -53,24 +70,8 @@ cc_library(
         "stb/stb_image_write.h",
         "stb/stb_truetype.h",
     ],
-    includes = ["."],
     include_prefix = INCLUDE_PREFIX,
-    visibility = ["//visibility:public"],
-    deps = [
-        "//base:base_includes",
-        "//video:video_options",
-    ],
-)
-
-cc_library(
-    name = "image_includes",
-    srcs = [],
-    hdrs = [
-        "imageWriter.h",
-        "loadImage.h",
-    ],
     includes = ["."],
-    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
         "//base:base_includes",
@@ -85,11 +86,11 @@ cc_library(
         "imageFormat.h",
         "imageFormat.inl",
     ],
-    copts=[
+    copts = [
         "-Wno-error=switch",
     ],
-    includes = ["."],
     include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
         "//base:base_includes",

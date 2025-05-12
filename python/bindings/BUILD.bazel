@@ -10,7 +10,8 @@ cc_library(
     ],
     deps = [
         "//base:base",
-        "//image:image",
+        "//image:load_image",
+        "//video:video_output",
         "//camera:camera",
         "@conda_python//:python",
     ],
