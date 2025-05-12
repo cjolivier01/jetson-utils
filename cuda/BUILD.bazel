@@ -131,7 +131,7 @@ cuda_library(
         ":cuda_utility",
         ":colorspace_cuda_lib",
         ":cuda_lib_headers",
-        "//image",
+        "//image:stb_image",
         "@local_cuda//:cuda_runtime",
     ],
 )

@@ -21,17 +21,11 @@
  */
  
 #include "videoSource.h"
-#include "imageLoader.h"
 
 #include "gstCamera.h"
-// #include "gstDecoder.h"
-
-#include "logging.h"
 
 #include <cassert>
 #include <cstdint>
-#include <string>
-#include <algorithm>
 
 // constructor
 videoSource::videoSource( const videoOptions& options ) : mOptions(options)
