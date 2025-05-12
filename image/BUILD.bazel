@@ -19,7 +19,7 @@ cc_library(
         "//cuda:cuda_lib_headers",
         "//cuda:colorspace_lib",
         "//threads",
-        "//video:video_includes",
+        "//video:video_output",
     ],
 )
 
