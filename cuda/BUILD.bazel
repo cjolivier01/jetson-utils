@@ -158,7 +158,7 @@ cuda_library(
         "-keep",
         "-Xcompiler=-fPIC",
         "-Xcompiler=-g",
-        "-Xcompiler=-O0",
+        # "-Xcompiler=-O0",
         "-Xcompiler=-rdynamic",
         "-G",
         "-g",
