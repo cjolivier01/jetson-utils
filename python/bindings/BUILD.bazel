@@ -13,7 +13,7 @@ cc_library(
         "//image:load_image",
         "//video:video_output",
         "//camera:camera",
-        "@conda_python//:python",
+        "@libpython",
     ],
 )
 
