@@ -4,7 +4,7 @@ cc_library(
     hdrs = glob(["include/**/*.h"]),
     includes = [
       "include",
-      "include/python3.11"
+      "include/python3.12"
     ],
     linkopts = [
       "-Llib",
