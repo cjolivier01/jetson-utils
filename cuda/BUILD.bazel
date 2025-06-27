@@ -3,6 +3,7 @@ load("@rules_cuda//cuda:defs.bzl", "cuda_library")
 
 INCLUDE_PREFIX = "jetson-utils/cuda"
 
+
 config_setting(
     name = "aarch64-linux-gnu",
     constraint_values = ["@platforms//cpu:aarch64"],
@@ -123,9 +124,11 @@ cuda_library(
     ],
     copts = [
         "-Xcompiler=-fPIC",
-        "-Xcompiler=-std=c++17",
         "-Wno-deprecated-gpu-targets",
         "-Xcompiler=-fdiagnostics-color=always",
+        # Jetson Nano (Ubuntu 18.04) needs c++14 max
+        "--std=c++14",
+        "-Xcompiler=-std=c++14",
     ] + select({
         # only in debug mode:
         ":debug_build": [
@@ -169,10 +172,11 @@ cuda_library(
     ],
     copts = [
         "-Xcompiler=-fPIC",
-        "-Xcompiler=-std=c++17",
-        # "-ccbin=/usr/bin/clang++-8", 
         "-Wno-deprecated-gpu-targets",
         "-Xcompiler=-fdiagnostics-color=always",
+        # Jetson Nano (Ubuntu 18.04) needs c++14 max
+        "--std=c++14",
+        "-Xcompiler=-std=c++14",
     ] + select({
         # only in debug mode:
         ":debug_build": [
@@ -186,10 +190,6 @@ cuda_library(
         # in all other modes, no extra flags
         "//conditions:default": [],
     }),
-    host_copts = [
-        "-x", "c++",
-        "-std=c++17",
-    ],
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_lib_headers",
@@ -202,7 +202,6 @@ cuda_library(
 cc_library(
     name = "cuda_lib_headers",
     hdrs = [
-        # "cudaColormap.h",
         "cudaCrop.h",
         "cudaDraw.h",
         "cudaFilterMode.h",
@@ -213,7 +212,6 @@ cc_library(
         "cudaPointCloud.h",
         "cudaResize.h",
         "cudaResizeRoi.h",
-        # "cudaUtility.h",
         "cudaWarp.h",
     ],
     include_prefix = INCLUDE_PREFIX,

@@ -31,12 +31,6 @@ conda_repository(
 
 # detect_conda_python(name = "conda_python")
 
-# new_local_repository(
-#     name = "conda_python",
-#     path = "/home/colivier/.conda/envs/ubuntu",
-#     build_file = "@//buildfiles:third_party/python.BUILD",
-# )
-
 http_archive(
     name = "rules_python",
     sha256 = "9c6e26911a79fbf510a8f06d8eedb40f412023cf7fa6d1461def27116bff022c",
