@@ -170,6 +170,7 @@ cuda_library(
     copts = [
         "-Xcompiler=-fPIC",
         "-Xcompiler=-std=c++17",
+        # "-ccbin=/usr/bin/clang++-8", 
         "-Wno-deprecated-gpu-targets",
         "-Xcompiler=-fdiagnostics-color=always",
     ] + select({
@@ -180,11 +181,15 @@ cuda_library(
             "-G",
             "-g",
             "-keep",
-            "-O0",
+            # "-O0",
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
     }),
+    host_copts = [
+        "-x", "c++",
+        "-std=c++17",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_lib_headers",
