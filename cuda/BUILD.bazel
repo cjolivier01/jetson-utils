@@ -129,12 +129,12 @@ cuda_library(
     ] + select({
         # only in debug mode:
         ":debug_build": [
-            "-Xcompiler=-O0",
+            # "-Xcompiler=-O0",
             "-Xcompiler=-g",
             "-G",
             "-g",
             "-keep",
-            "-O0",
+            # "-O0",
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
@@ -175,7 +175,7 @@ cuda_library(
     ] + select({
         # only in debug mode:
         ":debug_build": [
-            "-Xcompiler=-O0",
+            # "-Xcompiler=-O0",
             "-Xcompiler=-g",
             "-G",
             "-g",

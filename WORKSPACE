@@ -24,7 +24,7 @@ load("//bazel:dependencies.bzl", "conda_repository")
 conda_repository(
     name = "libpython",
     build_file = "@//buildfiles:third_party/libpython.BUILD",
-    files = ["lib/libpython3.11.so"],
+    files = ["lib/libpython3.12.so"],
 )
 
 # load("//:conda.bzl", "detect_conda_python")
