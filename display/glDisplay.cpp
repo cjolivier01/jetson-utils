@@ -29,7 +29,6 @@
 
 #include <algorithm>
 #include <cstdlib>
-// #include <iostream>
 
 //--------------------------------------------------------------
 std::vector<glDisplay*> gDisplays;
