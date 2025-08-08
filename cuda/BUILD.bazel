@@ -3,7 +3,6 @@ load("@rules_cuda//cuda:defs.bzl", "cuda_library")
 
 INCLUDE_PREFIX = "jetson-utils/cuda"
 
-
 config_setting(
     name = "aarch64-linux-gnu",
     constraint_values = ["@platforms//cpu:aarch64"],
@@ -30,9 +29,15 @@ cc_library(
         "-std=c++17",
         "-fPIC",
         "-Wno-error=deprecated-declarations",
-        # "-g",
-        # "-O0",
-    ],
+    ] + select({
+        # only in debug mode:
+        ":debug_build": [
+            "-g",
+            "-O0",
+        ],
+        # in all other modes, no extra flags
+        "//conditions:default": [],
+    }),
     include_prefix = INCLUDE_PREFIX,
     linkopts = select({
         ":aarch64-linux-gnu": [
@@ -46,8 +51,6 @@ cc_library(
         "-lnppc_static",
         "-lnppif_static",
         "-lnppicc_static",
-        # "-lnvbufsurface",
-        # "-lnvbufsurftransform",
         "-lculibos",
     ],
     visibility = ["//visibility:public"],
@@ -74,7 +77,15 @@ cc_library(
         "-std=c++17",
         "-fPIC",
         "-Wno-error=deprecated-declarations",
-    ],
+    ] + select({
+        # only in debug mode:
+        ":debug_build": [
+            "-g",
+            "-O0",
+        ],
+        # in all other modes, no extra flags
+        "//conditions:default": [],
+    }),
     include_prefix = INCLUDE_PREFIX,
     linkopts = select({
         ":aarch64-linux-gnu": [
@@ -88,20 +99,19 @@ cc_library(
         "-lnppc_static",
         "-lnppif_static",
         "-lnppicc_static",
-        #"-lnvbufsurface",
-        #"-lnvbufsurftransform",
         "-lculibos",
     ],
     visibility = ["//visibility:public"],
-    alwayslink = True,
     deps = [
         ":colorspace_cuda_lib",
         ":cuda_bayer",
+        "//base",
         "//display:display_includes",
         "//display:gl_buffer",
         "//display:gl_utility",
         "//image:image_format",
     ],
+    alwayslink = True,
 )
 
 cuda_library(
@@ -144,14 +154,14 @@ cuda_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    alwayslink = True,
     deps = [
-        ":cuda_utility",
         ":colorspace_cuda_lib",
         ":cuda_lib_headers",
+        ":cuda_utility",
         "//image:stb_image",
         "@local_cuda//:cuda_runtime",
     ],
+    alwayslink = True,
 )
 
 cuda_library(
@@ -193,13 +203,13 @@ cuda_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    alwayslink = True,
     deps = [
         ":cuda_lib_headers",
         ":cuda_math",
         "//image:image_format",
         "@local_cuda//:cuda_runtime",
     ],
+    alwayslink = True,
 )
 
 cc_library(

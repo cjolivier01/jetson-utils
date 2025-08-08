@@ -27,8 +27,7 @@ cc_library(
         "//video:video_source",
         "//video:video_output",
         "//camera:camera_includes",
-        "//cuda:cuda_lib_headers",
-        "//cuda:colorspace_lib",
+        "//cuda:cuda_lib",
         "//video:video_options",
         "@libpython",
     ],
@@ -40,18 +39,11 @@ cc_binary(
     linkshared = True,
     linkopts = [
         "-Wl,-rpath,$$ORIGIN",
+        "-Wl,--no-as-needed",
     ],
     deps = [
         ":python_bindings_lib",
-        "//display:display",
-        "//cuda:cuda_lib",
-        "//cuda:cuda_cuda_lib",
-        "//cuda:colorspace_cuda_lib",
-        "//cuda:colorspace_lib",
-        "//image:load_image",
-        "//video:video_output",
-        "//camera:camera",
-        "//python/extdeps:jetson_cuda",
+        "//core:jetson_utils",
     ],
 )
 

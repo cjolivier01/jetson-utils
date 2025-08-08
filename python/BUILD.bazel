@@ -15,6 +15,6 @@ py_binary(
     data = [
         ":python_pkg_files",
         "//python/bindings:jetson_utils_python_ext",
-        "//python/extdeps:jetson_cuda",
+        "//core:jetson_utils",
     ],
 )
