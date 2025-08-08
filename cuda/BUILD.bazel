@@ -93,6 +93,7 @@ cc_library(
         "-lculibos",
     ],
     visibility = ["//visibility:public"],
+    alwayslink = True,
     deps = [
         ":colorspace_cuda_lib",
         ":cuda_bayer",
@@ -143,6 +144,7 @@ cuda_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    alwayslink = True,
     deps = [
         ":cuda_utility",
         ":colorspace_cuda_lib",
@@ -191,6 +193,7 @@ cuda_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    alwayslink = True,
     deps = [
         ":cuda_lib_headers",
         ":cuda_math",

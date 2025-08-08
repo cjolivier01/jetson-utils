@@ -1,0 +1,22 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+# Shared library bundling CUDA symbols required by the Python extension
+cc_binary(
+    name = "jetson_cuda",
+    srcs = [],
+    linkshared = True,
+    linkopts = [
+        "-Wl,-rpath,$$ORIGIN",
+    ],
+    deps = [
+        "//cuda:cuda_cuda_lib",
+        "//cuda:colorspace_lib",
+        "//cuda:colorspace_cuda_lib",
+        "//cuda:cuda_lib_headers",
+        "//image:stb_image",
+        "//image:image_format",
+    ],
+)
+

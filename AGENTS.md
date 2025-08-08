@@ -12,6 +12,7 @@
 - Run tests (if present): `bazel test //...`.
 - Example run (after build): execute binaries from Bazel runfiles or `bazel run //video:video_output_demo` (adjust to target).
 - CMake alternative: `mkdir build && cd build && cmake .. && make -j$(nproc)`.
+- Build Python wheel: `bazel run //python:bdist_wheel` (emits a `.whl` into top-level `dist/`).
 
 ## Coding Style & Naming Conventions
 - C/C++/CUDA: C++17, `-fPIC`. Indentation uses tabs (see `.editorconfig`: `indent_style = tab`, `indent_size = 5`).
@@ -23,6 +24,7 @@
 - Use Bazel tests: `cc_test` for C++ and `py_test` for Python.
 - Place tests alongside modules or under a `tests/` package with clear target names like `:logging_test`, `:image_io_test`.
 - Aim for fast, hermetic tests; gate hardware/GPU integration behind flags.
+- Example: run `bazel test //base:logging_test`.
 
 ## Commit & Pull Request Guidelines
 - Commit messages: imperative mood, concise summary (≤72 chars), followed by detail when needed.
