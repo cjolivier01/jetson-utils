@@ -5,7 +5,6 @@ INCLUDE_PREFIX = "jetson-utils/display"
 cc_library(
     name = "display",
     srcs = [
-      "glBuffer.cpp",
       "glDisplay.cpp",
       "glTexture.cpp",
       "glWidget.cpp",
@@ -44,7 +43,6 @@ cc_library(
       "glDisplay.h",
       "glTexture.h",
       "glWidget.h",
-
     ],
     includes = ["."],
     include_prefix = INCLUDE_PREFIX,
@@ -66,12 +64,14 @@ cc_library(
     include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
+      "//base",
     ],
 )
 
 cc_library(
     name = "gl_buffer",
     srcs = [
+        "glBuffer.cpp",
     ],
     hdrs = [
         "glBuffer.h",
@@ -80,6 +80,8 @@ cc_library(
     include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
+      ":gl_utility",
+      "//cuda:cuda_utility",
     ],
 )
 
