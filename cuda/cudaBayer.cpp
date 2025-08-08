@@ -23,83 +23,85 @@
 #include "cudaBayer.h"
 #include "logging.h"
 
-#include <npp.h>
-#include <nppi.h>
+//#include <npp.h>
+//#include <nppi.h>
 
-static cudaError_t fillNppStreamContext(NppStreamContext& ctx, cudaStream_t stream) {
-  int device;
-  cudaDeviceProp deviceProp;
-  cudaError_t cu_err = cudaError_t::cudaSuccess;
-  memset(&ctx, 0, sizeof(ctx));
-
-  if ((cu_err = cudaGetDevice(&device)) != cudaSuccess) {
-    return cu_err;
-  }
-
-  if ((cu_err = cudaGetDeviceProperties(&deviceProp, device)) != cudaSuccess) {
-    return cu_err;
-  }
-
-  ctx.hStream = stream;
-  ctx.nCudaDeviceId = device;
-  ctx.nMultiProcessorCount = deviceProp.multiProcessorCount;
-  ctx.nMaxThreadsPerMultiProcessor = deviceProp.maxThreadsPerMultiProcessor;
-  ctx.nMaxThreadsPerBlock = deviceProp.maxThreadsPerBlock;
-  ctx.nSharedMemPerBlock = deviceProp.sharedMemPerBlock;
-
-  ctx.nCudaDevAttrComputeCapabilityMajor = deviceProp.major;
-  ctx.nCudaDevAttrComputeCapabilityMinor = deviceProp.minor;
-
-  return cu_err;
+namespace bayer {
+cudaError_t CFAToRGB_8u_C1C3R(const uint8_t *pSrc, int nSrcStep, Size oSrcSize,
+                              Rect oSrcROI, uint8_t *pDst, int nDstStep,
+                              BayerGrid eGrid, cudaStream_t stream);
 }
+using namespace bayer;
+
+// static cudaError_t fillNppStreamContext(NppStreamContext &ctx,
+//                                         cudaStream_t stream) {
+//   int device;
+//   cudaDeviceProp deviceProp;
+//   cudaError_t cu_err = cudaError_t::cudaSuccess;
+//   memset(&ctx, 0, sizeof(ctx));
+
+//   if ((cu_err = cudaGetDevice(&device)) != cudaSuccess) {
+//     return cu_err;
+//   }
+
+//   if ((cu_err = cudaGetDeviceProperties(&deviceProp, device)) != cudaSuccess) {
+//     return cu_err;
+//   }
+
+//   ctx.hStream = stream;
+//   ctx.nCudaDeviceId = device;
+//   ctx.nMultiProcessorCount = deviceProp.multiProcessorCount;
+//   ctx.nMaxThreadsPerMultiProcessor = deviceProp.maxThreadsPerMultiProcessor;
+//   ctx.nMaxThreadsPerBlock = deviceProp.maxThreadsPerBlock;
+//   ctx.nSharedMemPerBlock = deviceProp.sharedMemPerBlock;
+
+//   ctx.nCudaDevAttrComputeCapabilityMajor = deviceProp.major;
+//   ctx.nCudaDevAttrComputeCapabilityMinor = deviceProp.minor;
+
+//   return cu_err;
+// }
 
 // cudaBayerToRGB
-cudaError_t cudaBayerToRGB(
-    uint8_t* input,
-    uchar3* output,
-    size_t width,
-    size_t height,
-    imageFormat format,
-    cudaStream_t stream) {
-  NppiSize size;
+cudaError_t cudaBayerToRGB(uint8_t *input, uchar3 *output, size_t width,
+                           size_t height, imageFormat format,
+                           cudaStream_t stream) {
+  bayer::Size size;
   size.width = width;
   size.height = height;
 
-  NppiRect roi;
+  bayer::Rect roi;
   roi.x = 0;
   roi.y = 0;
   roi.width = width;
   roi.height = height;
 
-  NppiBayerGridPosition grid;
+  BayerGrid grid;
 
   if (format == IMAGE_BAYER_BGGR)
-    grid = NPPI_BAYER_BGGR;
+    grid = BayerGrid::BAYER_RGGB;
   else if (format == IMAGE_BAYER_GBRG)
-    grid = NPPI_BAYER_GBRG;
+    grid = BayerGrid::BAYER_GBRG;
   else if (format == IMAGE_BAYER_GRBG)
-    grid = NPPI_BAYER_GRBG;
+    grid = BayerGrid::BAYER_GRBG;
   else if (format == IMAGE_BAYER_RGGB)
-    grid = NPPI_BAYER_RGGB;
+    grid = BayerGrid::BAYER_RGGB;
   else
     return cudaErrorInvalidValue;
 
-  NppStreamContext nppStreamContext;
-  cudaError_t cu_err = fillNppStreamContext(nppStreamContext, stream);
-  if (cu_err != cudaError_t::cudaSuccess) {
-    return cu_err;
-  }
-
+  // NppStreamContext nppStreamContext;
+  // cudaError_t cu_err = fillNppStreamContext(nppStreamContext, stream);
+  // if (cu_err != cudaError_t::cudaSuccess) {
+  //   return cu_err;
+  // }
+#if 1
+  const cudaError_t result = CFAToRGB_8u_C1C3R(
+      input, width * sizeof(uint8_t), size, roi, (uint8_t *)output,
+      width * sizeof(uchar3), grid, stream);
+#else
   const NppStatus result = nppiCFAToRGB_8u_C1C3R_Ctx(
-      input,
-      width * sizeof(uint8_t),
-      size,
-      roi,
-      (uint8_t*)output,
-      width * sizeof(uchar3),
-      grid,
-      NPPI_INTER_UNDEFINED,
-      nppStreamContext);
+      input, width * sizeof(uint8_t), size, roi, (uint8_t *)output,
+      width * sizeof(uchar3), grid, NPPI_INTER_UNDEFINED, nppStreamContext);
+#endif
 
   if (result != 0) {
     LogError(LOG_CUDA "cudaBayerToRGB() NPP error %i\n", result);
@@ -109,12 +111,8 @@ cudaError_t cudaBayerToRGB(
   return cudaSuccess;
 }
 
-cudaError_t cudaBayerToRGBA(
-    uint8_t* input,
-    uchar3* output,
-    size_t width,
-    size_t height,
-    imageFormat format,
-    cudaStream_t stream) {
+cudaError_t cudaBayerToRGBA(uint8_t *input, uchar3 *output, size_t width,
+                            size_t height, imageFormat format,
+                            cudaStream_t stream) {
   return cudaErrorInvalidValue;
 }
