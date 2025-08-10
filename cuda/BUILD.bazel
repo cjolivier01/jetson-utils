@@ -22,6 +22,18 @@ cc_library(
     name = "cuda_lib",
     srcs = [
     ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":cuda_lib_impl",
+        "//display:display",
+    ],
+)
+
+
+cc_library(
+    name = "cuda_lib_impl",
+    srcs = [
+    ],
     copts = [
         "-fopenmp",
         "-Wall",

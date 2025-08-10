@@ -28,7 +28,7 @@ cc_library(
         ":gl_events",
         ":gl_camera",
         "//base",
-        "//cuda:cuda_lib",
+        "//cuda:cuda_lib_impl",
         "//network",
         "//video:video_output",
     ],
