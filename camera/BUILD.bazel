@@ -12,7 +12,9 @@ cc_library(
         "-Wno-deprecated-declarations",
     ],
     linkopts = [
-      "-lGL",
+        "-lGL",
+        "-lGLEW",
+        "-lX11",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -29,6 +31,11 @@ cc_library(
     hdrs = [
         "gstCamera.h",
         "v4l2Camera.h",
+    ],
+    linkopts = [
+        "-lGL",
+        "-lGLEW",
+        "-lX11",
     ],
     includes = ["."],
     include_prefix = INCLUDE_PREFIX,
