@@ -3,12 +3,12 @@ cc_binary(
     srcs = [
         "v4l2-display.cpp",
     ],
-    linkopts = [
-        "-lGL",
-        "-lGLEW",
-        "-lGLU",
-        "-lX11",
-    ],
+    # linkopts = [
+    #     "-lGL",
+    #     "-lGLEW",
+    #     "-lGLU",
+    #     "-lX11",
+    # ],
     visibility = ["//visibility:public"],
     deps = [
         "//base",

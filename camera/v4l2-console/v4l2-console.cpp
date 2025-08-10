@@ -24,7 +24,6 @@
 
 #include <stdio.h>
 #include <signal.h>
-//#include <unistd.h>
 
 
 bool signal_recieved = false;
