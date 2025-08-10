@@ -5,9 +5,9 @@ INCLUDE_PREFIX = "jetson-utils/display"
 cc_library(
     name = "display",
     srcs = [
-      "glDisplay.cpp",
-      "glTexture.cpp",
-      "glWidget.cpp",
+        "glDisplay.cpp",
+        "glTexture.cpp",
+        "glWidget.cpp",
     ],
     copts = [
         "-Wno-deprecated-declarations",
@@ -21,12 +21,12 @@ cc_library(
         "-lX11",
     ],
     visibility = ["//visibility:public"],
-    deps = [        
+    deps = [
         ":display_includes",
         ":gl_buffer",
-        ":gl_utility",
-        ":gl_events",
         ":gl_camera",
+        ":gl_events",
+        ":gl_utility",
         "//base",
         "//cuda:cuda_lib_impl",
         "//network",
@@ -37,15 +37,21 @@ cc_library(
 cc_library(
     name = "display_includes",
     srcs = [],
-    hdrs = # glob(["*.h"]), 
-    [
-      "glBuffer.h",
-      "glDisplay.h",
-      "glTexture.h",
-      "glWidget.h",
-    ],
-    includes = ["."],
+    hdrs =  # glob(["*.h"]),
+        [
+            "glBuffer.h",
+            "glDisplay.h",
+            "glTexture.h",
+            "glWidget.h",
+        ],
     include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
+    linkopts = [
+        "-lGL",
+        "-lGLU",
+        "-lGLEW",
+        "-lX11",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":gl_utility",
@@ -60,11 +66,11 @@ cc_library(
     hdrs = [
         "glUtility.h",
     ],
-    includes = ["."],
     include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
-      "//base",
+        "//base",
     ],
 )
 
@@ -76,12 +82,12 @@ cc_library(
     hdrs = [
         "glBuffer.h",
     ],
-    includes = ["."],
     include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
-      ":gl_utility",
-      "//cuda:cuda_utility",
+        ":gl_utility",
+        "//cuda:cuda_utility",
     ],
 )
 
@@ -93,17 +99,17 @@ cc_library(
     hdrs = [
         "glEvents.h",
     ],
+    include_prefix = INCLUDE_PREFIX,
     includes = ["."],
     linkopts = [
         "-lGL",
         "-lGLEW",
         "-lX11",
     ],
-    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
-      ":display_includes",
-      "//video:video_output",
+        ":display_includes",
+        "//video:video_output",
     ],
 )
 
@@ -115,8 +121,8 @@ cc_library(
     hdrs = [
         "glCamera.h",
     ],
-    includes = ["."],
     include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
     linkopts = [
         "-lGL",
         "-lGLEW",
@@ -124,8 +130,8 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-      ":gl_events",
-      ":display_includes",
-      "//video:video_output",
+        ":display_includes",
+        ":gl_events",
+        "//video:video_output",
     ],
 )
