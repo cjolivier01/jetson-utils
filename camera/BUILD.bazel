@@ -11,6 +11,9 @@ cc_library(
     copts = [
         "-Wno-deprecated-declarations",
     ],
+    linkopts = [
+      "-lGL",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":camera_includes",

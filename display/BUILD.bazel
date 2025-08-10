@@ -94,6 +94,9 @@ cc_library(
         "glEvents.h",
     ],
     includes = ["."],
+    linkopts = [
+        "-lGL",
+    ],
     include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
