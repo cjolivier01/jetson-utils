@@ -207,6 +207,7 @@ cuda_library(
         "cudaWarp-affine.cu",
         "cudaWarp-fisheye.cu",
         "cudaWarp-intrinsic.cu",
+        "cudaWarp-perspective.cu",
     ],
     hdrs = [
         "cudaAlphaBlend.cuh",
