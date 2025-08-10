@@ -23,7 +23,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":display_includes",
-        ":display_utils",
+        ":display_util",
         ":gl_buffer",
         ":gl_camera",
         ":gl_events",
@@ -36,12 +36,14 @@ cc_library(
 )
 
 cc_library(
-    name = "display_utils",
+    name = "display_util",
     srcs = [
         "glDisplayUtil.cpp",
     ],
-    copts = [
+    hdrs = [
+        "glDisplayUtil.h",
     ],
+    includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
     ],
@@ -50,13 +52,12 @@ cc_library(
 cc_library(
     name = "display_includes",
     srcs = [],
-    hdrs =  # glob(["*.h"]),
-        [
-            "glBuffer.h",
-            "glDisplay.h",
-            "glTexture.h",
-            "glWidget.h",
-        ],
+    hdrs = [
+        "glBuffer.h",
+        "glDisplay.h",
+        "glTexture.h",
+        "glWidget.h",
+    ],
     include_prefix = INCLUDE_PREFIX,
     includes = ["."],
     linkopts = [
@@ -121,8 +122,8 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":display_includes",
-        ":display_utils",
+        # ":display_includes",
+        ":display_util",
         "//video:video_output",
     ],
 )
@@ -145,7 +146,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":display_includes",
-        ":display_utils",
+        ":display_util",
         ":gl_events",
         "//video:video_output",
     ],
