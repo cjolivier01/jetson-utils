@@ -31,18 +31,7 @@
 #include <cstdlib>
 
 //--------------------------------------------------------------
-std::vector<glDisplay*> gDisplays;
-
-glDisplay* glGetDisplay(uint32_t display) {
-  if (display >= gDisplays.size())
-    return NULL;
-
-  return gDisplays[display];
-}
-
-uint32_t glGetNumDisplays() {
-  return gDisplays.size();
-}
+extern std::vector<glDisplay*> gDisplays;
 //--------------------------------------------------------------
 
 const char* glDisplay::DEFAULT_TITLE = "NVIDIA Jetson";

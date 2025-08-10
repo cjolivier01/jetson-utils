@@ -23,6 +23,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":display_includes",
+        ":display_utils",
         ":gl_buffer",
         ":gl_camera",
         ":gl_events",
@@ -31,6 +32,18 @@ cc_library(
         "//cuda:cuda_lib_impl",
         "//network",
         "//video:video_output",
+    ],
+)
+
+cc_library(
+    name = "display_utils",
+    srcs = [
+        "glDisplayUtil.cpp",
+    ],
+    copts = [
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
     ],
 )
 
@@ -109,6 +122,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":display_includes",
+        ":display_utils",
         "//video:video_output",
     ],
 )
@@ -131,6 +145,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":display_includes",
+        ":display_utils",
         ":gl_events",
         "//video:video_output",
     ],
