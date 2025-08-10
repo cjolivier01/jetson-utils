@@ -278,7 +278,6 @@ cuda_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    include_prefix = INCLUDE_PREFIX,
     deps = [
         ":cuda_lib_headers",
         ":cuda_math",
