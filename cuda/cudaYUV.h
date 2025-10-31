@@ -24,7 +24,7 @@
 #define __CUDA_YUV_CONVERT_H
 
 
-#include <cuda_runtime.h>
+#include "cuda_runtime_compat.h"
 
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -279,4 +279,3 @@ cudaError_t cudaNV12ToRGBA( void* input, float4* output, size_t width, size_t he
 ///@}
 
 #endif
-

@@ -5,7 +5,7 @@
 #include "cudaBayer.h"
 #include <algorithm>
 #include <cstdint>
-#include <cuda_runtime.h>
+#include "cuda_runtime_compat.h"
 
 using namespace bayer;
 

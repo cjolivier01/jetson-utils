@@ -4,6 +4,11 @@ load("@rules_cuda//cuda:defs.bzl", "cuda_library")
 INCLUDE_PREFIX = "jetson-utils/cuda"
 
 config_setting(
+    name = "use_hip",
+    define_values = {"jetson_use_hip": "true"},
+)
+
+config_setting(
     name = "aarch64-linux-gnu",
     constraint_values = ["@platforms//cpu:aarch64"],
 )
@@ -48,6 +53,9 @@ cc_library(
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
     }),
     include_prefix = INCLUDE_PREFIX,
     linkopts = select({
@@ -66,6 +74,7 @@ cc_library(
         ":cuda_cuda_lib",
         ":cuda_point_cloud_cuda_lib",
         ":cuda_point_cloud_lib",
+        ":cuda_compat_includes",
         "//display:display_includes",
         "//display:gl_buffer",
         "//display:gl_utility",
@@ -109,6 +118,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_lib_headers",
+        ":cuda_compat_includes",
         ":cuda_utility",
         "//display:display_includes",
         "//display:gl_buffer",
@@ -155,6 +165,7 @@ cc_library(
     deps = [
         ":colorspace_cuda_lib",
         ":cuda_bayer",
+        ":cuda_compat_includes",
         "//base",
         "//display:display_includes",
         "//display:gl_buffer",
@@ -188,6 +199,9 @@ cuda_library(
             "-O0",
         ],
         # in all other modes, no extra flags
+        "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJETSON_USE_HIP"],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -244,6 +258,7 @@ cuda_library(
     deps = [
         ":colorspace_cuda_lib",
         ":cuda_lib_headers",
+        ":cuda_compat_includes",
         ":cuda_utility",
         "//image:stb_image",
         "@local_cuda//:cuda_runtime",
@@ -288,11 +303,15 @@ cuda_library(
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_lib_headers",
         ":cuda_math",
+        ":cuda_compat_includes",
         "//image:image_format",
         "@local_cuda//:cuda_runtime",
     ],
@@ -322,6 +341,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         # ":cuda_bayer",
+        ":cuda_compat_includes",
         ":cuda_utility",
         "//base:base_includes",
         "//image:image_format",
@@ -356,6 +376,7 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":cuda_compat_includes",
         ":cuda_utility",
         "//image:image_format",
         "@local_cuda//:cuda_runtime",
@@ -370,6 +391,7 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":cuda_compat_includes",
         "//base:base_includes",
         "@local_cuda//:cuda_runtime",
     ],
@@ -384,7 +406,41 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":cuda_compat_includes",
         "//base:base_includes",
         "@local_cuda//:cuda_runtime",
     ],
+)
+
+# Header-only compatibility shims (CUDA/HIP + GL interop)
+cc_library(
+    name = "cuda_compat_includes",
+    hdrs = [
+        "cuda_gl_interop_shim.h",
+        "cuda_runtime_compat.h",
+    ],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@local_cuda//:cuda_runtime",
+    ],
+)
+
+# Tests
+cc_test(
+    name = "cuda_utility_test",
+    srcs = ["cuda_utility_test.cc"],
+    deps = [":cuda_utility"],
+)
+
+cc_test(
+    name = "cuda_math_test",
+    srcs = ["cuda_math_test.cc"],
+    deps = [":cuda_math"],
+)
+
+cc_test(
+    name = "cuda_gl_header_test",
+    srcs = ["cuda_gl_header_test.cc"],
+    deps = [":cuda_compat_includes"],
 )

@@ -23,7 +23,7 @@
 #ifndef __CUDA_HELPER_MATH_H_
 #define __CUDA_HELPER_MATH_H_
 
-#include <cuda_runtime.h>
+#include "cuda_runtime_compat.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @name Vector Math
@@ -1729,4 +1729,3 @@ inline __device__ __host__ float4 smoothstep(float4 a, float4 b, float4 x)
 ///@}
 
 #endif
-
