@@ -27,6 +27,15 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "base_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.hpp",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
 cc_test(
     name = "logging_test",
     srcs = ["logging_test.cc"],

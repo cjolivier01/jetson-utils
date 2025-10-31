@@ -97,3 +97,13 @@ cc_library(
         "//cuda:cuda_utility",
     ],
 )
+
+filegroup(
+    name = "image_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "stb/*.h",
+    ]),
+    visibility = ["//visibility:public"],
+)

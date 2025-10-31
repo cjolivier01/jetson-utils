@@ -25,6 +25,12 @@
 
 #include "cuda_runtime_compat.h"
 
+#ifdef __HIP_PLATFORM_AMD__
+#ifndef JETSON_USE_HIP
+#define JETSON_USE_HIP 1
+#endif
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @name Vector Math
 /// @internal
@@ -41,7 +47,7 @@ typedef unsigned short ushort;
 #define EXIT_WAIVED 2
 #endif
 
-#ifndef __CUDACC__
+#if !defined(__CUDACC__) && !defined(JETSON_USE_HIP)
 #include <math.h>
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -891,6 +897,7 @@ inline __host__ __device__ void operator-=(uint4 &a, uint b)
 // multiply
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifndef JETSON_USE_HIP
 inline __host__ __device__ float2 operator*(float2 a, float2 b)
 {
     return make_float2(a.x * b.x, a.y * b.y);
@@ -1311,6 +1318,8 @@ inline __host__ __device__ float4 operator/(float b, float4 a)
 {
     return make_float4(b / a.x, b / a.y, b / a.z, b / a.w);
 }
+
+#endif // JETSON_USE_HIP
 
 ////////////////////////////////////////////////////////////////////////////////
 // min

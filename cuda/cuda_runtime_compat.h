@@ -17,7 +17,13 @@
 #define cudaError_t                 hipError_t
 #define cudaSuccess                 hipSuccess
 #define cudaErrorInvalidValue       hipErrorInvalidValue
+#define cudaErrorInvalidDevicePointer hipErrorInvalidDevicePointer
 #define cudaErrorNotSupported       hipErrorNotSupported
+#define cudaErrorUnknown            hipErrorUnknown
+#define cudaErrorMemoryAllocation    hipErrorMemoryAllocation
+#define cudaErrorInvalidMemcpyDirection hipErrorInvalidMemcpyDirection
+#define cudaErrorInvalidSymbol       hipErrorInvalidSymbol
+#define cudaErrorNotYetImplemented    hipErrorNotSupported
 
 #define cudaStream_t                hipStream_t
 #define cudaEvent_t                 hipEvent_t
@@ -59,6 +65,9 @@
 
 #define cudaHostAlloc               hipHostMalloc
 #define cudaFreeHost                hipHostFree
+#define cudaMallocHost              hipHostMalloc
+#define cudaHostAllocMapped         hipHostMallocMapped
+#define cudaHostGetDevicePointer    hipHostGetDevicePointer
 
 #define cudaMemset                  hipMemset
 #define cudaMemsetAsync             hipMemsetAsync
@@ -101,4 +110,3 @@ enum cudaGraphicsMapFlags {
 #include <cuda_runtime.h>
 
 #endif  // JETSON_USE_HIP
-
