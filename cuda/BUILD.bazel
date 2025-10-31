@@ -173,6 +173,9 @@ cc_library(
     }) + select({
         ":use_hip": ["-DJETSON_USE_HIP"],
         "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
     }),
     include_prefix = INCLUDE_PREFIX,
     linkopts = select({
@@ -217,7 +220,9 @@ cc_library(
 cuda_library(
     name = "cuda_point_cloud_cuda_lib",
     srcs = [
-        "cudaPointCloud.cu",
+        # Exclude point cloud kernels from HIP static lib to avoid
+        # cross-TU linkage on member functions compiled with host toolchain.
+        # "cudaPointCloud.cu",
     ],
     hdrs = [
     ],
@@ -498,7 +503,6 @@ filegroup(
         "cudaWarp-fisheye.cu",
         "cudaWarp-intrinsic.cu",
         "cudaWarp-perspective.cu",
-        "cudaPointCloud.cu",
         "cudaColormap.cu",
         "cudaGrayscale.cu",
         "cudaRGB.cu",
@@ -619,17 +623,29 @@ cc_library(
 cc_test(
     name = "cuda_utility_test",
     srcs = ["cuda_utility_test.cc"],
+    copts = select({
+        ":use_hip": ["-UJETSON_USE_HIP", "-U__HIP_PLATFORM_AMD__"],
+        "//conditions:default": [],
+    }),
     deps = [":cuda_utility"],
 )
 
 cc_test(
     name = "cuda_math_test",
     srcs = ["cuda_math_test.cc"],
+    copts = select({
+        ":use_hip": ["-UJETSON_USE_HIP", "-U__HIP_PLATFORM_AMD__"],
+        "//conditions:default": [],
+    }),
     deps = [":cuda_math"],
 )
 
 cc_test(
     name = "cuda_gl_header_test",
     srcs = ["cuda_gl_header_test.cc"],
+    copts = select({
+        ":use_hip": ["-UJETSON_USE_HIP", "-U__HIP_PLATFORM_AMD__"],
+        "//conditions:default": [],
+    }),
     deps = [":cuda_compat_includes"],
 )

@@ -12,8 +12,24 @@
 #include "cuda_runtime_compat.h"
 
 #ifdef JETSON_USE_HIP
-#include <hip/hip_gl_interop.h>
 #include <GL/gl.h>
+
+#if defined(__HIP_DEVICE_COMPILE__)
+#include <hip/hip_gl_interop.h>
+#else
+// Host-only compilation: forward-declare HIP GL interop APIs to avoid pulling
+// HIP vector types that require clang extensions.
+extern "C" {
+struct hipGraphicsResource;
+hipError_t hipGraphicsGLRegisterBuffer(struct hipGraphicsResource** resource, GLuint buffer, unsigned int flags);
+hipError_t hipGraphicsGLRegisterImage(struct hipGraphicsResource** resource, GLuint image, GLenum target, unsigned int flags);
+hipError_t hipGraphicsUnregisterResource(struct hipGraphicsResource* resource);
+hipError_t hipGraphicsResourceSetMapFlags(struct hipGraphicsResource* resource, unsigned int flags);
+hipError_t hipGraphicsMapResources(int count, struct hipGraphicsResource** resources, hipStream_t stream);
+hipError_t hipGraphicsUnmapResources(int count, struct hipGraphicsResource** resources, hipStream_t stream);
+hipError_t hipGraphicsResourceGetMappedPointer(void** devPtr, size_t* size, struct hipGraphicsResource* resource);
+}
+#endif
 
 // Provide a forward-declared CUDA graphics resource type to preserve source
 // compatibility. It's only used by pointer in this project.
@@ -80,4 +96,3 @@ static inline cudaError_t cudaGraphicsResourceGetMappedPointer(
 #include <cuda_gl_interop.h>
 
 #endif  // JETSON_USE_HIP
-

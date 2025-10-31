@@ -27,7 +27,9 @@
 #include <sstream>
 
 #include "videoOptions.h"
+#ifndef JETSON_USE_HIP
 #include "NvInfer.h"
+#endif
 
 
 /**

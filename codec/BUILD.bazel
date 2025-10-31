@@ -9,7 +9,10 @@ cc_library(
     copts = [
         "-Wno-deprecated-declarations",
         "-Wno-sign-compare",
-    ],
+    ] + select({
+        "//cuda:use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         ":codec_includes",
@@ -93,7 +96,10 @@ cc_library(
     copts = [
         "-Wno-error=switch",
         "-Wno-error=unused-function",
-    ],
+    ] + select({
+        "//cuda:use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
+    }),
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = [

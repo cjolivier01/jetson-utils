@@ -37,3 +37,7 @@ build:jetson --action_env=target_platform="jetson"
 
 # Build with HIP/ROCm backend for CUDA kernels
 build:rocm --define=jetson_use_hip=true
+# Ensure all translation units see HIP remapping shims
+build:rocm --copt=-DJETSON_USE_HIP
+# When compiling host code with GCC/Clang (not hipcc), select AMD ROCm platform
+build:rocm --copt=-D__HIP_PLATFORM_AMD__

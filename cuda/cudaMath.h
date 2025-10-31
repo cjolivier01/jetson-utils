@@ -47,7 +47,11 @@ typedef unsigned short ushort;
 #define EXIT_WAIVED 2
 #endif
 
-#if !defined(__CUDACC__) && !defined(JETSON_USE_HIP)
+// Provide host-side fallbacks for math intrinsics when not compiling device code.
+// Under ROCm builds, many translation units are compiled with a host compiler
+// (not hipcc), so __HIP_DEVICE_COMPILE__ will not be defined even if
+// JETSON_USE_HIP is set. In that case we still need these helpers.
+#if !defined(__CUDACC__) && !defined(__HIPCC__)
 #include <math.h>
 
 ////////////////////////////////////////////////////////////////////////////////
