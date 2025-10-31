@@ -12,15 +12,23 @@ cc_binary(
         "-lX11",
     ],
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        "//cuda:use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":cuda_lib",
         "//base",
         "//codec",
-        "//cuda:cuda_lib",
         "//display",
         "//network",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        "//cuda:use_hip": [],
+        "//conditions:default": [
+            "//cuda:cuda_lib",
+            "@local_cuda//:cuda_runtime",
+        ],
+    }),
 )
 
 cuda_library(
@@ -33,11 +41,16 @@ cuda_library(
         "-g",
     ],
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        "//cuda:use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":headers",
-        "//cuda:cuda_cuda_lib",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        "//cuda:use_hip": ["//cuda:hip_cuda_lib"],
+        "//conditions:default": ["//cuda:cuda_cuda_lib", "@local_cuda//:cuda_runtime"],
+    }),
 )
 
 cc_library(
@@ -46,7 +59,8 @@ cc_library(
         "cudaInteropKernels.h",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        "@local_cuda//:cuda_runtime",
-    ],
+    deps = select({
+        "//cuda:use_hip": [],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )

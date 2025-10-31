@@ -56,6 +56,9 @@ cc_library(
     }) + select({
         ":use_hip": ["-DJETSON_USE_HIP"],
         "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
     }),
     include_prefix = INCLUDE_PREFIX,
     linkopts = select({
@@ -78,7 +81,9 @@ cc_library(
         "//display:gl_utility",
     ] + select({
         ":use_hip": [
-            ":hip_cuda_lib",
+        ":hip_cuda_lib",
+        "@rocm_sdk_includes//:rocm_sdk_core",
+            ":hip_runtime",
         ],
         "//conditions:default": [
             ":cuda_cuda_lib",
@@ -130,7 +135,10 @@ cc_library(
         "//display:gl_buffer",
         "//display:gl_camera",
         "//display:gl_utility",
-    ],
+    ] + select({
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_library(
@@ -162,6 +170,9 @@ cc_library(
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
     }),
     include_prefix = INCLUDE_PREFIX,
     linkopts = select({
@@ -181,6 +192,7 @@ cc_library(
             ":cuda_lib_headers",
             ":cuda_bayer",
             ":cuda_compat_includes",
+            "@rocm_sdk_includes//:rocm_sdk_core",
             "//base",
             "//display:display_includes",
             "//display:gl_buffer",
@@ -232,6 +244,10 @@ cuda_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        ":use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":colorspace_cuda_lib",
         ":cuda_point_cloud_lib",
@@ -282,6 +298,10 @@ cuda_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        ":use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":colorspace_cuda_lib",
         ":cuda_lib_headers",
@@ -335,6 +355,10 @@ cuda_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        ":use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":cuda_lib_headers",
         ":cuda_math",
@@ -374,8 +398,10 @@ cc_library(
         ":cuda_utility",
         "//base:base_includes",
         "//image:image_format",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )
 
 cc_library(
@@ -415,7 +441,7 @@ cc_library(
         ":cuda_utility",
         "//image:image_format",
     ] + select({
-        ":use_hip": [],
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
         "//conditions:default": ["@local_cuda//:cuda_runtime"],
     }),
 )
@@ -431,7 +457,7 @@ cc_library(
         ":cuda_compat_includes",
         "//base:base_includes",
     ] + select({
-        ":use_hip": [],
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
         "//conditions:default": ["@local_cuda//:cuda_runtime"],
     }),
 )
@@ -448,7 +474,7 @@ cc_library(
         ":cuda_compat_includes",
         "//base:base_includes",
     ] + select({
-        ":use_hip": [],
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
         "//conditions:default": ["@local_cuda//:cuda_runtime"],
     }),
 )
@@ -538,6 +564,24 @@ cc_import(
     name = "hip_cuda_lib",
     static_library = ":hip_cuda_lib_gen",
     visibility = ["//visibility:public"],
+    alwayslink = True,
+    target_compatible_with = select({
+        ":use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+# Link shim for HIP runtime
+cc_library(
+    name = "hip_runtime",
+    srcs = [],
+    hdrs = [],
+    linkopts = [
+        "-L/home/colivier/miniforge3/lib/python3.12/site-packages/_rocm_sdk_devel/lib",
+        "-Wl,-rpath,/home/colivier/miniforge3/lib/python3.12/site-packages/_rocm_sdk_devel/lib",
+        "-lamdhip64",
+    ],
+    visibility = ["//visibility:public"],
     target_compatible_with = select({
         ":use_hip": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -548,7 +592,6 @@ cc_test(
     name = "hip_build_all_test",
     srcs = ["hip_build_all_test.cc"],
     deps = [
-        ":hip_cuda_lib",
         ":cuda_lib_headers",
         ":cuda_compat_includes",
     ],

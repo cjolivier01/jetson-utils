@@ -101,3 +101,10 @@ new_local_repository(
 # Expose Python SOABI for naming the extension module
 load("//bazel:py_soabi.bzl", "py_soabi")
 py_soabi(name = "py_soabi")
+
+# ROCm HIP headers from conda environment (host includes)
+new_local_repository(
+    name = "rocm_sdk_includes",
+    path = "/home/colivier/miniforge3/lib/python3.12/site-packages/_rocm_sdk_core",
+    build_file = "@//buildfiles:third_party/rocm_sdk_core.BUILD",
+)

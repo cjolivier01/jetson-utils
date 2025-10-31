@@ -16,6 +16,7 @@ cc_library(
         ":gst_buffer_manager",
         ":gst_decoder",
         ":gst_utility",
+        "//cuda:cuda_lib",
         "//cuda:colorspace_lib",
         "//network",
         "//threads",
@@ -55,6 +56,7 @@ cc_library(
     deps = [
         ":gst_utility",
         "//base",
+        "//cuda:cuda_lib",
         "//cuda:colorspace_lib",
     ],
 )
