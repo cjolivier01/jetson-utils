@@ -35,3 +35,5 @@ build:jetson --cpu=aarch64
 build:jetson --define=target_platform=jetson
 build:jetson --action_env=target_platform="jetson"
 
+# Build with HIP/ROCm backend for CUDA kernels
+build:rocm --define=jetson_use_hip=true

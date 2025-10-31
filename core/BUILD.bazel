@@ -14,9 +14,7 @@ cc_binary(
         "//base:base",
         "//display:display",
         "//cuda:cuda_lib",
-        "//cuda:cuda_cuda_lib",
         "//cuda:colorspace_lib",
-        "//cuda:colorspace_cuda_lib",
         "//image:load_image",
         "//image:image",
         "//video:video_output",
@@ -26,5 +24,13 @@ cc_binary(
         "//video:video_options",
         "//camera:camera",
         "//network:network",
-    ],
+    ] + select({
+        "//cuda:use_hip": [
+            "//cuda:hip_cuda_lib",
+        ],
+        "//conditions:default": [
+            "//cuda:cuda_cuda_lib",
+            "//cuda:colorspace_cuda_lib",
+        ],
+    }),
 )

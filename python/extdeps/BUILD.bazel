@@ -11,12 +11,17 @@ cc_binary(
         "-Wl,-rpath,$$ORIGIN",
     ],
     deps = [
-        "//cuda:cuda_cuda_lib",
         "//cuda:colorspace_lib",
-        "//cuda:colorspace_cuda_lib",
         "//cuda:cuda_lib_headers",
         "//image:stb_image",
         "//image:image_format",
-    ],
+    ] + select({
+        "//cuda:use_hip": [
+            "//cuda:hip_cuda_lib",
+        ],
+        "//conditions:default": [
+            "//cuda:cuda_cuda_lib",
+            "//cuda:colorspace_cuda_lib",
+        ],
+    }),
 )
-

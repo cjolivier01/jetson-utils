@@ -71,14 +71,20 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":colorspace_lib",
-        ":cuda_cuda_lib",
-        ":cuda_point_cloud_cuda_lib",
         ":cuda_point_cloud_lib",
         ":cuda_compat_includes",
         "//display:display_includes",
         "//display:gl_buffer",
         "//display:gl_utility",
-    ],
+    ] + select({
+        ":use_hip": [
+            ":hip_cuda_lib",
+        ],
+        "//conditions:default": [
+            ":cuda_cuda_lib",
+            ":cuda_point_cloud_cuda_lib",
+        ],
+    }),
 )
 
 cc_library(
@@ -134,6 +140,13 @@ cc_library(
     ],
     hdrs = [
         "cudaColorspace.h",
+        "cudaRGB.h",
+        "cudaYUV.h",
+        "cudaBayer.h",
+        "cudaGrayscale.h",
+    ],
+    includes = [
+        ".",
     ],
     copts = [
         "-fopenmp",
@@ -162,16 +175,30 @@ cc_library(
         "-lculibos",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        ":colorspace_cuda_lib",
-        ":cuda_bayer",
-        ":cuda_compat_includes",
-        "//base",
-        "//display:display_includes",
-        "//display:gl_buffer",
-        "//display:gl_utility",
-        "//image:image_format",
-    ],
+    deps = select({
+        ":use_hip": [
+            ":hip_cuda_lib",
+            ":cuda_lib_headers",
+            ":cuda_bayer",
+            ":cuda_compat_includes",
+            "//base",
+            "//display:display_includes",
+            "//display:gl_buffer",
+            "//display:gl_utility",
+            "//image:image_format",
+        ],
+        "//conditions:default": [
+            ":colorspace_cuda_lib",
+            ":cuda_lib_headers",
+            ":cuda_bayer",
+            ":cuda_compat_includes",
+            "//base",
+            "//display:display_includes",
+            "//display:gl_buffer",
+            "//display:gl_utility",
+            "//image:image_format",
+        ],
+    }),
     alwayslink = True,
 )
 
@@ -313,8 +340,10 @@ cuda_library(
         ":cuda_math",
         ":cuda_compat_includes",
         "//image:image_format",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        ":use_hip": [],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
     alwayslink = True,
 )
 
@@ -357,11 +386,17 @@ cc_library(
         ".",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        ":cuda_cuda_lib",
-        "//image:image_format",
-        "@local_cuda//:cuda_runtime",
-    ],
+    deps = select({
+        ":use_hip": [
+            ":hip_cuda_lib",
+            "//image:image_format",
+        ],
+        "//conditions:default": [
+            ":cuda_cuda_lib",
+            "//image:image_format",
+            "@local_cuda//:cuda_runtime",
+        ],
+    }),
 )
 
 cc_library(
@@ -379,8 +414,10 @@ cc_library(
         ":cuda_compat_includes",
         ":cuda_utility",
         "//image:image_format",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        ":use_hip": [],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )
 
 cc_library(
@@ -393,8 +430,10 @@ cc_library(
     deps = [
         ":cuda_compat_includes",
         "//base:base_includes",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        ":use_hip": [],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )
 
 cc_library(
@@ -408,8 +447,10 @@ cc_library(
     deps = [
         ":cuda_compat_includes",
         "//base:base_includes",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        ":use_hip": [],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )
 
 # HIP (ROCm) build of CUDA kernels using hipcc. Enabled with:
