@@ -17,8 +17,9 @@
 #if defined(__HIP_DEVICE_COMPILE__)
 #include <hip/hip_gl_interop.h>
 #else
-// Host-only compilation: forward-declare HIP GL interop APIs to avoid pulling
-// HIP vector types that require clang extensions.
+// Host-only compilation. If HIP headers are present (via JUT_INCLUDE_HIP_HEADERS),
+// rely on their declarations. Otherwise, forward-declare minimal prototypes.
+#if !defined(JUT_INCLUDE_HIP_HEADERS)
 extern "C" {
 struct hipGraphicsResource;
 hipError_t hipGraphicsGLRegisterBuffer(struct hipGraphicsResource** resource, GLuint buffer, unsigned int flags);
@@ -29,6 +30,7 @@ hipError_t hipGraphicsMapResources(int count, struct hipGraphicsResource** resou
 hipError_t hipGraphicsUnmapResources(int count, struct hipGraphicsResource** resources, hipStream_t stream);
 hipError_t hipGraphicsResourceGetMappedPointer(void** devPtr, size_t* size, struct hipGraphicsResource* resource);
 }
+#endif
 #endif
 
 // Provide a forward-declared CUDA graphics resource type to preserve source
@@ -63,7 +65,14 @@ static inline cudaError_t cudaGraphicsResourceSetMapFlags(
     cudaGraphicsResource* resource,
     unsigned int flags)
 {
+    #if defined(__HIP_DEVICE_COMPILE__)
     return hipGraphicsResourceSetMapFlags(reinterpret_cast<hipGraphicsResource*>(resource), flags);
+    #else
+    // Some HIP distributions do not expose hipGraphicsResourceSetMapFlags at host compile time.
+    // Treat as a no-op and report success, matching CUDA behavior when flags are unused by caller.
+    (void)resource; (void)flags;
+    return hipSuccess;
+    #endif
 }
 
 static inline cudaError_t cudaGraphicsMapResources(

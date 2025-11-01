@@ -9,8 +9,4 @@ cc_binary(
         "//codec",
         "//display",
     ],
-    target_compatible_with = select({
-        "//cuda:use_hip": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
 )

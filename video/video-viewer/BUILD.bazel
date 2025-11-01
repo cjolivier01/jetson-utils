@@ -8,8 +8,4 @@ cc_binary(
         "//video:video_output_create",
         "//video:video_source_create",
     ],
-    target_compatible_with = select({
-        "//cuda:use_hip": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
 )

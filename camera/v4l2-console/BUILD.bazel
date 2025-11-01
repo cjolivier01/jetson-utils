@@ -7,8 +7,4 @@ cc_binary(
     deps = [
         "//camera",
     ],
-    target_compatible_with = select({
-        "//cuda:use_hip": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
 )
