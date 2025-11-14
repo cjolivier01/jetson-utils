@@ -38,6 +38,7 @@ cc_library(
         ":aarch64-linux-gnu": [
             "-L/usr/local/cuda/targets/aarch64-linux/lib",
             "-L/usr/lib/aarch64-linux-gnu/nvidia",
+	    "-L/usr/local/cuda/targets/sbsa-linux/lib",
         ],
         ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
         "//conditions:default": [],
@@ -80,6 +81,7 @@ cc_library(
         ":aarch64-linux-gnu": [
             "-L/usr/local/cuda/targets/aarch64-linux/lib",
             "-L/usr/lib/aarch64-linux-gnu/nvidia",
+	    "-L/usr/local/cuda/targets/sbsa-linux/lib",
         ],
         ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
         "//conditions:default": [],
