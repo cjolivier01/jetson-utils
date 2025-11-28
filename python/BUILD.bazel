@@ -18,3 +18,10 @@ py_binary(
         "//core:jetson_utils",
     ],
 )
+
+py_binary(
+    name = "develop",
+    srcs = ["develop.py"],
+    main = "develop.py",
+    tags = ["manual"],
+)
