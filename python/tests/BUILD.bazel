@@ -1,0 +1,88 @@
+package(default_visibility = ["//visibility:public"])
+
+py_test(
+    name = "test_imports",
+    srcs = ["test_imports.py"],
+    deps = ["//python:jetson_utils_py"],
+    data = [
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+    ],
+    python_version = "PY3",
+)
+
+py_test(
+    name = "test_logging",
+    srcs = ["test_logging.py"],
+    deps = ["//python:jetson_utils_py"],
+    data = [
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+    ],
+    python_version = "PY3",
+)
+
+py_test(
+    name = "test_cuda_memory",
+    srcs = ["test_cuda_memory.py"],
+    deps = ["//python:jetson_utils_py"],
+    data = [
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+    ],
+    timeout = "short",
+    python_version = "PY3",
+)
+
+py_test(
+    name = "test_image_io",
+    srcs = ["test_image_io.py"],
+    deps = ["//python:jetson_utils_py"],
+    data = [
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+        "//data:fontmapA.png",
+    ],
+    timeout = "short",
+    python_version = "PY3",
+)
+
+py_test(
+    name = "test_video_source_smoke",
+    srcs = ["test_video_source_smoke.py"],
+    deps = ["//python:jetson_utils_py"],
+    data = [
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+        "//data:fontmapA.png",
+    ],
+    timeout = "short",
+    python_version = "PY3",
+)
+
+py_test(
+    name = "test_video_viewer",
+    srcs = ["video_viewer_test.py"],
+    main = "video_viewer_test.py",
+    deps = ["//python:jetson_utils_py"],
+    data = [
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+        "//data:fontmapA.png",
+        "//python/examples:video_viewer_py",
+    ],
+    timeout = "short",
+    python_version = "PY3",
+)
+
+py_test(
+    name = "test_cuda_ops",
+    srcs = ["test_cuda_ops.py"],
+    deps = ["//python:jetson_utils_py"],
+    data = [
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+    ],
+    timeout = "short",
+    python_version = "PY3",
+)

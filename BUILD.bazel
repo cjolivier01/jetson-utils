@@ -1,0 +1,7 @@
+package(default_visibility = ["//visibility:public"])
+
+# Convenience alias to run the Python video viewer
+alias(
+    name = "video_viewer",
+    actual = "//python/examples:video_viewer",
+)

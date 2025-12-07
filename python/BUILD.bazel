@@ -8,6 +8,14 @@ filegroup(
     srcs = glob(["python/**"]),
 )
 
+# Provide pure-Python sources on PYTHONPATH for tests/binaries
+py_library(
+    name = "jetson_utils_py",
+    srcs = glob(["python/**/*.py"]),
+    # Make `python/` the import root so `import jetson_utils` works
+    imports = ["python"],
+)
+
 py_binary(
     name = "bdist_wheel",
     srcs = ["build_wheel.py"],
@@ -18,3 +26,17 @@ py_binary(
         "//core:jetson_utils",
     ],
 )
+
+# "develop" target: creates a .pth file like `python setup.py develop`
+py_test(
+    name = "develop",
+    srcs = ["develop_test.py"],
+    main = "develop_test.py",
+    deps = [
+        ":jetson_utils_py",
+    ],
+    tags = ["local"],  # run unsandboxed to write to user site-packages
+    env_inherit = ["JETSON_UTILS_WORKSPACE"],
+)
+
+# Tests live under python/tests
