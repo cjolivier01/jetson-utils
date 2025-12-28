@@ -14,6 +14,16 @@ config_setting(
 )
 
 config_setting(
+    name = "glibc_math_rsqrt_conflict",
+    define_values = {
+        # Set by ./perf on hosts with glibc >= 2.38,
+        # where <math.h> declares rsqrt/rsqrtf with noexcept
+        # and conflicts with CUDA's math_functions.h.
+        "glibc_math_rsqrt_conflict": "1",
+    },
+)
+
+config_setting(
     name = "debug_build",
     values = {"compilation_mode": "dbg"},
 )
@@ -226,6 +236,16 @@ cuda_library(
         "-Xcompiler=-fPIC",
         "-Wno-deprecated-gpu-targets",
         "-Xcompiler=-fdiagnostics-color=always",
+    ] + select({
+        # Only apply the rsqrt/rsqrtf workaround on hosts
+        # where glibc's math.h conflicts with CUDA.
+        ":glibc_math_rsqrt_conflict": [
+            "-Xcompiler=-U_GNU_SOURCE",
+            "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
+            "-Xcompiler=-D_XOPEN_SOURCE=700",
+        ],
+        "//conditions:default": [],
+    }) + [
         # Jetson Nano (Ubuntu 18.04) needs c++14 max
         "--std=c++14",
         "-Xcompiler=-std=c++14",
@@ -275,6 +295,16 @@ cuda_library(
         "-Xcompiler=-fPIC",
         "-Wno-deprecated-gpu-targets",
         "-Xcompiler=-fdiagnostics-color=always",
+    ] + select({
+        # Only apply the rsqrt/rsqrtf workaround on hosts
+        # where glibc's math.h conflicts with CUDA.
+        ":glibc_math_rsqrt_conflict": [
+            "-Xcompiler=-U_GNU_SOURCE",
+            "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
+            "-Xcompiler=-D_XOPEN_SOURCE=700",
+        ],
+        "//conditions:default": [],
+    }) + [
         # Jetson Nano (Ubuntu 18.04) needs c++14 max
         "--std=c++14",
         "-Xcompiler=-std=c++14",
