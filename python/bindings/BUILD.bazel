@@ -1,24 +1,59 @@
 # load("@rules_python//python:defs.bzl", "py_extension")
 
-cc_library(
-    name = "jetson_utils_lib",
-    srcs = glob(["*.cpp"]),
-    hdrs = glob(["*.h"]),
-    copts = [
-        "-std=c++17",  # Use C++17 (or higher if needed)
-        "-fPIC",
-    ],
-    deps = [
-        "//base:base",
-        "//image:load_image",
-        "//video:video_output",
-        "//camera:camera",
-        "@libpython",
-    ],
-)
+load("@py_soabi//:soabi.bzl", "SOABI")
 
 # # py_extension(
 #     name = "jetson_utils",  # The Python extension's name
 #     srcs = [],  # No additional source files needed
 #     extension = "jetson_utils_lib",  # Link against the C++ library above
 # )
+
+# Build the shared object for the Python extension and rename with SOABI
+cc_library(
+    name = "python_bindings_lib",
+    srcs = glob(["*.cpp"]),
+    hdrs = glob(["*.h"]),
+    copts = [
+        "-std=c++17",
+        "-fPIC",
+        "-Ipython/bindings",
+    ],
+    alwayslink = True,
+    deps = [
+        "//base:base",
+        "//display:display",
+        "//image:image_format",
+        "//image:load_image",
+        "//video:video_output_create",
+        "//video:video_source",
+        "//video:video_source_create",
+        "//video:video_output",
+        "//camera:camera",
+        "//cuda:cuda_lib",
+        "//cuda:cuda_cuda_lib",
+        "//video:video_options",
+        "@libpython",
+    ],
+)
+
+cc_binary(
+    name = "jetson_utils_python_raw",
+    srcs = [],
+    linkshared = True,
+    linkopts = [
+        "-Wl,-rpath,$$ORIGIN",
+        "-Wl,--no-as-needed",
+    ],
+    deps = [
+        ":python_bindings_lib",
+        "//core:jetson_utils",
+    ],
+)
+
+genrule(
+    name = "jetson_utils_python_ext",
+    srcs = [":jetson_utils_python_raw"],
+    outs = ["jetson_utils_python.%s.so" % SOABI],
+    cmd = "cp $(location :jetson_utils_python_raw) $@",
+    visibility = ["//visibility:public"],
+)

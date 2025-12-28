@@ -1,0 +1,30 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+# Shared core library aggregating native components used by the Python extension
+cc_binary(
+    name = "jetson_utils",
+    srcs = ["force_refs.cpp"],
+    linkshared = True,
+    linkopts = [
+        "-Wl,-rpath,$$ORIGIN",
+    ],
+    deps = [
+        "//base:base",
+        "//display:display",
+        "//cuda:cuda_lib",
+        "//cuda:cuda_cuda_lib",
+        "//cuda:colorspace_lib",
+        "//cuda:colorspace_cuda_lib",
+        "//image:load_image",
+        "//image:image",
+        "//video:video_output",
+        "//video:video_output_create",
+        "//video:video_source",
+        "//video:video_source_create",
+        "//video:video_options",
+        "//camera:camera",
+        "//network:network",
+    ],
+)

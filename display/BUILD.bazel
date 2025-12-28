@@ -4,7 +4,11 @@ INCLUDE_PREFIX = "jetson-utils/display"
 
 cc_library(
     name = "display",
-    srcs = glob(["*.cpp"]),
+    srcs = [
+        "glDisplay.cpp",
+        "glTexture.cpp",
+        "glWidget.cpp",
+    ],
     copts = [
         "-Wno-deprecated-declarations",
         "-Wno-sign-compare",
@@ -19,23 +23,52 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":display_includes",
+        ":display_util",
         ":gl_buffer",
+        ":gl_camera",
+        ":gl_events",
         ":gl_utility",
         "//base",
-        "//cuda:cuda_lib",
+        "//cuda:cuda_lib_impl",
         "//network",
         "//video:video_output",
     ],
 )
 
 cc_library(
-    name = "display_includes",
-    srcs = [],
-    hdrs = glob(["*.h"]),
+    name = "display_util",
+    srcs = [
+        "glDisplayUtil.cpp",
+    ],
+    hdrs = [
+        "glDisplayUtil.h",
+    ],
     includes = ["."],
-    include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
+    ],
+)
+
+cc_library(
+    name = "display_includes",
+    srcs = [],
+    hdrs = [
+        "glBuffer.h",
+        "glDisplay.h",
+        "glTexture.h",
+        "glWidget.h",
+    ],
+    include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
+    linkopts = [
+        "-lGL",
+        "-lGLU",
+        "-lGLEW",
+        "-lX11",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":gl_utility",
         "//base:base_includes",
     ],
 )
@@ -47,23 +80,74 @@ cc_library(
     hdrs = [
         "glUtility.h",
     ],
-    includes = ["."],
     include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
+        "//base",
     ],
 )
 
 cc_library(
     name = "gl_buffer",
     srcs = [
+        "glBuffer.cpp",
     ],
     hdrs = [
         "glBuffer.h",
     ],
-    includes = ["."],
     include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
+        ":gl_utility",
+        "//cuda:cuda_utility",
+    ],
+)
+
+cc_library(
+    name = "gl_events",
+    srcs = [
+        "glEvents.cpp",
+    ],
+    hdrs = [
+        "glEvents.h",
+    ],
+    include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
+    linkopts = [
+        "-lGL",
+        "-lGLEW",
+        "-lX11",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        # ":display_includes",
+        ":display_util",
+        "//video:video_output",
+    ],
+)
+
+cc_library(
+    name = "gl_camera",
+    srcs = [
+        "glCamera.cpp",
+    ],
+    hdrs = [
+        "glCamera.h",
+    ],
+    include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
+    linkopts = [
+        "-lGL",
+        "-lGLEW",
+        "-lX11",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":display_includes",
+        ":display_util",
+        ":gl_events",
+        "//video:video_output",
     ],
 )

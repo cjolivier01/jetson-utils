@@ -22,6 +22,7 @@
 
 #include "glDisplay.h"
 #include "cudaNormalize.h"
+#include "glDisplayUtil.h"
 #include "timespec.h"
 
 #include <X11/Xatom.h>
@@ -31,18 +32,7 @@
 #include <cstdlib>
 
 //--------------------------------------------------------------
-std::vector<glDisplay*> gDisplays;
-
-glDisplay* glGetDisplay(uint32_t display) {
-  if (display >= gDisplays.size())
-    return NULL;
-
-  return gDisplays[display];
-}
-
-uint32_t glGetNumDisplays() {
-  return gDisplays.size();
-}
+// extern std::vector<glDisplay*> gDisplays;
 //--------------------------------------------------------------
 
 const char* glDisplay::DEFAULT_TITLE = "NVIDIA Jetson";
@@ -128,14 +118,15 @@ glDisplay::glDisplay(const videoOptions& options) : videoOutput(options) {
 // Destructor
 glDisplay::~glDisplay() {
   // remove this instance from the global list
-  const size_t numDisplays = gDisplays.size();
+  glRemoveDisplay(this);
+  // const size_t numDisplays = gDisplays.size();
 
-  for (size_t n = 0; n < numDisplays; n++) {
-    if (gDisplays[n] == this) {
-      gDisplays.erase(gDisplays.begin() + n);
-      break;
-    }
-  }
+  // for (size_t n = 0; n < numDisplays; n++) {
+  //   if (gDisplays[n] == this) {
+  //     gDisplays.erase(gDisplays.begin() + n);
+  //     break;
+  //   }
+  // }
 
   // release widgets from the window
   RemoveAllWidgets();
@@ -225,8 +216,9 @@ glDisplay* glDisplay::Create(const videoOptions& options) {
   // release the GL context in case a different thread is used for rendering
   GL(glXMakeCurrent(vp->mDisplayX, None, NULL));
 
-  vp->mID = gDisplays.size();
-  gDisplays.push_back(vp);
+  vp->mID = glAddDisplay(vp);
+  // vp->mID = gDisplays.size();
+  // gDisplays.push_back(vp);
 
   LogInfo(
       LOG_GL "glDisplay -- display device initialized (%ux%u)\n",

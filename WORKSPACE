@@ -97,3 +97,7 @@ new_local_repository(
     build_file = "@//buildfiles:third_party/opencv_linux.BUILD",
     path = "/usr/include",
 )
+
+# Expose Python SOABI for naming the extension module
+load("//bazel:py_soabi.bzl", "py_soabi")
+py_soabi(name = "py_soabi")

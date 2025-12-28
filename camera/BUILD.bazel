@@ -11,6 +11,12 @@ cc_library(
     copts = [
         "-Wno-deprecated-declarations",
     ],
+    linkopts = [
+        "-lGL",
+        "-lGLEW",
+        "-lGLU",
+        "-lX11",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":camera_includes",
@@ -27,8 +33,14 @@ cc_library(
         "gstCamera.h",
         "v4l2Camera.h",
     ],
-    includes = ["."],
     include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
+    linkopts = [
+        "-lGL",
+        "-lGLEW",
+        "-lGLU",
+        "-lX11",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//base:base_includes",

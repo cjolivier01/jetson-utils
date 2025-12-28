@@ -1,0 +1,32 @@
+load("@py_soabi//:soabi.bzl", "SOABI")
+
+package(default_visibility = ["//visibility:public"])
+
+# All pure-Python package files to include in the wheel
+filegroup(
+    name = "python_pkg_files",
+    srcs = glob(["python/**"]),
+)
+
+py_binary(
+    name = "bdist_wheel",
+    srcs = ["build_wheel.py"],
+    main = "build_wheel.py",
+    data = [
+        ":python_pkg_files",
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+    ],
+)
+
+py_binary(
+    name = "develop",
+    srcs = ["develop.py"],
+    main = "develop.py",
+    data = [
+        ":python_pkg_files",
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+    ],
+    tags = ["manual"],
+)
