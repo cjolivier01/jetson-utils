@@ -27,10 +27,22 @@
 #include "gstUtility.h"
 
 #define GST_USE_UNSTABLE_API
-#if __has_include(<gst/webrtc/webrtc.h>)
-	#include <gst/webrtc/webrtc.h>
+#if defined(__has_include)
+	#if __has_include(<gst/webrtc/webrtc.h>)
+		#include <gst/webrtc/webrtc.h>
+		#define JETSON_GST_WEBRTC_API 1
+	#elif __has_include("gst/webrtc/webrtc.h")
+		#include "gst/webrtc/webrtc.h"
+		#define JETSON_GST_WEBRTC_API 1
+	#else
+		#define JETSON_GST_WEBRTC_API 0
+	#endif
 #else
-	#include "gst/webrtc/webrtc.h"
+	#define JETSON_GST_WEBRTC_API 0
+#endif
+
+#if JETSON_GST_WEBRTC_API
+	#include <gst/sdp/sdp.h>
 #endif
 
 

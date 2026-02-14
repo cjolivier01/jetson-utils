@@ -1087,11 +1087,18 @@ void gstDecoder::onWebsocketMessage( WebRTCPeer* peer, const char* message, size
 		LogVerbose(LOG_WEBRTC "gstDecoder -- configuring WebRTC recieve-only caps string: \n%s\n", caps_str.c_str());
 		
 		// add transciever in receive-only mode  (https://stackoverflow.com/questions/57430215/how-to-use-webrtcbin-create-offer-only-receive-video)
-		GstWebRTCRTPTransceiver* transceiver = NULL;
 		GstCaps* transceiver_caps = gst_caps_from_string(caps_str.c_str());
+
+#if defined(GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY)
+		GstWebRTCRTPTransceiver* transceiver = NULL;
 		g_signal_emit_by_name(peer_context->webrtcbin, "add-transceiver", GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY, transceiver_caps, &transceiver);
+
+		if( transceiver != NULL )
+			gst_object_unref(transceiver);
+#else
+		LogVerbose(LOG_WEBRTC "GStreamer headers missing RTP transceiver direction enum, skipping receive-only transceiver configuration\n");
+#endif
 		gst_caps_unref(transceiver_caps);
-		gst_object_unref(transceiver);
 		
 		// start the pipeline playing
 		decoder->mWebRTCConnected = true;		

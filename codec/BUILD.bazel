@@ -32,7 +32,6 @@ cc_library(
         "gstDecoder.h",
         "gstEncoder.h",
         "gstWebRTC.h",
-        "gst/webrtc/webrtc.h",
         "nvbuf_utils.h",
     ],
     includes = ["."],

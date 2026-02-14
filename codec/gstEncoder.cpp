@@ -897,9 +897,13 @@ void gstEncoder::onWebsocketMessage( WebRTCPeer* peer, const char* message, size
 		
 		g_signal_emit_by_name(peer_context->webrtcbin, "get-transceivers", &transceivers);
 		g_assert(transceivers != NULL && transceivers->len > 0);
-		
+
+#if defined(GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_SENDONLY)
 		GstWebRTCRTPTransceiver* transceiver = g_array_index(transceivers, GstWebRTCRTPTransceiver*, 0);
 		g_object_set(transceiver, "direction", GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_SENDONLY, NULL);
+#else
+		LogVerbose(LOG_WEBRTC "GStreamer headers missing RTP transceiver direction enum, skipping send-only transceiver configuration\n");
+#endif
 		g_array_unref(transceivers);
 		
 		// subscribe to callbacks

@@ -26,6 +26,7 @@
 
 #include "logging.h"
 
+#if JETSON_GST_WEBRTC_API
 #include <json-glib/json-glib.h>
 #include <regex>
 
@@ -335,3 +336,42 @@ void gstWebRTC::onWebsocketMessage( WebRTCPeer* peer, const char* message, size_
 
 	cleanup();
 }
+
+#else
+
+void gstWebRTC::onNegotiationNeeded( GstElement* webrtcbin, void* user_data )
+{
+	(void)webrtcbin;
+	(void)user_data;
+	LogError(LOG_WEBRTC "GStreamer WebRTC support isn't available in this build (missing gst/webrtc headers)\n");
+}
+
+
+void gstWebRTC::onCreateOffer( GstPromise* promise, void* user_data )
+{
+	(void)promise;
+	(void)user_data;
+	LogError(LOG_WEBRTC "GStreamer WebRTC support isn't available in this build (missing gst/webrtc headers)\n");
+}
+
+
+void gstWebRTC::onIceCandidate( GstElement* webrtcbin, uint32_t mline_index, char* candidate, void* user_data )
+{
+	(void)webrtcbin;
+	(void)mline_index;
+	(void)candidate;
+	(void)user_data;
+	LogError(LOG_WEBRTC "GStreamer WebRTC support isn't available in this build (missing gst/webrtc headers)\n");
+}
+
+
+void gstWebRTC::onWebsocketMessage( WebRTCPeer* peer, const char* message, size_t message_size, void* user_data )
+{
+	(void)peer;
+	(void)message;
+	(void)message_size;
+	(void)user_data;
+	LogError(LOG_WEBRTC "GStreamer WebRTC support isn't available in this build (missing gst/webrtc headers)\n");
+}
+
+#endif
