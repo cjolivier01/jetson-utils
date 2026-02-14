@@ -27,7 +27,11 @@
 #include "gstUtility.h"
 
 #define GST_USE_UNSTABLE_API
-#include <gst/webrtc/webrtc.h>
+#if __has_include(<gst/webrtc/webrtc.h>)
+	#include <gst/webrtc/webrtc.h>
+#else
+	#include "gst/webrtc/webrtc.h"
+#endif
 
 
 /**

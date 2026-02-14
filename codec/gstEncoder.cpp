@@ -33,8 +33,6 @@
 
 #include "cudaColorspace.h"
 
-#define GST_USE_UNSTABLE_API
-#include <gst/webrtc/webrtc.h>
 #include <gst/app/gstappsrc.h>
 
 #include <cassert>
