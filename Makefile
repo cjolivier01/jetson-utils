@@ -13,11 +13,24 @@ GLIBC_RSQRT_DEFINE := $(shell \
 	fi \
 )
 OPT_BAZEL_FLAGS := --config=opt --cpu=$(CPU) $(GLIBC_RSQRT_DEFINE)
-TOOLCHAIN_ENV := source "$(TOPDIR)/toolchain_env.sh"; ensure_cuda_env; ensure_rocm_env || true;
+CUDA_TOOLCHAIN_ENV := source "$(TOPDIR)/toolchain_env.sh"; ensure_cuda_env; ensure_rocm_env || true;
+ROCM_TOOLCHAIN_ENV := source "$(TOPDIR)/toolchain_env.sh"; ensure_cuda_env; ensure_rocm_env;
+DEFAULT_BUILD_TARGET := $(shell bash -lc 'source "$(TOPDIR)/toolchain_env.sh"; if ensure_cuda_env >/dev/null 2>&1; then printf cuda; elif ensure_rocm_env >/dev/null 2>&1; then printf rocm; fi')
+DEFAULT_TARGET := $(if $(DEFAULT_BUILD_TARGET),$(DEFAULT_BUILD_TARGET),missing_toolkit)
 
-all: print_targets
+all: $(DEFAULT_TARGET)
 
-.PHONY: all print_targets perf debug test wheel develop clean distclean expunge
+.PHONY: all cuda rocm missing_toolkit print_targets perf debug test wheel develop clean distclean expunge
+
+cuda:
+	bash -lc '$(CUDA_TOOLCHAIN_ENV) bazelisk build $(OPT_BAZEL_FLAGS) //...'
+
+rocm:
+	bash -lc '$(ROCM_TOOLCHAIN_ENV) bazelisk build $(OPT_BAZEL_FLAGS) --config=rocm //...'
+
+missing_toolkit:
+	@printf '%s\n' 'No supported GPU toolkit detected. Install CUDA or ROCm, or export CUDA_PATH/ROCM_PATH.' >&2
+	@exit 1
 
 perf:
 	./perf
@@ -26,13 +39,13 @@ debug:
 	./bld
 
 test:
-	bash -lc '$(TOOLCHAIN_ENV) bazelisk test $(OPT_BAZEL_FLAGS) //...'
+	bash -lc '$(CUDA_TOOLCHAIN_ENV) bazelisk test $(OPT_BAZEL_FLAGS) //...'
 
 wheel:
-	bash -lc '$(TOOLCHAIN_ENV) bazelisk run $(OPT_BAZEL_FLAGS) //python:bdist_wheel'
+	bash -lc '$(CUDA_TOOLCHAIN_ENV) bazelisk run $(OPT_BAZEL_FLAGS) //python:bdist_wheel'
 
 develop:
-	bash -lc '$(TOOLCHAIN_ENV) bazelisk run $(OPT_BAZEL_FLAGS) //python:develop'
+	bash -lc '$(CUDA_TOOLCHAIN_ENV) bazelisk run $(OPT_BAZEL_FLAGS) //python:develop'
 
 clean:
 	bazelisk clean
@@ -46,6 +59,9 @@ print_targets:
 		'' \
 		'Build Outputs' \
 		'-------------' \
+		'all          Default build target. Uses CUDA if installed, otherwise ROCm.' \
+		'cuda         Build every Bazel target with the CUDA backend.' \
+		'rocm         Build every Bazel target with the HIP/ROCm backend.' \
 		'perf         Build every Bazel target with optimized flags via ./perf (includes glibc conflict workaround detection).' \
 		'debug        Build every Bazel target with debug flags via ./bld; use for local iteration with symbols.' \
 		'' \
