@@ -48,12 +48,19 @@ This repository also includes Bazel build files for development, tests, and Pyth
 # build everything (debug)
 ./bld
 
+# optimized build with the glibc/CUDA workaround when needed
+./perf
+
 # or directly
 bazel build //...
 
 # run tests
 bazel test //...
 ```
+
+On hosts with glibc 2.38 or newer, `<math.h>` can conflict with CUDA's `rsqrt`/`rsqrtf`
+declarations. `./perf` detects that case and adds `--define=glibc_math_rsqrt_conflict=1`
+so the CUDA targets receive the required compiler flags automatically.
 
 ### HIP/ROCm Support (AMD GPUs)
 
@@ -62,10 +69,10 @@ The CUDA code now has a HIP compatibility layer so it can compile for AMD GPUs u
 - `cuda/cuda_runtime_compat.h` maps selected CUDA runtime APIs/types to HIP when building with `-DJETSON_USE_HIP`.
 - `cuda/cuda_gl_interop_shim.h` maps CUDA-OpenGL interop calls to HIP-GL.
 
-CUDA remains the default backend. To enable HIP macro definitions in C/C++ sources, pass:
+CUDA remains the default backend. To enable the HIP/ROCm backend, use:
 
 ```bash
-bazel build --define=jetson_use_hip=true //...
+bazel build --config=rocm //...
 ```
 
-Note: actually compiling `.cu` kernels with `hipcc` requires ROCm to be installed and a Bazel rule that invokes `hipcc`. If you want that wired up and validated on an AMD system, let us know and we can add a `hipcc`-based build path.
+The Bazel HIP path compiles the `.cu` kernels with `hipcc` and links against `libamdhip64`.

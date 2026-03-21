@@ -28,15 +28,16 @@ py_binary(
 )
 
 # "develop" target: creates a .pth file like `python setup.py develop`
-py_test(
+py_binary(
     name = "develop",
-    srcs = ["develop_test.py"],
-    main = "develop_test.py",
-    deps = [
-        ":jetson_utils_py",
+    srcs = ["develop.py"],
+    main = "develop.py",
+    data = [
+        ":python_pkg_files",
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
     ],
-    tags = ["local"],  # run unsandboxed to write to user site-packages
-    env_inherit = ["JETSON_UTILS_WORKSPACE"],
+    tags = ["manual"],
 )
 
 # Tests live under python/tests

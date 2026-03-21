@@ -441,6 +441,15 @@ bool gst_build_filesink( const URI& uri, videoOptions::Codec codec, std::ostring
 // gst_select_decoder
 const char* gst_select_decoder( videoOptions::Codec codec, videoOptions::CodecType& type )
 {
+	const char* force_nvdec = getenv("JETSON_UTILS_NVDEC");
+	if( force_nvdec != NULL && force_nvdec[0] != '0' )
+	{
+		if( codec == videoOptions::CODEC_H265 )
+			return "nvh265dec";
+		else if( codec == videoOptions::CODEC_H264 )
+			return "nvh264dec";
+	}
+
 #if defined(__aarch64__)
 #if NV_TENSORRT_MAJOR > 8 || (NV_TENSORRT_MAJOR == 8 && NV_TENSORRT_MINOR >= 4)
 	if( type == videoOptions::CODEC_OMX )  // JetPack 5 doesn't have OMX
@@ -451,7 +460,7 @@ const char* gst_select_decoder( videoOptions::Codec codec, videoOptions::CodecTy
 		type = gst_default_codec();
 #endif
 
-	if( type == videoOptions::CODEC_NVENC || type == videoOptions::CODEC_NVDEC )
+	if( type == videoOptions::CODEC_NVENC )
 		type = gst_default_codec();
 	
 	if( codec == videoOptions::CODEC_MJPEG )
@@ -505,6 +514,19 @@ const char* gst_select_decoder( videoOptions::Codec codec, videoOptions::CodecTy
 			return "nvjpegdec";
 		
 		return "nvv4l2decoder";
+	}
+	else if( type == videoOptions::CODEC_NVDEC )
+	{
+		// x86 NVDEC plugins shipped with DeepStream (or separate install)
+		switch(codec)
+		{
+			case videoOptions::CODEC_H264: return "nvh264dec";
+			case videoOptions::CODEC_H265: return "nvh265dec";
+			default: break;
+		}
+		// Unsupported codec for NVDEC; fall back to default
+		type = gst_default_codec();
+		return gst_select_decoder(codec, type);
 	}
 	
 	return NULL;

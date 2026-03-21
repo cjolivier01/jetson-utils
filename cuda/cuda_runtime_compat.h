@@ -45,8 +45,8 @@
     #define __forceinline__ inline
     #endif
     typedef int                         hipError_t;
-    typedef void*                       hipStream_t;
-    typedef void*                       hipEvent_t;
+    typedef struct ihipStream_t*        hipStream_t;
+    typedef struct ihipEvent_t*         hipEvent_t;
     typedef struct hipDeviceProp_t      hipDeviceProp_t;
 
     // Memory kinds & flags used

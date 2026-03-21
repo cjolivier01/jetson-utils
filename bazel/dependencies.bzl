@@ -96,3 +96,134 @@ conda_repository = repository_rule(
     },
     environ = ["CONDA_PREFIX"],
 )
+
+def _discover_root(ctx, env_vars, probe_script):
+    for env_var in env_vars:
+        value = ctx.os.environ.get(env_var)
+        if value and ctx.path(value).exists:
+            return value
+
+    result = ctx.execute(
+        ["/bin/bash", "-lc", probe_script],
+        quiet = True,
+    )
+
+    if result.return_code == 0:
+        root = result.stdout.strip()
+        if root:
+            return root
+
+    return ""
+
+def _symlink_entries(ctx, root, entries):
+    for entry in entries:
+        path = root + "/" + entry
+        if ctx.path(path).exists:
+            ctx.symlink(ctx.path(path), entry)
+
+def _local_cuda_sdk_repo_impl(ctx):
+    root = _discover_root(
+        ctx,
+        ["CUDA_PATH", "CUDA_HOME", "CUDA_ROOT"],
+        """
+set -eu
+for d in /usr/local/cuda /usr/local/cuda-*; do
+    [ -x "$d/bin/nvcc" ] || continue
+    printf '%s' "$d"
+    exit 0
+done
+exit 1
+""",
+    )
+
+    build = [
+        'load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")',
+        'package(default_visibility = ["//visibility:public"])',
+    ]
+
+    if root:
+        culibos = ""
+        for rel in [
+            "targets/x86_64-linux/lib/libculibos.a",
+            "targets/aarch64-linux/lib/libculibos.a",
+            "targets/sbsa-linux/lib/libculibos.a",
+        ]:
+            if ctx.path(root + "/" + rel).exists:
+                culibos = rel
+                break
+
+        if not culibos:
+            fail("Found CUDA toolkit at %s but could not locate libculibos.a" % root)
+
+        _symlink_entries(ctx, root, ["bin", "extras", "lib64", "nvvm", "targets"])
+
+        build.extend([
+            'filegroup(name = "nvcc", srcs = ["bin/nvcc"])',
+            'cc_import(name = "culibos", static_library = "%s")' % culibos,
+        ])
+    else:
+        build.extend([
+            'filegroup(name = "nvcc", srcs = [])',
+            'cc_library(name = "culibos", srcs = [], hdrs = [])',
+        ])
+
+    ctx.file("WORKSPACE", 'workspace(name = "%s")\n' % ctx.name)
+    ctx.file("BUILD.bazel", "\n".join(build) + "\n")
+
+def _local_rocm_sdk_repo_impl(ctx):
+    root = _discover_root(
+        ctx,
+        ["ROCM_PATH", "HIP_PATH"],
+        """
+set -eu
+for d in /opt/rocm /opt/rocm-*; do
+    [ -x "$d/bin/hipcc" ] || continue
+    [ -f "$d/include/hip/hip_runtime.h" ] || continue
+    [ -f "$d/lib/libamdhip64.so" ] || continue
+    printf '%s' "$d"
+    exit 0
+done
+exit 1
+""",
+    )
+
+    build = [
+        'load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")',
+        'package(default_visibility = ["//visibility:public"])',
+    ]
+
+    if root:
+        _symlink_entries(ctx, root, ["bin", "include", "lib"])
+
+        build.extend([
+            'filegroup(name = "hipcc", srcs = ["bin/hipcc"])',
+            'cc_library(',
+            '    name = "rocm_sdk_core",',
+            '    srcs = [],',
+            '    hdrs = [],',
+            '    includes = ["include"],',
+            ')',
+            'cc_import(',
+            '    name = "amdhip64",',
+            '    shared_library = "lib/libamdhip64.so",',
+            ')',
+        ])
+    else:
+        build.extend([
+            'filegroup(name = "hipcc", srcs = [])',
+            'cc_library(name = "rocm_sdk_core", srcs = [], hdrs = [], includes = [])',
+            'cc_library(name = "amdhip64", srcs = [], hdrs = [])',
+        ])
+
+    ctx.file("WORKSPACE", 'workspace(name = "%s")\n' % ctx.name)
+    ctx.file("BUILD.bazel", "\n".join(build) + "\n")
+
+local_cuda_sdk_repository = repository_rule(
+    implementation = _local_cuda_sdk_repo_impl,
+    environ = ["CUDA_HOME", "CUDA_PATH", "CUDA_ROOT"],
+)
+
+local_rocm_sdk_repository = repository_rule(
+    implementation = _local_rocm_sdk_repo_impl,
+    environ = ["HIP_PATH", "ROCM_PATH"],
+)

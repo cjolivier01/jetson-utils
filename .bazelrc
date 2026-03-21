@@ -2,6 +2,9 @@
 #build --compiler=clang
 build --nokeep_going --color=yes
 # build --crosstool_top=@toolchain//crosstool:toolchain
+# Pin compiler paths in repo_env so cc_configure refreshes when config drifts.
+build --repo_env=CC=/usr/bin/gcc
+build --repo_env=CXX=/usr/bin/g++
 build --copt=-fPIC
 build --copt=-std=c++17
 
