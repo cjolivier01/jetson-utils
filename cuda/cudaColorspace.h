@@ -23,7 +23,6 @@
 #ifndef __CUDA_COLORSPACE_H__
 #define __CUDA_COLORSPACE_H__
 
-#include "cudaUtility.h"
 #include "imageFormat.h"
 
 

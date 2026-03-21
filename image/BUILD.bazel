@@ -1,0 +1,99 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+INCLUDE_PREFIX = "jetson-utils/image"
+
+cc_library(
+    name = "image",
+    srcs = [
+        "imageWriter.cpp",
+    ],
+    hdrs = [
+        "imageWriter.h",
+    ],
+    copts = [
+        "-Wno-error=switch",
+        "-Wno-deprecated-declarations",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":image_format",
+        ":image_loader",
+        "//cuda:colorspace_lib",
+        "//cuda:cuda_lib_headers",
+        "//threads",
+        "//video:video_output",
+    ],
+)
+
+cc_library(
+    name = "image_loader",
+    srcs = [
+        "imageIO.cpp",
+        "imageLoader.cpp",
+    ],
+    hdrs = [
+        "imageIO.h",
+        "imageLoader.h",
+    ],
+    copts = [
+        "-Wno-error=switch",
+        "-Wno-deprecated-declarations",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":stb_image",
+        "//video:video_source",
+    ],
+)
+
+cc_library(
+    name = "load_image",
+    srcs = [
+    ],
+    hdrs = [
+        "loadImage.h",
+    ],
+    copts = [
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "image_loader",
+    ],
+)
+
+cc_library(
+    name = "stb_image",
+    srcs = [],
+    hdrs = [
+        "stb/stb_image.h",
+        "stb/stb_image_resize.h",
+        "stb/stb_image_write.h",
+        "stb/stb_truetype.h",
+    ],
+    include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base:base_includes",
+        "//video:video_options",
+    ],
+)
+
+cc_library(
+    name = "image_format",
+    srcs = [],
+    hdrs = [
+        "imageFormat.h",
+        "imageFormat.inl",
+    ],
+    copts = [
+        "-Wno-error=switch",
+    ],
+    include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base:base_includes",
+        "//cuda:cuda_utility",
+    ],
+)

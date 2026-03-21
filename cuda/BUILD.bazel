@@ -1,0 +1,432 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cuda//cuda:defs.bzl", "cuda_library")
+
+INCLUDE_PREFIX = "jetson-utils/cuda"
+
+config_setting(
+    name = "aarch64-linux-gnu",
+    constraint_values = ["@platforms//cpu:aarch64"],
+)
+
+config_setting(
+    name = "x86_64-linux-gnu",
+    constraint_values = ["@platforms//cpu:x86_64"],
+)
+
+config_setting(
+    name = "glibc_math_rsqrt_conflict",
+    define_values = {
+        # Set by ./perf on hosts with glibc >= 2.38,
+        # where <math.h> declares rsqrt/rsqrtf with noexcept
+        # and conflicts with CUDA's math_functions.h.
+        "glibc_math_rsqrt_conflict": "1",
+    },
+)
+
+config_setting(
+    name = "debug_build",
+    values = {"compilation_mode": "dbg"},
+)
+
+cc_library(
+    name = "cuda_lib",
+    srcs = [
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":cuda_lib_impl",
+        "//display:display",
+    ],
+)
+
+
+cc_library(
+    name = "cuda_lib_impl",
+    srcs = [
+    ],
+    copts = [
+        "-fopenmp",
+        "-Wall",
+        "-std=c++17",
+        "-fPIC",
+        "-Wno-error=deprecated-declarations",
+    ] + select({
+        # only in debug mode:
+        ":debug_build": [
+            "-g",
+            "-O0",
+        ],
+        # in all other modes, no extra flags
+        "//conditions:default": [],
+    }),
+    include_prefix = INCLUDE_PREFIX,
+    linkopts = select({
+        ":aarch64-linux-gnu": [
+            "-L/usr/local/cuda/targets/aarch64-linux/lib",
+            "-L/usr/lib/aarch64-linux-gnu/nvidia",
+	    "-L/usr/local/cuda/targets/sbsa-linux/lib",
+        ],
+        ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
+        "//conditions:default": [],
+    }) + [
+        # "-lculibos",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":colorspace_lib",
+        ":cuda_cuda_lib",
+        ":cuda_point_cloud_cuda_lib",
+        ":cuda_point_cloud_lib",
+        "//display:display_includes",
+        "//display:gl_buffer",
+        "//display:gl_utility",
+    ],
+)
+
+cc_library(
+    name = "cuda_point_cloud_lib",
+    srcs = [
+        "cudaPointCloud.cpp",
+    ],
+    hdrs = [
+        "cudaPointCloud.h",
+    ],
+    copts = [
+        "-fopenmp",
+        "-Wall",
+        "-std=c++17",
+        "-fPIC",
+        "-Wno-error=deprecated-declarations",
+    ] + select({
+        # only in debug mode:
+        ":debug_build": [
+            "-g",
+            "-O0",
+        ],
+        # in all other modes, no extra flags
+        "//conditions:default": [],
+    }),
+    include_prefix = INCLUDE_PREFIX,
+    linkopts = select({
+        ":aarch64-linux-gnu": [
+            "-L/usr/local/cuda/targets/aarch64-linux/lib",
+            "-L/usr/lib/aarch64-linux-gnu/nvidia",
+        ],
+        ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
+        "//conditions:default": [],
+    }) + [
+        "-lculibos",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":cuda_lib_headers",
+        ":cuda_utility",
+        "//display:display_includes",
+        "//display:gl_buffer",
+        "//display:gl_camera",
+        "//display:gl_utility",
+    ],
+)
+
+cc_library(
+    name = "colorspace_lib",
+    srcs = [
+        "cudaColorspace.cpp",
+    ],
+    hdrs = [
+        "cudaColorspace.h",
+    ],
+    copts = [
+        "-fopenmp",
+        "-Wall",
+        "-std=c++17",
+        "-fPIC",
+        "-Wno-error=deprecated-declarations",
+    ] + select({
+        # only in debug mode:
+        ":debug_build": [
+            "-g",
+            "-O0",
+        ],
+        # in all other modes, no extra flags
+        "//conditions:default": [],
+    }),
+    include_prefix = INCLUDE_PREFIX,
+    linkopts = select({
+        ":aarch64-linux-gnu": [
+            "-L/usr/local/cuda/targets/aarch64-linux/lib",
+            "-L/usr/lib/aarch64-linux-gnu/nvidia",
+	    "-L/usr/local/cuda/targets/sbsa-linux/lib",
+        ],
+        ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
+        "//conditions:default": [],
+    }) + [
+        "-lculibos",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":colorspace_cuda_lib",
+        ":cuda_bayer",
+        "//base",
+        "//display:display_includes",
+        "//display:gl_buffer",
+        "//display:gl_utility",
+        "//image:image_format",
+    ],
+    alwayslink = True,
+)
+
+cuda_library(
+    name = "cuda_point_cloud_cuda_lib",
+    srcs = [
+        "cudaPointCloud.cu",
+    ],
+    hdrs = [
+    ],
+    copts = [
+        "-Xcompiler=-fPIC",
+        "-Wno-deprecated-gpu-targets",
+        "-Xcompiler=-fdiagnostics-color=always",
+    ] + select({
+        # Only apply the rsqrt/rsqrtf workaround on hosts
+        # where glibc's math.h conflicts with CUDA.
+        ":glibc_math_rsqrt_conflict": [
+            "-Xcompiler=-U_GNU_SOURCE",
+            "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
+            "-Xcompiler=-D_XOPEN_SOURCE=700",
+        ],
+        "//conditions:default": [],
+    }) + [
+        # Jetson Nano (Ubuntu 18.04) needs c++14 max
+        "--std=c++14",
+        "-Xcompiler=-std=c++14",
+    ] + select({
+        # only in debug mode:
+        ":debug_build": [
+            "-Xcompiler=-g",
+            "-G",
+            "-g",
+            "-keep",
+            "-O0",
+        ],
+        # in all other modes, no extra flags
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":colorspace_cuda_lib",
+        ":cuda_point_cloud_lib",
+        "//image:stb_image",
+        "@local_cuda//:cuda_runtime",
+    ],
+    alwayslink = True,
+)
+
+cuda_library(
+    name = "cuda_cuda_lib",
+    srcs = [
+        "cudaBayer.cu",
+        "cudaCrop.cu",
+        "cudaDraw.cu",
+        "cudaFilterMode.cu",
+        "cudaFont.cu",
+        "cudaNormalize.cu",
+        "cudaOverlay.cu",
+        "cudaResize.cu",
+        "cudaResizeRoi.cu",
+        "cudaWarp-affine.cu",
+        "cudaWarp-fisheye.cu",
+        "cudaWarp-intrinsic.cu",
+        "cudaWarp-perspective.cu",
+    ],
+    hdrs = [
+        "cudaAlphaBlend.cuh",
+    ],
+    copts = [
+        "-Xcompiler=-fPIC",
+        "-Wno-deprecated-gpu-targets",
+        "-Xcompiler=-fdiagnostics-color=always",
+    ] + select({
+        # Only apply the rsqrt/rsqrtf workaround on hosts
+        # where glibc's math.h conflicts with CUDA.
+        ":glibc_math_rsqrt_conflict": [
+            "-Xcompiler=-U_GNU_SOURCE",
+            "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
+            "-Xcompiler=-D_XOPEN_SOURCE=700",
+        ],
+        "//conditions:default": [],
+    }) + [
+        # Jetson Nano (Ubuntu 18.04) needs c++14 max
+        "--std=c++14",
+        "-Xcompiler=-std=c++14",
+    ] + select({
+        # only in debug mode:
+        ":debug_build": [
+            # "-Xcompiler=-O0",
+            "-Xcompiler=-g",
+            "-G",
+            "-g",
+            "-keep",
+            # "-O0",
+        ],
+        # in all other modes, no extra flags
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":colorspace_cuda_lib",
+        ":cuda_lib_headers",
+        ":cuda_utility",
+        "//image:stb_image",
+        "@local_cuda//:cuda_runtime",
+    ],
+    alwayslink = True,
+)
+
+cuda_library(
+    name = "colorspace_cuda_lib",
+    srcs = [
+        "cudaColormap.cu",
+        "cudaGrayscale.cu",
+        "cudaRGB.cu",
+        "cudaYUV-NV12.cu",
+        "cudaYUV-YUYV.cu",
+        "cudaYUV-YV12.cu",
+    ],
+    hdrs = [
+        "cudaColormap.h",
+        "cudaFilterMode.cuh",
+        "cudaGrayscale.h",
+        "cudaMisc.cuh",
+        "cudaRGB.h",
+        "cudaYUV.h",
+    ],
+    copts = [
+        "-Xcompiler=-fPIC",
+        "-Wno-deprecated-gpu-targets",
+        "-Xcompiler=-fdiagnostics-color=always",
+    ] + select({
+        # Only apply the rsqrt/rsqrtf workaround on hosts
+        # where glibc's math.h conflicts with CUDA.
+        ":glibc_math_rsqrt_conflict": [
+            "-Xcompiler=-U_GNU_SOURCE",
+            "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
+            "-Xcompiler=-D_XOPEN_SOURCE=700",
+        ],
+        "//conditions:default": [],
+    }) + [
+        # Jetson Nano (Ubuntu 18.04) needs c++14 max
+        "--std=c++14",
+        "-Xcompiler=-std=c++14",
+    ] + select({
+        # only in debug mode:
+        ":debug_build": [
+            # "-Xcompiler=-O0",
+            "-Xcompiler=-g",
+            "-G",
+            "-g",
+            "-keep",
+            # "-O0",
+        ],
+        # in all other modes, no extra flags
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":cuda_lib_headers",
+        ":cuda_math",
+        "//image:image_format",
+        "@local_cuda//:cuda_runtime",
+    ],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "cuda_lib_headers",
+    hdrs = [
+        "cudaBayer.h",
+        "cudaCrop.h",
+        "cudaDraw.h",
+        "cudaFilterMode.h",
+        "cudaFont.h",
+        "cudaMappedMemory.h",
+        "cudaNormalize.h",
+        "cudaOverlay.h",
+        "cudaPointCloud.h",
+        "cudaResize.h",
+        "cudaResizeRoi.h",
+        "cudaWarp.h",
+    ],
+    include_prefix = INCLUDE_PREFIX,
+    includes = [
+        ".",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        # ":cuda_bayer",
+        ":cuda_utility",
+        "//base:base_includes",
+        "//image:image_format",
+        "@local_cuda//:cuda_runtime",
+    ],
+)
+
+cc_library(
+    name = "cuda_bayer",
+    srcs = ["cudaBayer.cpp"],
+    hdrs = ["cudaBayer.h"],
+    includes = [
+        ".",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":cuda_cuda_lib",
+        "//image:image_format",
+        "@local_cuda//:cuda_runtime",
+    ],
+)
+
+cc_library(
+    name = "cuda_math",
+    srcs = [],
+    hdrs = [
+        "cudaMath.h",
+        "cudaVector.h",
+    ],
+    includes = [
+        ".",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":cuda_utility",
+        "//image:image_format",
+        "@local_cuda//:cuda_runtime",
+    ],
+)
+
+cc_library(
+    name = "cuda_utility",
+    hdrs = ["cudaUtility.h"],
+    includes = [
+        ".",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base:base_includes",
+        "@local_cuda//:cuda_runtime",
+    ],
+)
+
+cc_library(
+    name = "cuda_mapped_memory",
+    hdrs = ["cudaMappedMemory.h"],
+    include_prefix = INCLUDE_PREFIX,
+    includes = [
+        ".",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base:base_includes",
+        "@local_cuda//:cuda_runtime",
+    ],
+)

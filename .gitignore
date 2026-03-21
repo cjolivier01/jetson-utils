@@ -1,2 +1,8 @@
-build/
+/build
 *.pyc
+*.whl
+/.fake_conda
+/bazel-*
+/output.png
+/compile_commands.json
+/.cache

@@ -1,0 +1,37 @@
+#!/bin/bash
+
+CPU="$(uname -m)"
+if [ "$CPU" == "x86_64" ]; then
+  CPU="k8"
+fi
+
+BAZEL_FLAGS="--config=opt --cpu=${CPU}"
+
+# Detect glibc version; enable the rsqrt/rsqrtf workaround only
+# on hosts with glibc >= 2.38, where <math.h> introduces those
+# symbols with noexcept and conflicts with CUDA's math_functions.h.
+detect_glibc_conflict() {
+  if command -v getconf >/dev/null 2>&1; then
+    ver="$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')"
+  else
+    ver="$(ldd --version 2>/dev/null | head -n1 | awk '{print $NF}')"
+  fi
+
+  [ -z "$ver" ] && return 1
+
+  major="${ver%%.*}"
+  minor="${ver#*.}"; minor="${minor%%.*}"
+
+  # glibc >= 2.38 ?
+  if [ "$major" -gt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -ge 38 ]; }; then
+    return 0
+  fi
+
+  return 1
+}
+
+if detect_glibc_conflict; then
+  BAZEL_FLAGS+=" --define=glibc_math_rsqrt_conflict=1"
+fi
+
+bazelisk build ${BAZEL_FLAGS} //...

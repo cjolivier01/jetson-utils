@@ -34,7 +34,10 @@
  */
 cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, 
                             int cx, int cy, float radius, const float4& color, cudaStream_t stream=0 );
-	
+
+cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, 
+                            int cx, int cy, float radius, float innerRadius, const float4& color, cudaStream_t stream=0 );
+
 /**
  * cudaDrawCircle
  * @ingroup drawing
@@ -55,6 +58,12 @@ inline cudaError_t cudaDrawCircle( void* image, size_t width, size_t height, ima
                                    int cx, int cy, float radius, const float4& color, cudaStream_t stream=0 )
 {
 	return cudaDrawCircle(image, image, width, height, format, cx, cy, radius, color, stream);
+}
+
+inline cudaError_t cudaDrawCircle( void* image, size_t width, size_t height, imageFormat format, 
+  int cx, int cy, float radius, float innerRadius, const float4& color, cudaStream_t stream=0 )
+{
+return cudaDrawCircle(image, image, width, height, format, cx, cy, radius, innerRadius, color, stream);
 }
 
 /**
@@ -121,6 +130,21 @@ cudaError_t cudaDrawRect( void* input, void* output, size_t width, size_t height
                           int left, int top, int right, int bottom, const float4& color, 
                           const float4& line_color=make_float4(0,0,0,0), float line_width=1.0f,
                           cudaStream_t stream=0 );
+
+cudaError_t cudaDrawRect( void* input, void* output, size_t width, size_t height, size_t pitch, imageFormat format, 
+                          int left, int top, int right, int bottom, const float4& color, 
+                          const float4& line_color=make_float4(0,0,0,0), float line_width=1.0f,
+                          cudaStream_t stream=0 );
+
+
+template<typename T> 
+cudaError_t cudaDrawRect( T* input, T* output, size_t width, size_t height, size_t pitch, 
+                          int left, int top, int right, int bottom, const float4& color,
+                          const float4& line_color=make_float4(0,0,0,0), float line_width=1.0f,
+                          cudaStream_t stream=0 )	
+{ 
+	return cudaDrawRect(input, output, width, height, pitch, imageFormatFromType<T>(), left, top, right, bottom, color, line_color, line_width, stream); 
+}
 
 /**
  * cudaDrawRect

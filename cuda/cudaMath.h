@@ -23,7 +23,7 @@
 #ifndef __CUDA_HELPER_MATH_H_
 #define __CUDA_HELPER_MATH_H_
 
-#include "cuda_runtime.h"
+#include <cuda_runtime.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @name Vector Math

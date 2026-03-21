@@ -1,0 +1,52 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+INCLUDE_PREFIX = "jetson-utils/camera"
+
+cc_library(
+    name = "camera",
+    srcs = [
+        "gstCamera.cpp",
+        "v4l2Camera.cpp",
+    ],
+    copts = [
+        "-Wno-deprecated-declarations",
+    ],
+    linkopts = [
+        "-lGL",
+        "-lGLEW",
+        "-lGLU",
+        "-lX11",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":camera_includes",
+        "//cuda:colorspace_lib",
+        "//video:video_source",
+        "@glib",
+    ],
+)
+
+cc_library(
+    name = "camera_includes",
+    srcs = [],
+    hdrs = [
+        "gstCamera.h",
+        "v4l2Camera.h",
+    ],
+    include_prefix = INCLUDE_PREFIX,
+    includes = ["."],
+    linkopts = [
+        "-lGL",
+        "-lGLEW",
+        "-lGLU",
+        "-lX11",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base:base_includes",
+        "//codec:codec_includes",
+        "//codec:gst_buffer_manager",
+        "//threads",
+        "@glib",
+    ],
+)

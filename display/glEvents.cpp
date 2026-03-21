@@ -20,16 +20,16 @@
  * DEALINGS IN THE SOFTWARE.
  */
  
-#include "glDisplay.h"
+#include "glDisplayUtil.h"
 #include "glEvents.h"
 
 
 // glRegisterEvents
 void glRegisterEvents( glEventHandler callback, void* user, uint32_t displayID )
 {
-	glDisplay* display = glGetDisplay(displayID);
+	auto* display = glGetDisplay(displayID);
 
-	if( display != NULL )
+	if( display != nullptr )
 		display->AddEventHandler(callback, user);
 }
 
@@ -41,9 +41,9 @@ void glUnregisterEvents( glEventHandler callback, void* user )
 
 	for( uint32_t n=0; n < numDisplays; n++ )
 	{
-		glDisplay* display = glGetDisplay(n);
+		auto* display = glGetDisplay(n);
 
-		if( display != NULL )
+		if( display != nullptr )
 			display->RemoveEventHandler(callback, user);
 	}
 }

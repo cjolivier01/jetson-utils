@@ -23,6 +23,7 @@
 #ifndef __FILESYSTEM_UTIL_H__
 #define __FILESYSTEM_UTIL_H__
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -129,7 +130,7 @@ enum fileTypes
 /**
  * Return a sorted list of the files in the specified directory.  listDir() will glob files from
  * the specified path, and filter against wildcard characters including `*` and `?`.
- * For example, valid paths would include `~/workspace`, `~/workspace/*.jpg`, ect.
+ * For example, valid paths would include `~/workspace`, `~/workspace/ *.jpg`, ect.
  *
  * @see here for a description of wildcard matching:  https://www.man7.org/linux/man-pages/man7/glob.7.html
  *
@@ -144,7 +145,6 @@ bool listDir( const std::string& path, std::vector<std::string>& list, uint32_t 
 
 /**
  * Return the directory 
-/**
  * Verify path and return true if the file exists.
  * @param mask filter by file type (by default, any file including directories will be checked).
  *             The mask should consist of fileTypes OR'd together (e.g. `FILE_REGULAR|FILE_DIR`).

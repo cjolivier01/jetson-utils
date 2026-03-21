@@ -62,34 +62,6 @@
 //  > rtsp://admin:power@127.0.0.1:8554/test
 //
 
-
-// supported image file extensions
-const char* gstDecoder::SupportedExtensions[] = { "mkv", "mp4", "qt", 
-										"flv", "avi", "h264", 
-										"h265", "mov", "webm", NULL };
-
-bool gstDecoder::IsSupportedExtension( const char* ext )
-{
-	if( !ext )
-		return false;
-
-	uint32_t extCount = 0;
-
-	while(true)
-	{
-		if( !SupportedExtensions[extCount] )
-			break;
-
-		if( strcasecmp(SupportedExtensions[extCount], ext) == 0 )
-			return true;
-
-		extCount++;
-	}
-
-	return false;
-}
-
-
 // constructor
 gstDecoder::gstDecoder( const videoOptions& options ) : videoSource(options)
 {	
@@ -951,7 +923,7 @@ bool gstDecoder::Open()
 		if( isLooping() )
 		{
 			// seek stream back to the beginning
-			GstEvent *seek_event = NULL;
+			// GstEvent *seek_event = NULL;
 
 			const bool seek = gst_element_seek(mPipeline, 1.0, GST_FORMAT_TIME,
 						                    (GstSeekFlags)(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
@@ -1115,11 +1087,18 @@ void gstDecoder::onWebsocketMessage( WebRTCPeer* peer, const char* message, size
 		LogVerbose(LOG_WEBRTC "gstDecoder -- configuring WebRTC recieve-only caps string: \n%s\n", caps_str.c_str());
 		
 		// add transciever in receive-only mode  (https://stackoverflow.com/questions/57430215/how-to-use-webrtcbin-create-offer-only-receive-video)
-		GstWebRTCRTPTransceiver* transceiver = NULL;
 		GstCaps* transceiver_caps = gst_caps_from_string(caps_str.c_str());
+
+#if defined(GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY)
+		GstWebRTCRTPTransceiver* transceiver = NULL;
 		g_signal_emit_by_name(peer_context->webrtcbin, "add-transceiver", GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY, transceiver_caps, &transceiver);
+
+		if( transceiver != NULL )
+			gst_object_unref(transceiver);
+#else
+		LogVerbose(LOG_WEBRTC "GStreamer headers missing RTP transceiver direction enum, skipping receive-only transceiver configuration\n");
+#endif
 		gst_caps_unref(transceiver_caps);
-		gst_object_unref(transceiver);
 		
 		// start the pipeline playing
 		decoder->mWebRTCConnected = true;		
@@ -1156,3 +1135,9 @@ void gstDecoder::onWebsocketMessage( WebRTCPeer* peer, const char* message, size
 	gstWebRTC::onWebsocketMessage(peer, message, message_size, user_data);
 }
 
+// TypeToStr
+const char *gstDecoder::TypeToStr(uint32_t type) const {
+  if (type == gstDecoder::Type)
+    return "gstDecoder";
+  return videoSource::TypeToStr(type);
+}

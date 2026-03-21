@@ -27,6 +27,9 @@
 #include <GL/glew.h>
 #include <GL/glx.h>
 
+// wth, Xlib.h #define's 'Status'
+#undef Status
+
 #include <stdio.h>
 #include "logging.h"
 

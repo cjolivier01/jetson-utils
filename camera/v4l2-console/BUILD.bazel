@@ -1,0 +1,10 @@
+cc_binary(
+    name = "v4l2_console",
+    srcs = [
+        "v4l2-console.cpp",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//camera",
+    ],
+)

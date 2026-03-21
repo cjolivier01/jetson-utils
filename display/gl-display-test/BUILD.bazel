@@ -1,0 +1,72 @@
+load("@rules_cuda//cuda:defs.bzl", "cuda_library")
+
+config_setting(
+    name = "glibc_math_rsqrt_conflict",
+    define_values = {
+        # Set by ./perf on hosts with glibc >= 2.38,
+        # where <math.h> declares rsqrt/rsqrtf with noexcept
+        # and conflicts with CUDA's math_functions.h.
+        "glibc_math_rsqrt_conflict": "1",
+    },
+)
+
+cc_binary(
+    name = "gl_display_test",
+    srcs = [
+        "gl-display-test.cpp",
+    ],
+    linkopts = [
+        "-lGL",
+        "-lGLEW",
+        "-lGLU",
+        "-lX11",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":cuda_lib",
+        "//base",
+        "//codec",
+        "//cuda:cuda_lib",
+        "//display",
+        "//network",
+        "@local_cuda//:cuda_runtime",
+    ],
+)
+
+cuda_library(
+    name = "cuda_lib",
+    srcs = glob(["*.cu"]),
+    hdrs = glob(["*.h"]),
+    copts = [
+        "-Xcompiler=-fPIC",
+    ] + select({
+        # Only apply the rsqrt/rsqrtf workaround on hosts
+        # where glibc's math.h conflicts with CUDA.
+        ":glibc_math_rsqrt_conflict": [
+            "-Xcompiler=-U_GNU_SOURCE",
+            "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
+            "-Xcompiler=-D_XOPEN_SOURCE=700",
+        ],
+        "//conditions:default": [],
+    }) + [
+        "-Xcompiler=-g",
+        "-g",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":headers",
+        "//cuda:cuda_cuda_lib",
+        "@local_cuda//:cuda_runtime",
+    ],
+)
+
+cc_library(
+    name = "headers",
+    hdrs = [
+        "cudaInteropKernels.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@local_cuda//:cuda_runtime",
+    ],
+)

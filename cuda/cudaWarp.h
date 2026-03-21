@@ -23,10 +23,8 @@
 #ifndef __CUDA_WARP_H__
 #define __CUDA_WARP_H__
 
-
 #include "cudaUtility.h"
 #include "imageFormat.h"
-
 
 /**
  * Apply 2x3 affine warp to an 8-bit fixed-point RGBA image.
@@ -34,10 +32,10 @@
  * If the transform has already been inverted, set transform_inverted to true.
  * @ingroup warping
  */
-cudaError_t cudaWarpAffine( uchar4* input, uchar4* output, uint32_t width, uint32_t height,
-                            const float transform[2][3], bool transform_inverted=false,
-                            cudaStream_t stream=0 );
-
+cudaError_t cudaWarpAffine(uchar4* input, uchar4* output, uint32_t width,
+                           uint32_t height, const float transform[2][3],
+                           bool transform_inverted = false,
+                           cudaStream_t stream = 0);
 
 /**
  * Apply 2x3 affine warp to an 32-bit floating-point RGBA image.
@@ -45,10 +43,10 @@ cudaError_t cudaWarpAffine( uchar4* input, uchar4* output, uint32_t width, uint3
  * If the transform has already been inverted, set transform_inverted to true.
  * @ingroup warping
  */
-cudaError_t cudaWarpAffine( float4* input, float4* output, uint32_t width, uint32_t height,
-                            const float transform[2][3], bool transform_inverted=false,
-                            cudaStream_t stream=0 );
-
+cudaError_t cudaWarpAffine(float4* input, float4* output, uint32_t width,
+                           uint32_t height, const float transform[2][3],
+                           bool transform_inverted = false,
+                           cudaStream_t stream = 0);
 
 /**
  * Apply a 3x3 perspective warp to an image.
@@ -56,27 +54,33 @@ cudaError_t cudaWarpAffine( float4* input, float4* output, uint32_t width, uint3
  * If the transform has already been inverted, set transform_inverted to true.
  * @ingroup warping
  */
-cudaError_t cudaWarpPerspective( void* input, uint32_t inputWidth, uint32_t inputHeight, imageFormat inputFormat,
-                                 void* output, uint32_t outputWidth, uint32_t outputHeight, imageFormat outputFormat,
-                                 const float transform[3][3], bool transform_inverted=false, cudaStream_t stream=0 );
-		
-		
+cudaError_t cudaWarpPerspective(void* input, uint32_t inputWidth,
+                                uint32_t inputHeight, imageFormat inputFormat,
+                                void* output, uint32_t outputWidth,
+                                uint32_t outputHeight, imageFormat outputFormat,
+                                const float transform[3][3],
+                                bool transform_inverted = false,
+                                cudaStream_t stream = 0);
+
 /**
  * Apply a 3x3 perspective warp to an image.
  * The 3x3 matrix transform is in row-major order (transform[row][column])
  * If the transform has already been inverted, set transform_inverted to true.
  * @ingroup warping
  */
-template<typename T> 
-cudaError_t cudaWarpPerspective( T* input, uint32_t inputWidth, uint32_t inputHeight,
-                                 T* output, uint32_t outputWidth, uint32_t outputHeight,
-                                 const float transform[3][3], bool transform_inverted=false,
-                                 cudaStream_t stream=0 )
-{ 
-	return cudaWarpPerspective(input, inputWidth, inputHeight, imageFormatFromType<T>(), output, outputWidth, outputHeight, imageFormatFromType<T>(), transform, transform_inverted, stream);
-}	
+template <typename T>
+cudaError_t cudaWarpPerspective(T* input, uint32_t inputWidth,
+                                uint32_t inputHeight, T* output,
+                                uint32_t outputWidth, uint32_t outputHeight,
+                                const float transform[3][3],
+                                bool transform_inverted = false,
+                                cudaStream_t stream = 0) {
+  return cudaWarpPerspective(input, inputWidth, inputHeight,
+                             imageFormatFromType<T>(), output, outputWidth,
+                             outputHeight, imageFormatFromType<T>(), transform,
+                             transform_inverted, stream);
+}
 
-						   
 /**
  * Apply 3x3 perspective warp to an 8-bit fixed-point RGBA image.
  * The 3x3 matrix transform is in row-major order (transform[row][column])
@@ -85,10 +89,10 @@ cudaError_t cudaWarpPerspective( T* input, uint32_t inputWidth, uint32_t inputHe
  *             accepts different dimensions for the input and output images.
  * @ingroup warping
  */
-cudaError_t cudaWarpPerspective( uchar4* input, uchar4* output, uint32_t width, uint32_t height,
-                                 const float transform[3][3], bool transform_inverted=false,
-                                 cudaStream_t stream=0 );
-
+cudaError_t cudaWarpPerspective(uchar4* input, uchar4* output, uint32_t width,
+                                uint32_t height, const float transform[3][3],
+                                bool transform_inverted = false,
+                                cudaStream_t stream = 0);
 
 /**
  * Apply 3x3 perspective warp to an 32-bit floating-point RGBA image.
@@ -98,46 +102,68 @@ cudaError_t cudaWarpPerspective( uchar4* input, uchar4* output, uint32_t width, 
  *             accepts different dimensions for the input and output images.
  * @ingroup warping
  */
-cudaError_t cudaWarpPerspective( float4* input, float4* output, uint32_t width, uint32_t height,
-                                 const float transform[3][3], bool transform_inverted=false,
-                                 cudaStream_t stream=0 );
-
-
-/**
- * Apply in-place instrinsic lens distortion correction to an 8-bit fixed-point RGBA image.
- * Pinhole camera model with radial (barrel) distortion and tangential distortion.
- * @ingroup warping
- */
-cudaError_t cudaWarpIntrinsic( uchar4* input, uchar4* output, uint32_t width, uint32_t height,
-                               const float2& focalLength, const float2& principalPoint, const float4& distortion,
-                               cudaStream_t stream=0 );
-											  
+cudaError_t cudaWarpPerspective(float4* input, float4* output, uint32_t width,
+                                uint32_t height, const float transform[3][3],
+                                bool transform_inverted = false,
+                                cudaStream_t stream = 0);
 
 /**
- * Apply in-place instrinsic lens distortion correction to 32-bit floating-point RGBA image.
- * Pinhole camera model with radial (barrel) distortion and tangential distortion.
+ * Apply in-place instrinsic lens distortion correction to an 8-bit fixed-point
+ * RGBA image. Pinhole camera model with radial (barrel) distortion and
+ * tangential distortion.
  * @ingroup warping
  */
-cudaError_t cudaWarpIntrinsic( float4* input, float4* output, uint32_t width, uint32_t height,
-                               const float2& focalLength, const float2& principalPoint, const float4& distortion,
-                               cudaStream_t stream=0 );
-											  
+cudaError_t cudaWarpIntrinsic(uchar4* input, uchar4* output, uint32_t width,
+                              uint32_t height, const float2& focalLength,
+                              const float2& principalPoint,
+                              const float4& distortion,
+                              cudaStream_t stream = 0);
+
+/**
+ * Apply in-place instrinsic lens distortion correction to 32-bit floating-point
+ * RGBA image. Pinhole camera model with radial (barrel) distortion and
+ * tangential distortion.
+ * @ingroup warping
+ */
+cudaError_t cudaWarpIntrinsic(float4* input, float4* output, uint32_t width,
+                              uint32_t height, const float2& focalLength,
+                              const float2& principalPoint,
+                              const float4& distortion,
+                              cudaStream_t stream = 0);
 
 /**
  * Apply fisheye lens dewarping to an 8-bit fixed-point RGBA image.
  * @param[in] focus focus of the lens (in mm).
  * @ingroup warping
  */
-cudaError_t cudaWarpFisheye( uchar4* input, uchar4* output, uint32_t width, uint32_t height, float focus, cudaStream_t stream=0 );
-
+cudaError_t cudaWarpFisheye(uchar4* input, uchar4* output, uint32_t width,
+                            uint32_t height, float focus,
+                            cudaStream_t stream = 0);
 
 /**
  * Apply fisheye lens dewarping to a 32-bit floating-point RGBA image.
  * @param[in] focus focus of the lens (in mm).
  * @ingroup warping
  */
-cudaError_t cudaWarpFisheye( float4* input, float4* output, uint32_t width, uint32_t height, float focus, cudaStream_t stream=0 );
+cudaError_t cudaWarpFisheye(float4* input, float4* output, uint32_t width,
+                            uint32_t height, float focus,
+                            cudaStream_t stream = 0);
 
-							
+// ---------------- public C-style API ----------------
+//
+// depth codes match OpenCV's (but we don't include OpenCV):
+//   0: 8U, 2: 16U, 4: 32S, 5: 32F
+// interp: 0=NEAREST, 1=LINEAR, 2=CUBIC
+// borderMode: 0=CONSTANT, 1=REPLICATE, 2=REFLECT, 3=WRAP, 4=REFLECT_101
+//
+// Expects M (9 floats) mapping DEST->SRC (inverse map).
+//
+// Returns cudaSuccess on success; otherwise a CUDA error code.
+//
+extern "C" cudaError_t warpPerspectiveCudaRaw(
+    const void* src, size_t srcStepBytes, int srcW, int srcH, void* dst,
+    size_t dstStepBytes, int dstW, int dstH, const float M[9], int depth,
+    int channels, int interp, int borderMode, const float borderValue[4],
+    cudaStream_t stream);
+
 #endif
-

@@ -1,0 +1,34 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "base",
+    srcs = glob(["*.cpp"]),
+    copts = [
+        "-fPIC",
+        "-Wno-deprecated-declarations",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":base_includes",
+        "//threads",
+    ],
+)
+
+cc_library(
+    name = "base_includes",
+    srcs = [],
+    hdrs = glob(
+        [
+            "*.h",
+            "*.hpp",
+        ],
+    ),
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "logging_test",
+    srcs = ["logging_test.cc"],
+    deps = [":base"],
+)

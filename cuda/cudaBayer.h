@@ -23,14 +23,12 @@
 #ifndef __CUDA_BAYER_H__
 #define __CUDA_BAYER_H__
 
-
-#include "cudaUtility.h"
 #include "imageFormat.h"
-
 
 //////////////////////////////////////////////////////////////////////////////////
 /// @name 8-bit Bayer to RGB/RGBA
-/// @see cudaConvertColor() from cudaColorspace.h for automated format conversion
+/// @see cudaConvertColor() from cudaColorspace.h for automated format
+/// conversion
 /// @ingroup colorspace
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -38,19 +36,42 @@
 
 /**
  * Demosaick an 8-bit Bayer image to uchar3 RGB.
- * @params format the Bayer pattern of the input image, should be one of: 	
- *                IMAGE_BAYER_BGGR, IMAGE_BAYER_GBRG, IMAGE_BAYER_GRBG, IMAGE_BAYER_RGGB
+ * @params format the Bayer pattern of the input image, should be one of:
+ *                IMAGE_BAYER_BGGR, IMAGE_BAYER_GBRG, IMAGE_BAYER_GRBG,
+ * IMAGE_BAYER_RGGB
  */
-cudaError_t cudaBayerToRGB( uint8_t* input, uchar3* output, size_t width, size_t height, imageFormat format, cudaStream_t stream=0 );
+cudaError_t cudaBayerToRGB(uint8_t *input, uchar3 *output, size_t width,
+                           size_t height, imageFormat format,
+                           cudaStream_t stream = 0);
 
 /**
  * Demosaick an 8-bit Bayer image to uchar4 RGBA.
- * @params format the Bayer pattern of the input image, should be one of: 	
- *                IMAGE_BAYER_BGGR, IMAGE_BAYER_GBRG, IMAGE_BAYER_GRBG, IMAGE_BAYER_RGGB
+ * @params format the Bayer pattern of the input image, should be one of:
+ *                IMAGE_BAYER_BGGR, IMAGE_BAYER_GBRG, IMAGE_BAYER_GRBG,
+ * IMAGE_BAYER_RGGB
  */
-cudaError_t cudaBayerToRGBA( uint8_t* input, uchar3* output, size_t width, size_t height, imageFormat format, cudaStream_t stream=0 );
+cudaError_t cudaBayerToRGBA(uint8_t *input, uchar3 *output, size_t width,
+                            size_t height, imageFormat format,
+                            cudaStream_t stream = 0);
 
 ///@}
 
-#endif
+namespace bayer {
+struct Size {
+  int width, height;
+};
+struct Rect {
+  int x, y, width, height;
+};
 
+// Match NPP Bayer grid choices.
+enum BayerGrid {
+  BAYER_RGGB = 0, // Row0: R G; Row1: G B
+  BAYER_GRBG = 1, // Row0: G R; Row1: B G
+  BAYER_GBRG = 2, // Row0: G B; Row1: R G
+  BAYER_BGGR = 3  // Row0: B G; Row1: G R
+};
+
+} // namespace bayer
+
+#endif

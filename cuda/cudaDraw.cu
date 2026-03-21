@@ -40,12 +40,11 @@ template<typename T> inline __device__ __host__ T sqr(T x) 				    { return x*x;
 inline __device__ __host__ float dist2(float x1, float y1, float x2, float y2) { return sqr(x1-x2) + sqr(y1-y2); }
 inline __device__ __host__ float dist(float x1, float y1, float x2, float y2)  { return sqrtf(dist2(x1,y1,x2,y2)); }
 
-
 //----------------------------------------------------------------------------
 // Circle drawing (find if the distance to the circle <= radius)
 //----------------------------------------------------------------------------						 
 template<typename T>
-__global__ void gpuDrawCircle( T* img, int imgWidth, int imgHeight, int offset_x, int offset_y, int cx, int cy, float radius2, const float4 color ) 
+__global__ void gpuDrawCircle( T* img, int imgWidth, int imgHeight, int offset_x, int offset_y, int cx, int cy, float radius2, float innerRadius, const float4 color ) 
 {
 	const int x = blockIdx.x * blockDim.x + threadIdx.x + offset_x;
 	const int y = blockIdx.y * blockDim.y + threadIdx.y + offset_y;
@@ -57,7 +56,8 @@ __global__ void gpuDrawCircle( T* img, int imgWidth, int imgHeight, int offset_x
 	const int dy = y - cy;
 	
 	// if x,y is in the circle draw it
-	if( dx * dx + dy * dy < radius2 ) 
+  int64_t posval = dx * dx + dy * dy;
+	if( posval < radius2 && posval > innerRadius) 
 	{
 		const int idx = y * imgWidth + x;
 		img[idx] = cudaAlphaBlend(img[idx], color);
@@ -65,7 +65,7 @@ __global__ void gpuDrawCircle( T* img, int imgWidth, int imgHeight, int offset_x
 }
 
 // cudaDrawCircle
-cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, int cx, int cy, float radius, const float4& color, cudaStream_t stream )
+cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, int cx, int cy, float radius, float innerRadius, const float4& color, cudaStream_t stream )
 {
 	if( !input || !output || width == 0 || height == 0 || radius <= 0 )
 		return cudaErrorInvalidValue;
@@ -85,7 +85,7 @@ cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t heig
 	const dim3 gridDim(iDivUp(diameter,blockDim.x), iDivUp(diameter,blockDim.y));
 
 	#define LAUNCH_DRAW_CIRCLE(type) \
-		gpuDrawCircle<type><<<gridDim, blockDim, 0, stream>>>((type*)output, width, height, offset_x, offset_y, cx, cy, radius*radius, color)
+		gpuDrawCircle<type><<<gridDim, blockDim, 0, stream>>>((type*)output, width, height, offset_x, offset_y, cx, cy, radius*radius, innerRadius*innerRadius, color)
 	
 	if( format == IMAGE_RGB8 )
 		LAUNCH_DRAW_CIRCLE(uchar3);
@@ -104,6 +104,9 @@ cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t heig
 	return cudaGetLastError();
 }
 
+cudaError_t cudaDrawCircle( void* input, void* output, size_t width, size_t height, imageFormat format, int cx, int cy, float radius, const float4& color, cudaStream_t stream ) {
+  return cudaDrawCircle(input, output, width, height, format, cx, cy, radius, 0.0f, color, stream);
+}
 
 //----------------------------------------------------------------------------
 // Line drawing (find if the distance to the line <= line_width)
@@ -206,6 +209,23 @@ __global__ void gpuDrawRect( T* img, int imgWidth, int imgHeight, int x0, int y0
 	img[idx] = cudaAlphaBlend(img[idx], color);
 }
 
+template<typename T>
+__global__ void gpuDrawRectPitched( T* img, int imgWidth, int imgHeight, int pitch, int x0, int y0, int boxWidth, int boxHeight, const float4 color ) 
+{
+	const int box_x = blockIdx.x * blockDim.x + threadIdx.x;
+	const int box_y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if( box_x >= boxWidth || box_y >= boxHeight )
+		return;
+
+	const int x = box_x + x0;
+	const int y = box_y + y0;
+
+	if( x >= imgWidth || y >= imgHeight || x < 0 || y < 0 )
+		return;
+ T *pos = start_of_row(img, y, pitch) + x;
+	*pos = cudaAlphaBlend(*pos, color);
+}
 
 // cudaDrawRect
 cudaError_t cudaDrawRect( void* input, void* output, size_t width, size_t height, imageFormat format, int left, int top, int right, int bottom, const float4& color, const float4& line_color, float line_width, cudaStream_t stream )
@@ -250,6 +270,82 @@ cudaError_t cudaDrawRect( void* input, void* output, size_t width, size_t height
 				
 		#define LAUNCH_DRAW_RECT(type) \
 			gpuDrawRect<type><<<gridDim, blockDim, 0, stream>>>((type*)output, width, height, left, top, boxWidth, boxHeight, color)
+		
+		if( format == IMAGE_RGB8 )
+			LAUNCH_DRAW_RECT(uchar3);
+		else if( format == IMAGE_RGBA8 )
+			LAUNCH_DRAW_RECT(uchar4);
+		else if( format == IMAGE_RGB32F )
+			LAUNCH_DRAW_RECT(float3); 
+		else if( format == IMAGE_RGBA32F )
+			LAUNCH_DRAW_RECT(float4);
+		else
+		{
+			imageFormatErrorMsg(LOG_CUDA, "cudaDrawRect()", format);
+			return cudaErrorInvalidValue;
+		}
+	}
+	
+	// rect outline
+	if( line_color.w > 0 && line_width > 0 )
+	{
+		int lines[4][4] = {
+			{left, top, right, top},
+			{right, top, right, bottom},
+			{right, bottom, left, bottom},
+			{left, bottom, left, top}
+		};
+		
+		for( uint32_t n=0; n < 4; n++ )
+			CUDA(cudaDrawLine(output, width, height, format, lines[n][0], lines[n][1], lines[n][2], lines[n][3], line_color, line_width, stream));
+	}
+	
+	return cudaGetLastError();
+}
+
+// cudaDrawRect
+cudaError_t cudaDrawRect( void* input, void* output, size_t width, size_t height, size_t pitch, imageFormat format, int left, int top, int right, int bottom, const float4& color, const float4& line_color, float line_width, cudaStream_t stream )
+{
+	if( !input || !output || width == 0 || height == 0 )
+		return cudaErrorInvalidValue;
+
+	// if the input and output images are different, copy the input to the output
+	// this is because we only launch the kernel in the approximate area of the circle
+	if( input != output )
+		CUDA(cudaMemcpyAsync(output, input, imageFormatSize(format, width, height, pitch), cudaMemcpyDeviceToDevice, stream));
+		
+	// make sure the coordinates are ordered
+	if( left > right )
+	{
+		const int swap = left;
+		left = right;
+		right = swap;
+	}
+	
+	if( top > bottom )
+	{
+		const int swap = top;
+		top = bottom;
+		bottom = swap;
+	}
+	
+	const int boxWidth = right - left;
+	const int boxHeight = bottom - top;
+	
+	if( boxWidth <= 0 || boxHeight <= 0 )
+	{
+		LogError(LOG_CUDA "cudaDrawRect() -- rect had width/height <= 0  left=%i top=%i right=%i bottom=%i\n", left, top, right, bottom);
+		return cudaErrorInvalidValue;
+	}
+
+	// rect fill
+	if( color.w > 0 )
+	{
+		const dim3 blockDim(8, 8);
+		const dim3 gridDim(iDivUp(boxWidth,blockDim.x), iDivUp(boxHeight,blockDim.y));
+				
+		#define LAUNCH_DRAW_RECT(type) \
+			gpuDrawRectPitched<type><<<gridDim, blockDim, 0, stream>>>((type*)output, width, height, pitch, left, top, boxWidth, boxHeight, color)
 		
 		if( format == IMAGE_RGB8 )
 			LAUNCH_DRAW_RECT(uchar3);

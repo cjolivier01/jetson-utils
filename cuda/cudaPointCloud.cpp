@@ -30,7 +30,6 @@
 #include "mat33.h"
 #include "logging.h"
 
-
 // constructor
 cudaPointCloud::cudaPointCloud()
 {
@@ -154,7 +153,6 @@ bool cudaPointCloud::allocBufferGL()
 
 	return true;
 }
-
 
 // allocDepthResize
 bool cudaPointCloud::allocDepthResize( size_t size )

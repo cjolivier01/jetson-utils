@@ -46,8 +46,12 @@ __global__ void gpuPerspectiveWarp( T* input, T* output, int width, int height,
 	
 	T px;
 
-	px.x = 0; px.y = 255;
-	px.z = 0; px.w = 255;
+	px.x = 0;
+  //px.y = 255;
+  px.y = 0;
+	px.z = 0;
+  //px.w = 255;
+  px.w = 0;
 
 	if( u < width && v < height && u >= 0 && v >= 0 )
 		px = input[v * width + u];

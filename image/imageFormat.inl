@@ -221,6 +221,11 @@ inline size_t imageFormatSize( imageFormat format, size_t width, size_t height )
 }
 
 
+inline size_t imageFormatSize( imageFormat format, size_t width, size_t height, size_t pitch )
+{
+	return (width * pitch);
+}
+
 /**
  * @ingroup image
  * @internal

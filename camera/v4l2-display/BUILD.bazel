@@ -1,0 +1,12 @@
+cc_binary(
+    name = "v4l2_display",
+    srcs = [
+        "v4l2-display.cpp",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base",
+        "//camera",
+        "//display",
+    ],
+)

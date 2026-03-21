@@ -23,7 +23,6 @@
 #ifndef __IMAGE_LOADER_H_
 #define __IMAGE_LOADER_H_
 
-
 #include "videoSource.h"
 
 #include <string>
@@ -38,7 +37,7 @@
  * function to load the images, so the supported formats are the same.
  *
  * imageLoader has the ability to load an sequence of images from a directory,
- * including wildcard characters (e.g. `images/*.jpg`), or just a single image.
+ * including wildcard characters (e.g. `images/ *.jpg`), or just a single image.
  * When given just the path to a directory, it will load all valid images from
  * that directory.
  *
@@ -98,6 +97,8 @@ public:
 	 */
 	virtual inline uint32_t GetType() const		{ return Type; }
 
+	const char *TypeToStr(uint32_t type) const override;
+
 	/**
 	 * Unique type identifier of imageLoader class.
 	 */
@@ -131,7 +132,7 @@ public:
 protected:
 	imageLoader( const videoOptions& options );
 
-	inline bool isLooping() const { return (mOptions.loop < 0) || ((mOptions.loop > 0) && (mLoopCount < mOptions.loop)); }
+	inline bool isLooping() const { return (mOptions.loop < 0) || ((mOptions.loop > 0) && (mLoopCount < (size_t)mOptions.loop)); }
 
 	bool mEOS;
 	size_t mLoopCount;

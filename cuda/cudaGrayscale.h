@@ -23,9 +23,8 @@
 #ifndef __CUDA_GRAYSCALE_CONVERT_H
 #define __CUDA_GRAYSCALE_CONVERT_H
 
-
-#include "cudaUtility.h"
-
+#include <cuda_runtime.h>
+#include <cstdint>
 
 //////////////////////////////////////////////////////////////////////////////////
 /// @name 8-bit grayscale to floating-point grayscale (and vice versa)
