@@ -15,10 +15,8 @@ GLIBC_RSQRT_DEFINE := $(shell \
 OPT_BAZEL_FLAGS := --config=opt --cpu=$(CPU) $(GLIBC_RSQRT_DEFINE)
 CUDA_TOOLCHAIN_ENV := source "$(TOPDIR)/toolchain_env.sh"; ensure_cuda_env; ensure_rocm_env || true;
 ROCM_TOOLCHAIN_ENV := source "$(TOPDIR)/toolchain_env.sh"; ensure_cuda_env; ensure_rocm_env;
-DEFAULT_BUILD_TARGET := $(shell bash -lc 'source "$(TOPDIR)/toolchain_env.sh"; if ensure_cuda_env >/dev/null 2>&1; then printf cuda; elif ensure_rocm_env >/dev/null 2>&1; then printf rocm; fi')
-DEFAULT_TARGET := $(if $(DEFAULT_BUILD_TARGET),$(DEFAULT_BUILD_TARGET),missing_toolkit)
 
-all: $(DEFAULT_TARGET)
+all: print_targets
 
 .PHONY: all cuda rocm missing_toolkit print_targets perf debug test wheel develop clean distclean expunge
 
@@ -59,7 +57,7 @@ print_targets:
 		'' \
 		'Build Outputs' \
 		'-------------' \
-		'all          Default build target. Uses CUDA if installed, otherwise ROCm.' \
+		'all          Show this help text (same as print_targets).' \
 		'cuda         Build every Bazel target with the CUDA backend.' \
 		'rocm         Build every Bazel target with the HIP/ROCm backend.' \
 		'perf         Build every Bazel target with optimized flags via ./perf (includes glibc conflict workaround detection).' \
