@@ -1,4 +1,8 @@
 TOPDIR := $(shell pwd)
+CPU := $(shell uname -m)
+ifeq ($(CPU),x86_64)
+CPU := k8
+endif
 GLIBC_RSQRT_DEFINE := $(shell \
 	ver=$$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $$2}'); \
 	if [ -z "$$ver" ]; then ver=$$(ldd --version 2>/dev/null | head -n1 | awk '{print $$NF}'); fi; \
@@ -8,6 +12,8 @@ GLIBC_RSQRT_DEFINE := $(shell \
 		echo "--define=glibc_math_rsqrt_conflict=1"; \
 	fi \
 )
+OPT_BAZEL_FLAGS := --config=opt --cpu=$(CPU) $(GLIBC_RSQRT_DEFINE)
+TOOLCHAIN_ENV := source "$(TOPDIR)/toolchain_env.sh"; ensure_cuda_env; ensure_rocm_env || true;
 
 all: print_targets
 
@@ -20,13 +26,13 @@ debug:
 	./bld
 
 test:
-	bazelisk test --config=opt $(GLIBC_RSQRT_DEFINE) //...
+	bash -lc '$(TOOLCHAIN_ENV) bazelisk test $(OPT_BAZEL_FLAGS) //...'
 
 wheel:
-	bazelisk run --config=opt $(GLIBC_RSQRT_DEFINE) //python:bdist_wheel
+	bash -lc '$(TOOLCHAIN_ENV) bazelisk run $(OPT_BAZEL_FLAGS) //python:bdist_wheel'
 
 develop:
-	bazelisk run --config=opt $(GLIBC_RSQRT_DEFINE) //python:develop
+	bash -lc '$(TOOLCHAIN_ENV) bazelisk run $(OPT_BAZEL_FLAGS) //python:develop'
 
 clean:
 	bazelisk clean

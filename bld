@@ -1,10 +1,24 @@
 #!/bin/bash
 
+set -euo pipefail
+
+source "$(dirname "$0")/toolchain_env.sh"
+
 CPU="$(uname -p)"
 if [ "$CPU" == "x86_64" ]; then
   CPU="k8"
 fi
 
-BAZEL_FLAGS="--config=debug --cpu=${CPU}"
+ensure_cuda_env
+ensure_rocm_env || true
 
-bazelisk build ${BAZEL_FLAGS} $@ //...
+BAZEL_ARGS=(
+	"--config=debug"
+	"--cpu=${CPU}"
+)
+
+if detect_glibc_conflict; then
+	BAZEL_ARGS+=("--define=glibc_math_rsqrt_conflict=1")
+fi
+
+bazelisk build "${BAZEL_ARGS[@]}" "$@" //...
