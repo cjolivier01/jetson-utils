@@ -13,9 +13,13 @@ cc_library(
     copts = [
         "-Wno-error=switch",
         "-Wno-deprecated-declarations",
-    ],
+    ] + select({
+        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
     deps = [
+        "//cuda:cuda_lib",
         ":image_format",
         ":image_loader",
         "//cuda:colorspace_lib",
@@ -38,7 +42,10 @@ cc_library(
     copts = [
         "-Wno-error=switch",
         "-Wno-deprecated-declarations",
-    ],
+    ] + select({
+        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         ":stb_image",
@@ -88,7 +95,10 @@ cc_library(
     ],
     copts = [
         "-Wno-error=switch",
-    ],
+    ] + select({
+        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
+    }),
     include_prefix = INCLUDE_PREFIX,
     includes = ["."],
     visibility = ["//visibility:public"],
@@ -96,4 +106,14 @@ cc_library(
         "//base:base_includes",
         "//cuda:cuda_utility",
     ],
+)
+
+filegroup(
+    name = "image_hdrs",
+    srcs = glob([
+        "*.h",
+        "*.inl",
+        "stb/*.h",
+    ]),
+    visibility = ["//visibility:public"],
 )

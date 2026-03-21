@@ -7,9 +7,6 @@ build --repo_env=CC=/usr/bin/gcc
 build --repo_env=CXX=/usr/bin/g++
 build --copt=-fPIC
 build --copt=-std=c++17
-# Ubuntu's GCC defaults to -fuse-ld=gold in this environment, but ld.gold may be absent.
-# Force GNU ld.bfd to keep local and CI builds consistent.
-build --linkopt=-fuse-ld=bfd
 
 #build -c opt
 build:opt -c opt
@@ -40,3 +37,10 @@ build --action_env=target_platform="jetson"
 build:jetson --cpu=aarch64
 build:jetson --define=target_platform=jetson
 build:jetson --action_env=target_platform="jetson"
+
+# Build with HIP/ROCm backend for CUDA kernels
+build:rocm --define=jetson_use_hip=true
+# Ensure all translation units see HIP remapping shims
+build:rocm --copt=-DJETSON_USE_HIP
+# When compiling host code with GCC/Clang (not hipcc), select AMD ROCm platform
+build:rocm --copt=-D__HIP_PLATFORM_AMD__

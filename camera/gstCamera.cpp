@@ -25,7 +25,9 @@
 #include "cudaColorspace.h"
 #include "filesystem.h"
 #include "logging.h"
+#ifndef JETSON_USE_HIP
 #include "NvInfer.h"
+#endif
 
 #include <gst/app/gstappsink.h>
 

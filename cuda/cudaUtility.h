@@ -24,8 +24,10 @@
 #define __CUDA_UTILITY_H_
 
 
-#include <cuda_runtime.h>
+#include "cuda_runtime_compat.h"
+#ifndef JETSON_USE_HIP
 #include <cuda.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -149,4 +151,3 @@ inline __device__ __host__ int iDivUp( int a, int b )  		{ return (a % b != 0) ?
 
 
 #endif
-

@@ -1,0 +1,24 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["video-viewer.py"]) 
+
+filegroup(
+    name = "video_viewer_py",
+    srcs = ["video-viewer.py"],
+)
+
+py_binary(
+    name = "video_viewer",
+    srcs = ["video-viewer.py"],
+    main = "video-viewer.py",
+    imports = [
+        "python",
+        "python/bindings",
+    ],
+    deps = ["//python:jetson_utils_py"],
+    data = [
+        "//python/bindings:jetson_utils_python_ext",
+        "//core:jetson_utils",
+        "//python/extdeps:jetson_cuda",
+    ],
+)

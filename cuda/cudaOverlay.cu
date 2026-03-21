@@ -46,38 +46,20 @@ __global__ void gpuOverlayAlphaPitch(T *input, int inputWidth, int inputHeight,
 }
 
 //---------------------------------------------------------------------
-// Base wrapper to provide the legacy no-pitch entry point
+// Base wrapper to provide the legacy no-pitch entry point.
 //---------------------------------------------------------------------
-cudaError_t cudaOverlay(
-	void* input,
-	size_t inputWidth,
-	size_t inputHeight,
-	void* output,
-	size_t outputWidth,
-	size_t outputHeight,
-	imageFormat format,
-	int x,
-	int y,
-	cudaStream_t stream) {
-	if (!input || !output)
-		return cudaErrorInvalidValue;
+cudaError_t cudaOverlay(void *input, size_t inputWidth, size_t inputHeight,
+                        void *output, size_t outputWidth, size_t outputHeight,
+                        imageFormat format, int x, int y, cudaStream_t stream) {
+  if (!input || !output)
+    return cudaErrorInvalidValue;
 
-	const size_t inputPitch = imageFormatSize(format, inputWidth, 1);
-	const size_t outputPitch = imageFormatSize(format, outputWidth, 1);
+  const size_t inputPitch = imageFormatSize(format, inputWidth, 1);
+  const size_t outputPitch = imageFormatSize(format, outputWidth, 1);
 
-	return cudaOverlayPitch(
-		input,
-		inputWidth,
-		inputHeight,
-		inputPitch,
-		output,
-		outputWidth,
-		outputHeight,
-		outputPitch,
-		format,
-		x,
-		y,
-		stream);
+  return cudaOverlayPitch(input, inputWidth, inputHeight, inputPitch, output,
+                          outputWidth, outputHeight, outputPitch, format, x, y,
+                          stream);
 }
 
 //---------------------------------------------------------------------

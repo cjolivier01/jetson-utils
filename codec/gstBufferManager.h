@@ -36,7 +36,9 @@
 	#undef ENABLE_NVMM	// NVMM is only enabled for GStreamer 1.0 and newer
 #endif
 
+#ifndef JETSON_USE_HIP
 #include "NvInfer.h"
+#endif
 #if NV_TENSORRT_MAJOR > 8 || (NV_TENSORRT_MAJOR == 8 && NV_TENSORRT_MINOR >= 4)
 	#undef ENABLE_NVMM  // debug NVMM under JetPack 5
 #endif

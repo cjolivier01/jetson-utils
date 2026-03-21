@@ -19,7 +19,11 @@ rules_cuda_dependencies()
 
 register_detected_cuda_toolchains()
 
-load("//bazel:dependencies.bzl", "conda_repository")
+load("//bazel:dependencies.bzl", "conda_repository", "local_cuda_sdk_repository", "local_rocm_sdk_repository")
+
+local_cuda_sdk_repository(
+    name = "cuda_sdk",
+)
 
 conda_repository(
     name = "libpython",
@@ -101,3 +105,7 @@ new_local_repository(
 # Expose Python SOABI for naming the extension module
 load("//bazel:py_soabi.bzl", "py_soabi")
 py_soabi(name = "py_soabi")
+
+local_rocm_sdk_repository(
+    name = "rocm_sdk_includes",
+)

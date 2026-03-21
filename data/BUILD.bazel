@@ -1,0 +1,8 @@
+package(default_visibility = ["//visibility:public"])
+
+# Expose test image assets to tests/examples
+exports_files([
+    "fontmapA.png",
+    "fontmapB.png",
+])
+

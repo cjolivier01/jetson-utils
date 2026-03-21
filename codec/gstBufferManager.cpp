@@ -29,7 +29,9 @@
 #ifdef ENABLE_NVMM
 #include <nvbuf_utils.h>
 #include <cuda_egl_interop.h>
+#ifndef JETSON_USE_HIP
 #include <NvInfer.h>
+#endif
 
 #if NV_TENSORRT_MAJOR > 8 || (NV_TENSORRT_MAJOR == 8 && NV_TENSORRT_MINOR >= 4)
 #include <nvbufsurface.h>   // JetPack 5

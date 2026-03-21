@@ -95,9 +95,12 @@ def main():
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
 
-        # Place compiled extension at top-level so imports like
-        # `from jetson_utils_python import *` resolve (upstream expects top-level)
-        ext_dst = root / ext_path.name
+        # Place compiled extension inside the package directory so it installs under
+        # site-packages/jetson_utils/ per standard packaging expectations.
+        # The package code will import it relatively (with fallback to top-level for Bazel dev).
+        pkg_ext_dir = root / "jetson_utils"
+        pkg_ext_dir.mkdir(parents=True, exist_ok=True)
+        ext_dst = pkg_ext_dir / ext_path.name
         shutil.copy2(ext_path, ext_dst)
 
         # Include shared core library (for DT_NEEDED resolution at runtime)

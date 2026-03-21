@@ -25,7 +25,7 @@
 
 
 #include "cudaUtility.h"
-#include "cuda_gl_interop.h"
+#include "cuda_gl_interop_shim.h"
 
 
 /**

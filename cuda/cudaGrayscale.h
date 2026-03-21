@@ -23,7 +23,7 @@
 #ifndef __CUDA_GRAYSCALE_CONVERT_H
 #define __CUDA_GRAYSCALE_CONVERT_H
 
-#include <cuda_runtime.h>
+#include "cuda_runtime_compat.h"
 #include <cstdint>
 
 //////////////////////////////////////////////////////////////////////////////////

@@ -4,6 +4,11 @@ load("@rules_cuda//cuda:defs.bzl", "cuda_library")
 INCLUDE_PREFIX = "jetson-utils/cuda"
 
 config_setting(
+    name = "use_hip",
+    define_values = {"jetson_use_hip": "true"},
+)
+
+config_setting(
     name = "aarch64-linux-gnu",
     constraint_values = ["@platforms//cpu:aarch64"],
 )
@@ -16,9 +21,6 @@ config_setting(
 config_setting(
     name = "glibc_math_rsqrt_conflict",
     define_values = {
-        # Set by ./perf on hosts with glibc >= 2.38,
-        # where <math.h> declares rsqrt/rsqrtf with noexcept
-        # and conflicts with CUDA's math_functions.h.
         "glibc_math_rsqrt_conflict": "1",
     },
 )
@@ -58,29 +60,33 @@ cc_library(
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
     }),
     include_prefix = INCLUDE_PREFIX,
-    linkopts = select({
-        ":aarch64-linux-gnu": [
-            "-L/usr/local/cuda/targets/aarch64-linux/lib",
-            "-L/usr/lib/aarch64-linux-gnu/nvidia",
-	    "-L/usr/local/cuda/targets/sbsa-linux/lib",
-        ],
-        ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
-        "//conditions:default": [],
-    }) + [
-        # "-lculibos",
-    ],
     visibility = ["//visibility:public"],
     deps = [
         ":colorspace_lib",
-        ":cuda_cuda_lib",
-        ":cuda_point_cloud_cuda_lib",
         ":cuda_point_cloud_lib",
+        ":cuda_compat_includes",
         "//display:display_includes",
         "//display:gl_buffer",
         "//display:gl_utility",
-    ],
+    ] + select({
+        ":use_hip": [
+        ":hip_cuda_lib",
+        "@rocm_sdk_includes//:rocm_sdk_core",
+            ":hip_runtime",
+        ],
+        "//conditions:default": [
+            ":cuda_cuda_lib",
+            ":cuda_point_cloud_cuda_lib",
+        ],
+    }),
 )
 
 cc_library(
@@ -107,25 +113,19 @@ cc_library(
         "//conditions:default": [],
     }),
     include_prefix = INCLUDE_PREFIX,
-    linkopts = select({
-        ":aarch64-linux-gnu": [
-            "-L/usr/local/cuda/targets/aarch64-linux/lib",
-            "-L/usr/lib/aarch64-linux-gnu/nvidia",
-        ],
-        ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
-        "//conditions:default": [],
-    }) + [
-        "-lculibos",
-    ],
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_lib_headers",
+        ":cuda_compat_includes",
         ":cuda_utility",
         "//display:display_includes",
         "//display:gl_buffer",
         "//display:gl_camera",
         "//display:gl_utility",
-    ],
+    ] + select({
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        "//conditions:default": ["@cuda_sdk//:culibos"],
+    }),
 )
 
 cc_library(
@@ -135,6 +135,13 @@ cc_library(
     ],
     hdrs = [
         "cudaColorspace.h",
+        "cudaRGB.h",
+        "cudaYUV.h",
+        "cudaBayer.h",
+        "cudaGrayscale.h",
+    ],
+    includes = [
+        ".",
     ],
     copts = [
         "-fopenmp",
@@ -150,29 +157,41 @@ cc_library(
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
     }),
     include_prefix = INCLUDE_PREFIX,
-    linkopts = select({
-        ":aarch64-linux-gnu": [
-            "-L/usr/local/cuda/targets/aarch64-linux/lib",
-            "-L/usr/lib/aarch64-linux-gnu/nvidia",
-	    "-L/usr/local/cuda/targets/sbsa-linux/lib",
-        ],
-        ":x86_64-linux-gnu": ["-L/usr/local/cuda/targets/x86_64-linux/lib"],
-        "//conditions:default": [],
-    }) + [
-        "-lculibos",
-    ],
     visibility = ["//visibility:public"],
-    deps = [
-        ":colorspace_cuda_lib",
-        ":cuda_bayer",
-        "//base",
-        "//display:display_includes",
-        "//display:gl_buffer",
-        "//display:gl_utility",
-        "//image:image_format",
-    ],
+    deps = select({
+        ":use_hip": [
+            ":hip_cuda_lib",
+            ":cuda_lib_headers",
+            ":cuda_bayer",
+            ":cuda_compat_includes",
+            "@rocm_sdk_includes//:rocm_sdk_core",
+            "//base",
+            "//display:display_includes",
+            "//display:gl_buffer",
+            "//display:gl_utility",
+            "//image:image_format",
+        ],
+        "//conditions:default": [
+            ":colorspace_cuda_lib",
+            ":cuda_lib_headers",
+            ":cuda_bayer",
+            ":cuda_compat_includes",
+            "@cuda_sdk//:culibos",
+            "//base",
+            "//display:display_includes",
+            "//display:gl_buffer",
+            "//display:gl_utility",
+            "//image:image_format",
+        ],
+    }),
     alwayslink = True,
 )
 
@@ -188,8 +207,6 @@ cuda_library(
         "-Wno-deprecated-gpu-targets",
         "-Xcompiler=-fdiagnostics-color=always",
     ] + select({
-        # Only apply the rsqrt/rsqrtf workaround on hosts
-        # where glibc's math.h conflicts with CUDA.
         ":glibc_math_rsqrt_conflict": [
             "-Xcompiler=-U_GNU_SOURCE",
             "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
@@ -211,8 +228,15 @@ cuda_library(
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        ":use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":colorspace_cuda_lib",
         ":cuda_point_cloud_lib",
@@ -247,8 +271,6 @@ cuda_library(
         "-Wno-deprecated-gpu-targets",
         "-Xcompiler=-fdiagnostics-color=always",
     ] + select({
-        # Only apply the rsqrt/rsqrtf workaround on hosts
-        # where glibc's math.h conflicts with CUDA.
         ":glibc_math_rsqrt_conflict": [
             "-Xcompiler=-U_GNU_SOURCE",
             "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
@@ -273,9 +295,14 @@ cuda_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        ":use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":colorspace_cuda_lib",
         ":cuda_lib_headers",
+        ":cuda_compat_includes",
         ":cuda_utility",
         "//image:stb_image",
         "@local_cuda//:cuda_runtime",
@@ -306,8 +333,6 @@ cuda_library(
         "-Wno-deprecated-gpu-targets",
         "-Xcompiler=-fdiagnostics-color=always",
     ] + select({
-        # Only apply the rsqrt/rsqrtf workaround on hosts
-        # where glibc's math.h conflicts with CUDA.
         ":glibc_math_rsqrt_conflict": [
             "-Xcompiler=-U_GNU_SOURCE",
             "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
@@ -330,14 +355,24 @@ cuda_library(
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
+    }) + select({
+        ":use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        ":use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":cuda_lib_headers",
         ":cuda_math",
+        ":cuda_compat_includes",
         "//image:image_format",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        ":use_hip": [],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
     alwayslink = True,
 )
 
@@ -364,11 +399,14 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         # ":cuda_bayer",
+        ":cuda_compat_includes",
         ":cuda_utility",
         "//base:base_includes",
         "//image:image_format",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )
 
 cc_library(
@@ -379,11 +417,21 @@ cc_library(
         ".",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        ":cuda_cuda_lib",
-        "//image:image_format",
-        "@local_cuda//:cuda_runtime",
-    ],
+    copts = select({
+        ":use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        ":use_hip": [
+            ":hip_cuda_lib",
+            "//image:image_format",
+        ],
+        "//conditions:default": [
+            ":cuda_cuda_lib",
+            "//image:image_format",
+            "@local_cuda//:cuda_runtime",
+        ],
+    }),
 )
 
 cc_library(
@@ -398,10 +446,13 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":cuda_compat_includes",
         ":cuda_utility",
         "//image:image_format",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )
 
 cc_library(
@@ -412,9 +463,12 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":cuda_compat_includes",
         "//base:base_includes",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )
 
 cc_library(
@@ -426,7 +480,175 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":cuda_compat_includes",
         "//base:base_includes",
+    ] + select({
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
+)
+
+# HIP (ROCm) build of CUDA kernels using hipcc. Enabled with:
+#   bazel build --define=jetson_use_hip=true //cuda:hip_cuda_lib
+
+filegroup(
+    name = "hip_cuda_srcs",
+    srcs = [
+        "cudaBayer.cu",
+        "cudaCrop.cu",
+        "cudaDraw.cu",
+        "cudaFilterMode.cu",
+        "cudaFont.cu",
+        "cudaNormalize.cu",
+        "cudaOverlay.cu",
+        "cudaResize.cu",
+        "cudaResizeRoi.cu",
+        "cudaWarp-affine.cu",
+        "cudaWarp-fisheye.cu",
+        "cudaWarp-intrinsic.cu",
+        "cudaWarp-perspective.cu",
+        "cudaColormap.cu",
+        "cudaGrayscale.cu",
+        "cudaRGB.cu",
+        "cudaYUV-NV12.cu",
+        "cudaYUV-YUYV.cu",
+        "cudaYUV-YV12.cu",
+    ],
+)
+
+genrule(
+    name = "hip_cuda_lib_gen",
+    srcs = [":hip_cuda_srcs"] + [
+        # headers to ensure they are in the sandbox during compilation
+        "cudaAlphaBlend.cuh",
+        "cudaFilterMode.cuh",
+        "cudaMisc.cuh",
+        "cudaColormap.h",
+        "cudaFilterMode.h",
+        "cudaGrayscale.h",
+        "cudaRGB.h",
+        "cudaWarp.h",
+        "cudaBayer.h",
+        "cudaCrop.h",
+        "cudaDraw.h",
+        "cudaFont.h",
+        "cudaMappedMemory.h",
+        "cudaNormalize.h",
+        "cudaOverlay.h",
+        "cudaPointCloud.h",
+        "cudaResize.h",
+        "cudaResizeRoi.h",
+        "cudaVector.h",
+        "cudaMath.h",
+        "cudaUtility.h",
+        "cudaColorspace.h",
+        "cuda_runtime_compat.h",
+        "cuda_gl_interop_shim.h",
+        "//base:base_hdrs",
+        "//image:image_hdrs",
+    ],
+    outs = ["libhip_cuda_kernels.a"],
+    tools = ["@rocm_sdk_includes//:hipcc"],
+    cmd = (
+        "set -e; mkdir -p $(@D)/hipobjs; " +
+        "for s in $(SRCS); do " +
+        "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$(@D)/hipobjs/$${b%.*}.o; " +
+        "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++14 -fPIC -O2 -DJETSON_USE_HIP " +
+        "    -I. -Icuda -Ibase -Iimage -Idisplay -Ithreads -Ivideo -Icodec -Inetwork -Ipython -Ipython/bindings " +
+        "    $$s -o $$o; " +
+        "  esac; " +
+        "done; " +
+        "ar rcs $@ $(@D)/hipobjs/*.o"
+    ),
+    tags = ["no-sandbox"],
+    visibility = ["//visibility:public"],
+    toolchains = [],
+    target_compatible_with = select({
+        ":use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+cc_import(
+    name = "hip_cuda_lib",
+    static_library = ":hip_cuda_lib_gen",
+    visibility = ["//visibility:public"],
+    alwayslink = True,
+    target_compatible_with = select({
+        ":use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+# Link shim for HIP runtime
+cc_library(
+    name = "hip_runtime",
+    srcs = [],
+    hdrs = [],
+    deps = [
+        "@rocm_sdk_includes//:amdhip64",
+    ],
+    visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        ":use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+cc_test(
+    name = "hip_build_all_test",
+    srcs = ["hip_build_all_test.cc"],
+    deps = [
+        ":cuda_lib_headers",
+        ":cuda_compat_includes",
+    ],
+    target_compatible_with = select({
+        ":use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+# Header-only compatibility shims (CUDA/HIP + GL interop)
+cc_library(
+    name = "cuda_compat_includes",
+    hdrs = [
+        "cuda_gl_interop_shim.h",
+        "cuda_runtime_compat.h",
+    ],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
         "@local_cuda//:cuda_runtime",
     ],
+)
+
+# Tests
+cc_test(
+    name = "cuda_utility_test",
+    srcs = ["cuda_utility_test.cc"],
+    copts = select({
+        ":use_hip": ["-UJETSON_USE_HIP", "-U__HIP_PLATFORM_AMD__"],
+        "//conditions:default": [],
+    }),
+    deps = [":cuda_utility"],
+)
+
+cc_test(
+    name = "cuda_math_test",
+    srcs = ["cuda_math_test.cc"],
+    copts = select({
+        ":use_hip": ["-UJETSON_USE_HIP", "-U__HIP_PLATFORM_AMD__"],
+        "//conditions:default": [],
+    }),
+    deps = [":cuda_math"],
+)
+
+cc_test(
+    name = "cuda_gl_header_test",
+    srcs = ["cuda_gl_header_test.cc"],
+    copts = select({
+        ":use_hip": ["-UJETSON_USE_HIP", "-U__HIP_PLATFORM_AMD__"],
+        "//conditions:default": [],
+    }),
+    deps = [":cuda_compat_includes"],
 )

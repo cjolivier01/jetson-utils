@@ -9,13 +9,20 @@ cc_library(
     copts = [
         "-Wno-deprecated-declarations",
         "-Wno-sign-compare",
-    ],
+    ] + select({
+        "//cuda:use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
+    }) + select({
+        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         ":codec_includes",
         ":gst_buffer_manager",
         ":gst_decoder",
         ":gst_utility",
+        "//cuda:cuda_lib",
         "//cuda:colorspace_lib",
         "//network",
         "//threads",
@@ -55,6 +62,7 @@ cc_library(
     deps = [
         ":gst_utility",
         "//base",
+        "//cuda:cuda_lib",
         "//cuda:colorspace_lib",
     ],
 )
@@ -91,7 +99,13 @@ cc_library(
     copts = [
         "-Wno-error=switch",
         "-Wno-error=unused-function",
-    ],
+    ] + select({
+        "//cuda:use_hip": ["-DJETSON_USE_HIP"],
+        "//conditions:default": [],
+    }) + select({
+        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//conditions:default": [],
+    }),
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = [

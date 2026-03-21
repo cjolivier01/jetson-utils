@@ -1,5 +1,12 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
+HIP_COPTS = select({
+    "//cuda:use_hip": [
+        "-DJETSON_USE_HIP",
+    ],
+    "//conditions:default": [],
+})
+
 cc_library(
     name = "video_output",
     srcs = [
@@ -10,7 +17,7 @@ cc_library(
     ],
     copts = [
         "-Wno-deprecated-declarations",
-    ],
+    ] + HIP_COPTS,
     visibility = ["//visibility:public"],
     deps = [
         ":video_options",
@@ -27,6 +34,7 @@ cc_library(
         "videoSource.h",
     ],
     includes = ["."],
+    copts = HIP_COPTS,
     visibility = ["//visibility:public"],
     deps = [
         ":video_options",
@@ -45,6 +53,7 @@ cc_library(
     hdrs = [
     ],
     includes = ["."],
+    copts = HIP_COPTS,
     visibility = ["//visibility:public"],
     deps = [
         ":video_options",
@@ -64,6 +73,7 @@ cc_library(
     hdrs = [
     ],
     includes = ["."],
+    copts = HIP_COPTS,
     visibility = ["//visibility:public"],
     deps = [
         ":video_options",
@@ -87,7 +97,7 @@ cc_library(
     copts = [
         "-std=c++17",
         "-Wno-sign-compare",
-    ],
+    ] + HIP_COPTS,
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = [

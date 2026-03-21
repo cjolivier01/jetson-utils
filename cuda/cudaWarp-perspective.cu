@@ -18,7 +18,7 @@
 //
 // Or build a single binary together with your .cpp wrapper.
 
-#include <cuda_runtime.h>
+#include "cuda_runtime_compat.h"
 #include <math.h>
 
 
@@ -351,7 +351,6 @@ cudaError_t warpPerspectiveCudaRaw(
     }
     return cudaErrorInvalidValue;
 }
-
 
 
 

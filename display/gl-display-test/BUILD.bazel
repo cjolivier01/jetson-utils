@@ -3,9 +3,6 @@ load("@rules_cuda//cuda:defs.bzl", "cuda_library")
 config_setting(
     name = "glibc_math_rsqrt_conflict",
     define_values = {
-        # Set by ./perf on hosts with glibc >= 2.38,
-        # where <math.h> declares rsqrt/rsqrtf with noexcept
-        # and conflicts with CUDA's math_functions.h.
         "glibc_math_rsqrt_conflict": "1",
     },
 )
@@ -22,15 +19,23 @@ cc_binary(
         "-lX11",
     ],
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        "//cuda:use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":cuda_lib",
         "//base",
         "//codec",
-        "//cuda:cuda_lib",
         "//display",
         "//network",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        "//cuda:use_hip": [],
+        "//conditions:default": [
+            "//cuda:cuda_lib",
+            "@local_cuda//:cuda_runtime",
+        ],
+    }),
 )
 
 cuda_library(
@@ -40,8 +45,6 @@ cuda_library(
     copts = [
         "-Xcompiler=-fPIC",
     ] + select({
-        # Only apply the rsqrt/rsqrtf workaround on hosts
-        # where glibc's math.h conflicts with CUDA.
         ":glibc_math_rsqrt_conflict": [
             "-Xcompiler=-U_GNU_SOURCE",
             "-Xcompiler=-D_POSIX_C_SOURCE=200809L",
@@ -53,11 +56,16 @@ cuda_library(
         "-g",
     ],
     visibility = ["//visibility:public"],
+    target_compatible_with = select({
+        "//cuda:use_hip": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":headers",
-        "//cuda:cuda_cuda_lib",
-        "@local_cuda//:cuda_runtime",
-    ],
+    ] + select({
+        "//cuda:use_hip": ["//cuda:hip_cuda_lib"],
+        "//conditions:default": ["//cuda:cuda_cuda_lib", "@local_cuda//:cuda_runtime"],
+    }),
 )
 
 cc_library(
@@ -66,7 +74,8 @@ cc_library(
         "cudaInteropKernels.h",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        "@local_cuda//:cuda_runtime",
-    ],
+    deps = select({
+        "//cuda:use_hip": [],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )

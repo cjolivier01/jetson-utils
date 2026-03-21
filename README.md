@@ -40,30 +40,39 @@ sudo ldconfig
 
 If you're missing dependencies, run the [`jetson-inference/CMakePreBuild.sh`](https://github.com/dusty-nv/jetson-inference/blob/master/CMakePreBuild.sh) script.
 
-### Bazel / `./perf` build and glibc 2.38+
+### Bazel Build (project-local)
 
-This repository also includes a Bazel-based build used for performance testing:
+This repository also includes Bazel build files for development, tests, and Python wheels:
 
-``` bash
+```bash
+# build everything (debug)
+./bld
+
+# optimized build with the glibc/CUDA workaround when needed
 ./perf
+
+# or directly
+bazel build //...
+
+# run tests
+bazel test //...
 ```
 
-On hosts with glibc 2.38 or newer, `<math.h>` now declares `rsqrt`/`rsqrtf` with `noexcept`, which conflicts with CUDA's own declarations in `crt/math_functions.h` when compiling `.cu` files with `nvcc`. To work around this, `./perf`:
+On hosts with glibc 2.38 or newer, `<math.h>` can conflict with CUDA's `rsqrt`/`rsqrtf`
+declarations. `./perf` detects that case and adds `--define=glibc_math_rsqrt_conflict=1`
+so the CUDA targets receive the required compiler flags automatically.
 
-- Detects the glibc version at runtime.
-- For glibc >= 2.38, adds `--define=glibc_math_rsqrt_conflict=1` to the Bazel flags.
-- Bazel then conditionally adds a small set of `-Xcompiler` flags only to the CUDA targets to avoid the `rsqrt`/`rsqrtf` conflict.
+### HIP/ROCm Support (AMD GPUs)
 
-If you want to override this behavior:
+The CUDA code now has a HIP compatibility layer so it can compile for AMD GPUs under ROCm/HIP:
 
-- To force the workaround on or off when calling Bazel directly:
+- `cuda/cuda_runtime_compat.h` maps selected CUDA runtime APIs/types to HIP when building with `-DJETSON_USE_HIP`.
+- `cuda/cuda_gl_interop_shim.h` maps CUDA-OpenGL interop calls to HIP-GL.
 
-  ```bash
-  # Force enable
-  bazelisk build --config=opt --cpu=k8 --define=glibc_math_rsqrt_conflict=1 //...
+CUDA remains the default backend. To enable the HIP/ROCm backend, use:
 
-  # Force disable
-  bazelisk build --config=opt --cpu=k8 --define=glibc_math_rsqrt_conflict=0 //...
-  ```
+```bash
+bazel build --config=rocm //...
+```
 
-- To bypass `./perf` entirely, invoke Bazel directly as above with your desired `--define` setting. The `glibc_math_rsqrt_conflict` define only affects how the CUDA `.cu` files are compiled with `nvcc`; it does not change the rest of the project.
+The Bazel HIP path compiles the `.cu` kernels with `hipcc` and links against `libamdhip64`.

@@ -23,7 +23,9 @@
 #include "gstUtility.h"
 #include "filesystem.h"
 
+#ifndef JETSON_USE_HIP
 #include "NvInfer.h"
+#endif
 #include "logging.h"
 
 #include <stdint.h>
