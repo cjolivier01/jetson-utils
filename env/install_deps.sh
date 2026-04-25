@@ -44,10 +44,23 @@ have_pkg() {
 	apt-cache show "$1" >/dev/null 2>&1
 }
 
+APT_UPDATED=0
+
+ensure_apt_metadata() {
+	if [ "$APT_UPDATED" -eq 1 ]; then
+		return 0
+	fi
+
+	sudo apt-get update
+	APT_UPDATED=1
+}
+
 install_group() {
 	local -a packages=("$@")
 	local -a available=()
 	local pkg=""
+
+	ensure_apt_metadata
 
 	for pkg in "${packages[@]}"; do
 		if have_pkg "$pkg"; then
@@ -61,7 +74,6 @@ install_group() {
 		return 0
 	fi
 
-	sudo apt-get update
 	sudo apt-get install -y "${available[@]}"
 }
 

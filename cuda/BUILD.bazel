@@ -608,6 +608,28 @@ cc_test(
     }),
 )
 
+cc_test(
+    name = "hip_runtime_smoke_test",
+    srcs = ["hip_runtime_smoke_test.cc"],
+    copts = select({
+        ":use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":cuda_lib",
+        ":cuda_lib_headers",
+    ],
+    target_compatible_with = select({
+        ":use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
 # Header-only compatibility shims (CUDA/HIP + GL interop)
 cc_library(
     name = "cuda_compat_includes",

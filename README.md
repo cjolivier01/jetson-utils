@@ -80,9 +80,9 @@ bazel build --config=rocm //...
 ./env/test_rocm.sh
 ```
 
-On hosts without a `python` symlink, prefer `make rocm` / `./env/test_rocm.sh`, or export `PYTHON_BIN_PATH="$(command -v python3)"` before calling Bazel directly.
+The helper scripts (`make`, `./bld`, `./perf`, `./env/test_rocm.sh`) now prefer `python3` and export `PYTHON_BIN_PATH` automatically. If you call Bazel directly, export `PYTHON_BIN_PATH="$(command -v python3)"` first.
 
-`./env/test_rocm.sh` builds the core native targets and runs the committed HIP-related Bazel tests. Passing `--full` additionally runs `bazel build --config=rocm //...`. The helper scripts export `PYTHON_BIN_PATH` automatically for hosts that only provide `python3`.
+`./env/test_rocm.sh` builds the core native targets, runs the HIP link smoke test, and executes a small HIP runtime smoke test that allocates device memory, launches kernels, and checks the results. Passing `--full` additionally runs `bazel build --config=rocm //...`.
 
 Validation for this change was run on host `ripper` (`Ubuntu 24.04.4 LTS`, `ROCm 6.4.1`).
 

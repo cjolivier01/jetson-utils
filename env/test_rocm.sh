@@ -43,9 +43,7 @@ bazelisk build --repo_env=PYTHON_BIN_PATH="$PYTHON_BIN_PATH" --config=rocm \
 bazelisk test --repo_env=PYTHON_BIN_PATH="$PYTHON_BIN_PATH" --config=rocm \
 	//base:logging_test \
 	//cuda:hip_build_all_test \
-	//cuda:cuda_utility_test \
-	//cuda:cuda_math_test \
-	//cuda:cuda_gl_header_test
+	//cuda:hip_runtime_smoke_test
 
 if [ "$FULL_BUILD" -eq 1 ]; then
 	bazelisk build --repo_env=PYTHON_BIN_PATH="$PYTHON_BIN_PATH" --config=rocm //...

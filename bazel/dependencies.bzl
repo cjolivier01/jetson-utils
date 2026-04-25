@@ -15,6 +15,27 @@ def _basename(path):
 def _path_exists(ctx, path):
     return ctx.path(path).exists
 
+def _first_existing(ctx, paths):
+    for path in paths:
+        if _path_exists(ctx, path):
+            return path
+    return ""
+
+def _find_versioned_file(ctx, directory, prefix):
+    dir_path = ctx.path(directory)
+
+    if not dir_path.exists:
+        return ""
+
+    for entry in dir_path.readdir():
+        entry_str = str(entry)
+        name = _basename(entry_str)
+
+        if name.startswith(prefix + "."):
+            return entry_str
+
+    return ""
+
 # Implementation of the conda repository rule.
 def conda_repo_setup(ctx):
     # Get the conda installation root.
@@ -163,12 +184,27 @@ def _valid_rocm_root(ctx, root):
     for rel in [
         "bin/hipcc",
         "include/hip/hip_runtime.h",
-        "lib/libamdhip64.so",
     ]:
         if not _path_exists(ctx, root + "/" + rel):
             return False
 
-    return True
+    return bool(_find_rocm_runtime_library(ctx, root))
+
+def _find_rocm_runtime_library(ctx, root):
+    runtime = _first_existing(ctx, [
+        root + "/lib/libamdhip64.so",
+        root + "/lib64/libamdhip64.so",
+    ])
+
+    if runtime:
+        return runtime
+
+    for directory in [root + "/lib", root + "/lib64"]:
+        runtime = _find_versioned_file(ctx, directory, "libamdhip64.so")
+        if runtime:
+            return runtime
+
+    return ""
 
 def _local_cuda_sdk_repo_impl(ctx):
     root = _discover_root(
@@ -228,7 +264,12 @@ def _local_rocm_sdk_repo_impl(ctx):
     ]
 
     if root:
-        _symlink_entries(ctx, root, ["bin", "include", "lib"])
+        runtime = _find_rocm_runtime_library(ctx, root)
+
+        if not runtime:
+            fail("Found ROCm toolkit at %s but could not locate libamdhip64" % root)
+
+        _symlink_entries(ctx, root, ["bin", "include", "lib", "lib64"])
 
         build.extend([
             'filegroup(name = "hipcc", srcs = ["bin/hipcc"])',
@@ -240,7 +281,7 @@ def _local_rocm_sdk_repo_impl(ctx):
             ')',
             'cc_import(',
             '    name = "amdhip64",',
-            '    shared_library = "lib/libamdhip64.so",',
+            '    shared_library = "%s",' % runtime[len(root) + 1:],
             ')',
         ])
     else:
@@ -291,6 +332,8 @@ libdir = sysconfig.get_config_var("LIBDIR") or ""
 libpl = sysconfig.get_config_var("LIBPL") or ""
 search_roots = []
 names = []
+shared = []
+static = []
 
 for value in [sysconfig.get_config_var("LDLIBRARY"), sysconfig.get_config_var("LIBRARY")]:
     if value and value not in names:
@@ -300,13 +343,18 @@ for candidate in [libdir, libpl, os.path.join(sys.prefix, "lib")]:
     if candidate and candidate not in search_roots and os.path.isdir(candidate):
         search_roots.append(candidate)
 
-candidates = []
 for root in search_roots:
     for name in names:
-        candidates.append(os.path.join(root, name))
-    for pattern in ["libpython*.so", "libpython*.so.*", "libpython*.a"]:
-        candidates.extend(sorted(glob.glob(os.path.join(root, pattern))))
+        path = os.path.join(root, name)
+        if name.endswith(".a"):
+            static.append(path)
+        else:
+            shared.append(path)
+    for pattern in ["libpython*.so", "libpython*.so.*"]:
+        shared.extend(sorted(glob.glob(os.path.join(root, pattern))))
+    static.extend(sorted(glob.glob(os.path.join(root, "libpython*.a"))))
 
+candidates = shared + static
 seen = set()
 for candidate in candidates:
     if candidate in seen:
@@ -378,5 +426,5 @@ local_rocm_sdk_repository = repository_rule(
 
 local_libpython_repository = repository_rule(
     implementation = _local_libpython_repo_impl,
-    environ = ["CONDA_PREFIX", "PATH", "PYTHON_BIN_PATH"],
+    environ = ["CONDA_PREFIX", "PYTHON_BIN_PATH"],
 )

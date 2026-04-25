@@ -29,13 +29,29 @@ valid_cuda_root() {
 	return 1
 }
 
+find_rocm_runtime_lib() {
+	local root="$1"
+	local candidate=""
+
+	for candidate in \
+		"$root/lib/libamdhip64.so" \
+		"$root/lib64/libamdhip64.so" \
+		"$root"/lib/libamdhip64.so.* \
+		"$root"/lib64/libamdhip64.so.*
+	do
+		[ -f "$candidate" ] && { printf '%s\n' "$candidate"; return 0; }
+	done
+
+	return 1
+}
+
 valid_rocm_root() {
 	local root="$1"
 
 	[ -n "$root" ] || return 1
 	[ -x "$root/bin/hipcc" ] || return 1
 	[ -f "$root/include/hip/hip_runtime.h" ] || return 1
-	[ -f "$root/lib/libamdhip64.so" ] || return 1
+	find_rocm_runtime_lib "$root" >/dev/null || return 1
 
 	return 0
 }
@@ -107,10 +123,10 @@ ensure_python_env() {
 		return 0
 	fi
 
-	if command -v python >/dev/null 2>&1; then
-		python_bin="$(command -v python)"
-	elif command -v python3 >/dev/null 2>&1; then
+	if command -v python3 >/dev/null 2>&1; then
 		python_bin="$(command -v python3)"
+	elif command -v python >/dev/null 2>&1; then
+		python_bin="$(command -v python)"
 	else
 		return 1
 	fi
