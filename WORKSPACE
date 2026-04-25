@@ -19,16 +19,14 @@ rules_cuda_dependencies()
 
 register_detected_cuda_toolchains()
 
-load("//bazel:dependencies.bzl", "conda_repository", "local_cuda_sdk_repository", "local_rocm_sdk_repository")
+load("//bazel:dependencies.bzl", "local_cuda_sdk_repository", "local_libpython_repository", "local_rocm_sdk_repository")
 
 local_cuda_sdk_repository(
     name = "cuda_sdk",
 )
 
-conda_repository(
+local_libpython_repository(
     name = "libpython",
-    build_file = "@//buildfiles:third_party/libpython.BUILD",
-    files = ["lib/libpython3.12.so"],
 )
 
 # load("//:conda.bzl", "detect_conda_python")

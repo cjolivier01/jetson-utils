@@ -553,7 +553,7 @@ genrule(
         "set -e; mkdir -p $(@D)/hipobjs; " +
         "for s in $(SRCS); do " +
         "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$(@D)/hipobjs/$${b%.*}.o; " +
-        "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++14 -fPIC -O2 -DJETSON_USE_HIP " +
+        "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP " +
         "    -I. -Icuda -Ibase -Iimage -Idisplay -Ithreads -Ivideo -Icodec -Inetwork -Ipython -Ipython/bindings " +
         "    $$s -o $$o; " +
         "  esac; " +

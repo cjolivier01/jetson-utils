@@ -97,6 +97,29 @@ ensure_rocm_env() {
 	append_path_once "$rocm_root/bin"
 }
 
+ensure_python_env() {
+	local python_bin="${PYTHON_BIN_PATH:-}"
+
+	if [ -n "$python_bin" ] && [ -x "$python_bin" ] && [ ! -d "$python_bin" ]; then
+		python_bin="$(readlink -f "$python_bin")"
+		export PYTHON_BIN_PATH="$python_bin"
+		append_path_once "$(dirname "$python_bin")"
+		return 0
+	fi
+
+	if command -v python >/dev/null 2>&1; then
+		python_bin="$(command -v python)"
+	elif command -v python3 >/dev/null 2>&1; then
+		python_bin="$(command -v python3)"
+	else
+		return 1
+	fi
+
+	python_bin="$(readlink -f "$python_bin")"
+	export PYTHON_BIN_PATH="$python_bin"
+	append_path_once "$(dirname "$python_bin")"
+}
+
 detect_glibc_conflict() {
 	local ver=""
 	local major=""

@@ -6,6 +6,15 @@ def _ends_with_slash(s):
         return False
     return s[len(s) - 1:] == "/"
 
+def _basename(path):
+    parts = path.rsplit("/", 1)
+    if len(parts) == 1:
+        return parts[0]
+    return parts[1]
+
+def _path_exists(ctx, path):
+    return ctx.path(path).exists
+
 # Implementation of the conda repository rule.
 def conda_repo_setup(ctx):
     # Get the conda installation root.
@@ -97,21 +106,30 @@ conda_repository = repository_rule(
     environ = ["CONDA_PREFIX"],
 )
 
-def _discover_root(ctx, env_vars, probe_script):
+def _discover_root(ctx, env_vars, fixed_candidates, scan_candidates, validator):
     for env_var in env_vars:
         value = ctx.os.environ.get(env_var)
-        if value and ctx.path(value).exists:
+        if value and validator(ctx, value):
             return value
 
-    result = ctx.execute(
-        ["/bin/bash", "-lc", probe_script],
-        quiet = True,
-    )
+    for candidate in fixed_candidates:
+        if validator(ctx, candidate):
+            return candidate
 
-    if result.return_code == 0:
-        root = result.stdout.strip()
-        if root:
-            return root
+    for scan_dir, prefix in scan_candidates:
+        scan_path = ctx.path(scan_dir)
+
+        if not scan_path.exists:
+            continue
+
+        for entry in scan_path.readdir():
+            entry_str = str(entry)
+
+            if not _basename(entry_str).startswith(prefix):
+                continue
+
+            if validator(ctx, entry_str):
+                return entry_str
 
     return ""
 
@@ -121,19 +139,44 @@ def _symlink_entries(ctx, root, entries):
         if ctx.path(path).exists:
             ctx.symlink(ctx.path(path), entry)
 
+def _valid_cuda_root(ctx, root):
+    if not root:
+        return False
+
+    if not _path_exists(ctx, root + "/bin/nvcc"):
+        return False
+
+    for rel in [
+        "targets/x86_64-linux/lib/libculibos.a",
+        "targets/aarch64-linux/lib/libculibos.a",
+        "targets/sbsa-linux/lib/libculibos.a",
+    ]:
+        if _path_exists(ctx, root + "/" + rel):
+            return True
+
+    return False
+
+def _valid_rocm_root(ctx, root):
+    if not root:
+        return False
+
+    for rel in [
+        "bin/hipcc",
+        "include/hip/hip_runtime.h",
+        "lib/libamdhip64.so",
+    ]:
+        if not _path_exists(ctx, root + "/" + rel):
+            return False
+
+    return True
+
 def _local_cuda_sdk_repo_impl(ctx):
     root = _discover_root(
         ctx,
         ["CUDA_PATH", "CUDA_HOME", "CUDA_ROOT"],
-        """
-set -eu
-for d in /usr/local/cuda /usr/local/cuda-*; do
-    [ -x "$d/bin/nvcc" ] || continue
-    printf '%s' "$d"
-    exit 0
-done
-exit 1
-""",
+        ["/usr/local/cuda"],
+        [("/usr/local", "cuda-")],
+        _valid_cuda_root,
     )
 
     build = [
@@ -174,17 +217,9 @@ def _local_rocm_sdk_repo_impl(ctx):
     root = _discover_root(
         ctx,
         ["ROCM_PATH", "HIP_PATH"],
-        """
-set -eu
-for d in /opt/rocm /opt/rocm-*; do
-    [ -x "$d/bin/hipcc" ] || continue
-    [ -f "$d/include/hip/hip_runtime.h" ] || continue
-    [ -f "$d/lib/libamdhip64.so" ] || continue
-    printf '%s' "$d"
-    exit 0
-done
-exit 1
-""",
+        ["/opt/rocm"],
+        [("/opt", "rocm-")],
+        _valid_rocm_root,
     )
 
     build = [
@@ -218,6 +253,119 @@ exit 1
     ctx.file("WORKSPACE", 'workspace(name = "%s")\n' % ctx.name)
     ctx.file("BUILD.bazel", "\n".join(build) + "\n")
 
+def _discover_libpython_path(ctx):
+    python_bin = ctx.os.environ.get("PYTHON_BIN_PATH")
+
+    if not python_bin:
+        conda_prefix = ctx.os.environ.get("CONDA_PREFIX")
+        if conda_prefix:
+            candidate = conda_prefix + "/bin/python3"
+            if _path_exists(ctx, candidate):
+                python_bin = candidate
+
+    if not python_bin:
+        for candidate in ["/usr/bin/python3", "/usr/local/bin/python3"]:
+            if _path_exists(ctx, candidate):
+                python_bin = candidate
+                break
+
+    if not python_bin:
+        result = ctx.execute(
+            ["/usr/bin/env", "python3", "-c", "import sys; print(sys.executable)"],
+            quiet = True,
+        )
+
+        if result.return_code == 0:
+            python_bin = result.stdout.strip()
+
+    if not python_bin:
+        fail("Unable to locate python3 for libpython discovery. Set PYTHON_BIN_PATH or CONDA_PREFIX.")
+
+    probe = """
+import glob
+import os
+import sys
+import sysconfig
+
+libdir = sysconfig.get_config_var("LIBDIR") or ""
+libpl = sysconfig.get_config_var("LIBPL") or ""
+search_roots = []
+names = []
+
+for value in [sysconfig.get_config_var("LDLIBRARY"), sysconfig.get_config_var("LIBRARY")]:
+    if value and value not in names:
+        names.append(value)
+
+for candidate in [libdir, libpl, os.path.join(sys.prefix, "lib")]:
+    if candidate and candidate not in search_roots and os.path.isdir(candidate):
+        search_roots.append(candidate)
+
+candidates = []
+for root in search_roots:
+    for name in names:
+        candidates.append(os.path.join(root, name))
+    for pattern in ["libpython*.so", "libpython*.so.*", "libpython*.a"]:
+        candidates.extend(sorted(glob.glob(os.path.join(root, pattern))))
+
+seen = set()
+for candidate in candidates:
+    if candidate in seen:
+        continue
+    seen.add(candidate)
+    if os.path.exists(candidate):
+        print(candidate)
+        raise SystemExit(0)
+
+raise SystemExit(1)
+"""
+
+    result = ctx.execute([python_bin, "-c", probe], quiet = True)
+
+    if result.return_code != 0:
+        fail("Unable to locate libpython using %s" % python_bin)
+
+    libpython = result.stdout.strip()
+
+    if not libpython:
+        fail("Python discovery did not return a libpython path.")
+
+    return libpython
+
+def _local_libpython_repo_impl(ctx):
+    libpython = _discover_libpython_path(ctx)
+    libpython_name = _basename(libpython)
+    import_rule = 'cc_import(name = "libpython_import", shared_library = "%s")' % libpython_name
+
+    if libpython_name.endswith(".a"):
+        import_rule = 'cc_import(name = "libpython_import", static_library = "%s")' % libpython_name
+
+    ctx.symlink(ctx.path(libpython), libpython_name)
+
+    build = [
+        'load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")',
+        'package(default_visibility = ["//visibility:public"])',
+        import_rule,
+        'cc_library(',
+        '    name = "libpython",',
+        '    linkopts = [',
+        '        "-lpthread",',
+        '        "-lrt",',
+        '        "-ldl",',
+        '        "-lutil",',
+        '        "-lcrypt",',
+        '        "-lm",',
+        '    ],',
+        '    deps = [',
+        '        ":libpython_import",',
+        '        "@local_config_python//:python_headers",',
+        '    ],',
+        '    linkstatic = 1,',
+        ')',
+    ]
+
+    ctx.file("WORKSPACE", 'workspace(name = "%s")\n' % ctx.name)
+    ctx.file("BUILD.bazel", "\n".join(build) + "\n")
+
 local_cuda_sdk_repository = repository_rule(
     implementation = _local_cuda_sdk_repo_impl,
     environ = ["CUDA_HOME", "CUDA_PATH", "CUDA_ROOT"],
@@ -226,4 +374,9 @@ local_cuda_sdk_repository = repository_rule(
 local_rocm_sdk_repository = repository_rule(
     implementation = _local_rocm_sdk_repo_impl,
     environ = ["HIP_PATH", "ROCM_PATH"],
+)
+
+local_libpython_repository = repository_rule(
+    implementation = _local_libpython_repo_impl,
+    environ = ["CONDA_PREFIX", "PATH", "PYTHON_BIN_PATH"],
 )
