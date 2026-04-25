@@ -46,6 +46,9 @@
  * Evaluates to true on success
  * @ingroup cudaError
  */
+#ifdef CUDA_SUCCESS
+#undef CUDA_SUCCESS
+#endif
 #define CUDA_SUCCESS(x)			(CUDA(x) == cudaSuccess)
 
 /**

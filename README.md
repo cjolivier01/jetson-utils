@@ -64,15 +64,36 @@ so the CUDA targets receive the required compiler flags automatically.
 
 ### HIP/ROCm Support (AMD GPUs)
 
-The CUDA code now has a HIP compatibility layer so it can compile for AMD GPUs under ROCm/HIP:
+The CUDA code has a HIP compatibility layer so it can compile for AMD GPUs under ROCm/HIP:
 
 - `cuda/cuda_runtime_compat.h` maps selected CUDA runtime APIs/types to HIP when building with `-DJETSON_USE_HIP`.
 - `cuda/cuda_gl_interop_shim.h` maps CUDA-OpenGL interop calls to HIP-GL.
+- `bazel/dependencies.bzl` now auto-detects default ROCm installs under `/opt/rocm` and `/opt/rocm-*`.
+- `WORKSPACE` now discovers `libpython` from the active Python runtime, so full Bazel builds are not hard-blocked on `CONDA_PREFIX`.
 
-CUDA remains the default backend. To enable the HIP/ROCm backend, use:
+CUDA remains the default backend. To enable the HIP/ROCm backend, use one of:
 
 ```bash
+make rocm
+make rocm-test
 bazel build --config=rocm //...
+./env/test_rocm.sh
 ```
 
-The Bazel HIP path compiles the `.cu` kernels with `hipcc` and links against `libamdhip64`.
+The helper scripts (`make`, `./bld`, `./perf`, `./env/test_rocm.sh`) now prefer `python3` and export `PYTHON_BIN_PATH` automatically. If you call Bazel directly, export `PYTHON_BIN_PATH="$(command -v python3)"` first.
+
+`./env/test_rocm.sh` builds the core native targets, runs the HIP link smoke test, and executes a small HIP runtime smoke test that allocates device memory, launches kernels, and checks the results. Passing `--full` additionally runs `bazel build --config=rocm //...`.
+
+Validation for this change was run on host `ripper` (`Ubuntu 24.04.4 LTS`, `ROCm 6.4.1`).
+
+### Vulkan Status
+
+Vulkan development packages and shader tools can be installed with:
+
+```bash
+./env/install_deps.sh --vulkan
+```
+
+This change does not add a Vulkan compute backend.
+
+The current implementation is built around CUDA/HIP kernel launches, CUDA/HIP runtime memory management, and CUDA/HIP-OpenGL interop. Making Vulkan a real alternative backend would require a separate compute/runtime abstraction plus rewritten kernels and graphics interop. The repository now includes the Vulkan package install path for future work, but Vulkan is not a drop-in replacement for the existing CUDA/HIP backend today.

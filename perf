@@ -9,6 +9,7 @@ if [ "$CPU" == "x86_64" ]; then
   CPU="k8"
 fi
 
+ensure_python_env
 ensure_cuda_env
 ensure_rocm_env || true
 
@@ -21,4 +22,4 @@ if detect_glibc_conflict; then
   BAZEL_ARGS+=("--define=glibc_math_rsqrt_conflict=1")
 fi
 
-bazelisk build "${BAZEL_ARGS[@]}" "$@" //...
+bazelisk build "${BAZEL_ARGS[@]}" "--repo_env=PYTHON_BIN_PATH=${PYTHON_BIN_PATH}" "$@" //...

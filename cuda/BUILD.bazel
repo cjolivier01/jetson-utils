@@ -553,7 +553,7 @@ genrule(
         "set -e; mkdir -p $(@D)/hipobjs; " +
         "for s in $(SRCS); do " +
         "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$(@D)/hipobjs/$${b%.*}.o; " +
-        "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++14 -fPIC -O2 -DJETSON_USE_HIP " +
+        "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP " +
         "    -I. -Icuda -Ibase -Iimage -Idisplay -Ithreads -Ivideo -Icodec -Inetwork -Ipython -Ipython/bindings " +
         "    $$s -o $$o; " +
         "  esac; " +
@@ -601,6 +601,28 @@ cc_test(
     deps = [
         ":cuda_lib_headers",
         ":cuda_compat_includes",
+    ],
+    target_compatible_with = select({
+        ":use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+cc_test(
+    name = "hip_runtime_smoke_test",
+    srcs = ["hip_runtime_smoke_test.cc"],
+    copts = select({
+        ":use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":cuda_lib",
+        ":cuda_lib_headers",
     ],
     target_compatible_with = select({
         ":use_hip": [],

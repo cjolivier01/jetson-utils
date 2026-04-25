@@ -29,13 +29,29 @@ valid_cuda_root() {
 	return 1
 }
 
+find_rocm_runtime_lib() {
+	local root="$1"
+	local candidate=""
+
+	for candidate in \
+		"$root/lib/libamdhip64.so" \
+		"$root/lib64/libamdhip64.so" \
+		"$root"/lib/libamdhip64.so.* \
+		"$root"/lib64/libamdhip64.so.*
+	do
+		[ -f "$candidate" ] && { printf '%s\n' "$candidate"; return 0; }
+	done
+
+	return 1
+}
+
 valid_rocm_root() {
 	local root="$1"
 
 	[ -n "$root" ] || return 1
 	[ -x "$root/bin/hipcc" ] || return 1
 	[ -f "$root/include/hip/hip_runtime.h" ] || return 1
-	[ -f "$root/lib/libamdhip64.so" ] || return 1
+	find_rocm_runtime_lib "$root" >/dev/null || return 1
 
 	return 0
 }
@@ -95,6 +111,29 @@ ensure_rocm_env() {
 	export ROCM_PATH="$rocm_root"
 	export HIP_PATH="$rocm_root"
 	append_path_once "$rocm_root/bin"
+}
+
+ensure_python_env() {
+	local python_bin="${PYTHON_BIN_PATH:-}"
+
+	if [ -n "$python_bin" ] && [ -x "$python_bin" ] && [ ! -d "$python_bin" ]; then
+		python_bin="$(readlink -f "$python_bin")"
+		export PYTHON_BIN_PATH="$python_bin"
+		append_path_once "$(dirname "$python_bin")"
+		return 0
+	fi
+
+	if command -v python3 >/dev/null 2>&1; then
+		python_bin="$(command -v python3)"
+	elif command -v python >/dev/null 2>&1; then
+		python_bin="$(command -v python)"
+	else
+		return 1
+	fi
+
+	python_bin="$(readlink -f "$python_bin")"
+	export PYTHON_BIN_PATH="$python_bin"
+	append_path_once "$(dirname "$python_bin")"
 }
 
 detect_glibc_conflict() {
