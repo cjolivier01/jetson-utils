@@ -1,5 +1,13 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
+HIP_DEFINES = select({
+    "//cuda:use_hip": [
+        "JETSON_USE_HIP",
+        "JUT_INCLUDE_HIP_HEADERS",
+    ],
+    "//conditions:default": [],
+})
+
 cc_library(
     name = "base",
     srcs = glob(["*.cpp"]),
@@ -7,7 +15,12 @@ cc_library(
         "-fPIC",
         "-Wno-deprecated-declarations",
     ] + select({
-        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//cuda:use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -27,6 +40,7 @@ cc_library(
         ],
     ),
     includes = ["."],
+    defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
 )
 

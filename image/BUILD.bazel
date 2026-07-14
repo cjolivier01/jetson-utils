@@ -1,6 +1,13 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 INCLUDE_PREFIX = "jetson-utils/image"
+HIP_DEFINES = select({
+    "//cuda:use_hip": [
+        "JETSON_USE_HIP",
+        "JUT_INCLUDE_HIP_HEADERS",
+    ],
+    "//conditions:default": [],
+})
 
 cc_library(
     name = "image",
@@ -14,7 +21,12 @@ cc_library(
         "-Wno-error=switch",
         "-Wno-deprecated-declarations",
     ] + select({
-        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//cuda:use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -43,7 +55,12 @@ cc_library(
         "-Wno-error=switch",
         "-Wno-deprecated-declarations",
     ] + select({
-        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//cuda:use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -96,11 +113,17 @@ cc_library(
     copts = [
         "-Wno-error=switch",
     ] + select({
-        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//cuda:use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
         "//conditions:default": [],
     }),
     include_prefix = INCLUDE_PREFIX,
     includes = ["."],
+    defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         "//base:base_includes",
