@@ -30,6 +30,22 @@ config_setting(
     values = {"compilation_mode": "dbg"},
 )
 
+HIP_DEFINES = select({
+    ":use_hip": [
+        "JETSON_USE_HIP",
+        "JUT_INCLUDE_HIP_HEADERS",
+    ],
+    "//conditions:default": [],
+})
+
+HIP_SYSTEM_COPTS = select({
+    ":use_hip": [
+        "-isystem",
+        "external/rocm_sdk_includes/include",
+    ],
+    "//conditions:default": [],
+})
+
 cc_library(
     name = "cuda_lib",
     srcs = [
@@ -111,7 +127,8 @@ cc_library(
         ],
         # in all other modes, no extra flags
         "//conditions:default": [],
-    }),
+    }) + HIP_SYSTEM_COPTS,
+    defines = HIP_DEFINES,
     include_prefix = INCLUDE_PREFIX,
     visibility = ["//visibility:public"],
     deps = [
@@ -123,7 +140,10 @@ cc_library(
         "//display:gl_camera",
         "//display:gl_utility",
     ] + select({
-        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        ":use_hip": [
+            ":hip_runtime",
+            "@rocm_sdk_includes//:rocm_sdk_core",
+        ],
         "//conditions:default": ["@cuda_sdk//:culibos"],
     }),
 )
@@ -396,6 +416,7 @@ cc_library(
     includes = [
         ".",
     ],
+    defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         # ":cuda_bayer",
@@ -416,6 +437,7 @@ cc_library(
     includes = [
         ".",
     ],
+    defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
     copts = select({
         ":use_hip": [
@@ -429,6 +451,7 @@ cc_library(
     deps = select({
         ":use_hip": [
             ":hip_cuda_lib",
+            ":hip_runtime",
             "//image:image_format",
         ],
         "//conditions:default": [
@@ -437,6 +460,7 @@ cc_library(
             "@local_cuda//:cuda_runtime",
         ],
     }),
+    alwayslink = True,
 )
 
 cc_library(
@@ -466,6 +490,7 @@ cc_library(
     includes = [
         ".",
     ],
+    defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_compat_includes",
@@ -483,6 +508,7 @@ cc_library(
     includes = [
         ".",
     ],
+    defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         ":cuda_compat_includes",
@@ -500,6 +526,7 @@ filegroup(
     name = "hip_cuda_srcs",
     srcs = [
         "cudaBayer.cu",
+        "cudaPointCloud.cu",
         "cudaCrop.cu",
         "cudaDraw.cu",
         "cudaFilterMode.cu",
@@ -650,6 +677,7 @@ cc_library(
         "//conditions:default": [],
     }),
     includes = ["."],
+    defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
     deps = select({
         ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],

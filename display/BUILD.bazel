@@ -1,6 +1,13 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 INCLUDE_PREFIX = "jetson-utils/display"
+HIP_DEFINES = select({
+    "//cuda:use_hip": [
+        "JETSON_USE_HIP",
+        "JUT_INCLUDE_HIP_HEADERS",
+    ],
+    "//conditions:default": [],
+})
 
 cc_library(
     name = "display",
@@ -72,6 +79,7 @@ cc_library(
     ],
     include_prefix = INCLUDE_PREFIX,
     includes = ["."],
+    defines = HIP_DEFINES,
     linkopts = [
         "-lGL",
         "-lGLU",
@@ -94,6 +102,7 @@ cc_library(
     ],
     include_prefix = INCLUDE_PREFIX,
     includes = ["."],
+    defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         "//base",
@@ -110,11 +119,18 @@ cc_library(
     ],
     include_prefix = INCLUDE_PREFIX,
     includes = ["."],
+    defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
     deps = [
         ":gl_utility",
         "//cuda:cuda_utility",
-    ],
+    ] + select({
+        "//cuda:use_hip": [
+            "//cuda:hip_runtime",
+            "@rocm_sdk_includes//:rocm_sdk_core",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 cc_library(

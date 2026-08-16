@@ -1,3 +1,11 @@
+HIP_DEFINES = select({
+    "//cuda:use_hip": [
+        "JETSON_USE_HIP",
+        "JUT_INCLUDE_HIP_HEADERS",
+    ],
+    "//conditions:default": [],
+})
+
 cc_library(
     name = "threads",
     srcs = glob(["*.cpp"]),
@@ -6,6 +14,7 @@ cc_library(
         "*.inl",
     ]),
     includes = ["."],
+    defines = HIP_DEFINES,
     copts = select({
         "//cuda:use_hip": [
             "-DJETSON_USE_HIP",
