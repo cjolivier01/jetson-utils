@@ -602,7 +602,7 @@ genrule(
         "set -e; objdir=$(@D)/hip_cuda_lib_objs; rm -rf $$objdir; mkdir -p $$objdir; " +
         "for s in $(SRCS); do " +
         "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$$objdir/$${b%.*}.o; repo_root=$$(dirname $$s)/..; " +
-        "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP " +
+        "    HIP_PLATFORM=amd $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP -D__HIP_PLATFORM_AMD__ " +
         "    -I$$repo_root -I$$repo_root/cuda -I$$repo_root/base -I$$repo_root/image -I$$repo_root/display -I$$repo_root/threads -I$$repo_root/video -I$$repo_root/codec -I$$repo_root/network -I$$repo_root/python -I$$repo_root/python/bindings " +
         "    $$s -o $$o; " +
         "  esac; " +
@@ -648,7 +648,7 @@ genrule(
         "set -e; objdir=$(@D)/hip_cuda_point_cloud_objs; rm -rf $$objdir; mkdir -p $$objdir; " +
         "for s in $(SRCS); do " +
         "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$$objdir/$${b%.*}.o; repo_root=$$(dirname $$s)/..; " +
-        "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP " +
+        "    HIP_PLATFORM=amd $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP -D__HIP_PLATFORM_AMD__ " +
         "    -I$$repo_root -I$$repo_root/cuda -I$$repo_root/base -I$$repo_root/image -I$$repo_root/display -I$$repo_root/threads -I$$repo_root/video -I$$repo_root/codec -I$$repo_root/network -I$$repo_root/python -I$$repo_root/python/bindings " +
         "    $$s -o $$o; " +
         "  esac; " +
