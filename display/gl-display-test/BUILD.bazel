@@ -19,20 +19,22 @@ cc_binary(
         "-lX11",
     ],
     visibility = ["//visibility:public"],
-    target_compatible_with = select({
-        "//cuda:use_hip": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
     deps = [
-        ":cuda_lib",
+        ":headers",
         "//base",
-        "//codec",
         "//display",
-        "//network",
     ] + select({
-        "//cuda:use_hip": [],
+        "//cuda:use_hip": [
+            ":hip_cuda_lib",
+            "//cuda:cuda_lib_headers",
+            "//cuda:hip_cuda_lib",
+            "//cuda:hip_runtime",
+            "@rocm_sdk_includes//:rocm_sdk_core",
+        ],
         "//conditions:default": [
-            "//cuda:cuda_lib",
+            ":cuda_lib",
+            "//cuda:cuda_lib_headers",
+            "//cuda:cuda_cuda_lib",
             "@local_cuda//:cuda_runtime",
         ],
     }),
@@ -68,14 +70,68 @@ cuda_library(
     }),
 )
 
+genrule(
+    name = "hip_cuda_lib_gen",
+    srcs = [
+        "cudaInteropKernels.cu",
+        "cudaInteropKernels.h",
+        "//base:base_hdrs",
+        "//cuda:cuda_compat_hdrs",
+    ],
+    outs = ["libhip_gl_display_test_kernels.a"],
+    tools = ["@rocm_sdk_includes//:hipcc"],
+    cmd = (
+        "set -e; objdir=$(@D)/hip_gl_display_test_objs; rm -rf $$objdir; mkdir -p $$objdir; " +
+        "for s in $(SRCS); do " +
+        "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$$objdir/$${b%.*}.o; repo_root=$$(dirname $$s)/../..; " +
+        "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP " +
+        "    -I$$repo_root -I$$repo_root/base -I$$repo_root/cuda -I$$repo_root/display -I$$repo_root/display/gl-display-test " +
+        "    $$s -o $$o; " +
+        "  esac; " +
+        "done; " +
+        "ar rcs $@ $$objdir/*.o"
+    ),
+    tags = ["no-sandbox"],
+    visibility = ["//visibility:public"],
+    toolchains = [],
+    target_compatible_with = select({
+        "//cuda:use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+cc_import(
+    name = "hip_cuda_lib",
+    static_library = ":hip_cuda_lib_gen",
+    visibility = ["//visibility:public"],
+    alwayslink = True,
+    target_compatible_with = select({
+        "//cuda:use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
 cc_library(
     name = "headers",
     hdrs = [
         "cudaInteropKernels.h",
     ],
     visibility = ["//visibility:public"],
+    defines = select({
+        "//cuda:use_hip": [
+            "JETSON_USE_HIP",
+            "JUT_INCLUDE_HIP_HEADERS",
+        ],
+        "//conditions:default": [],
+    }),
     deps = select({
-        "//cuda:use_hip": [],
-        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+        "//cuda:use_hip": [
+            "//cuda:cuda_utility",
+            "@rocm_sdk_includes//:rocm_sdk_core",
+        ],
+        "//conditions:default": [
+            "//cuda:cuda_utility",
+            "@local_cuda//:cuda_runtime",
+        ],
     }),
 )

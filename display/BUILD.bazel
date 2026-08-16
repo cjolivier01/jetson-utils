@@ -44,10 +44,18 @@ cc_library(
         ":gl_events",
         ":gl_utility",
         "//base",
-        "//cuda:cuda_lib_impl",
+        "//cuda:cuda_lib_headers",
+        "//cuda:cuda_mapped_memory",
     ] + select({
-        "//cuda:use_hip": ["//cuda:hip_cuda_lib", "//cuda:hip_runtime", "@rocm_sdk_includes//:rocm_sdk_core"],
-        "//conditions:default": [],
+        "//cuda:use_hip": [
+            "//cuda:hip_cuda_lib",
+            "//cuda:hip_runtime",
+            "@rocm_sdk_includes//:rocm_sdk_core",
+        ],
+        "//conditions:default": [
+            "//cuda:cuda_cuda_lib",
+            "@local_cuda//:cuda_runtime",
+        ],
     }) + [
         "//network",
         "//video:video_output",

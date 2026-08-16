@@ -142,6 +142,8 @@ cc_library(
     ] + select({
         ":use_hip": [
             ":hip_runtime",
+            ":hip_cuda_lib",
+            ":hip_cuda_point_cloud_lib",
             "@rocm_sdk_includes//:rocm_sdk_core",
         ],
         "//conditions:default": ["@cuda_sdk//:culibos"],
@@ -501,6 +503,15 @@ cc_library(
     }),
 )
 
+filegroup(
+    name = "cuda_compat_hdrs",
+    srcs = [
+        "cudaUtility.h",
+        "cuda_runtime_compat.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "cuda_mapped_memory",
     hdrs = ["cudaMappedMemory.h"],
@@ -526,7 +537,6 @@ filegroup(
     name = "hip_cuda_srcs",
     srcs = [
         "cudaBayer.cu",
-        "cudaPointCloud.cu",
         "cudaCrop.cu",
         "cudaDraw.cu",
         "cudaFilterMode.cu",
@@ -545,6 +555,13 @@ filegroup(
         "cudaYUV-NV12.cu",
         "cudaYUV-YUYV.cu",
         "cudaYUV-YV12.cu",
+    ],
+)
+
+filegroup(
+    name = "hip_cuda_point_cloud_srcs",
+    srcs = [
+        "cudaPointCloud.cu",
     ],
 )
 
@@ -582,17 +599,15 @@ genrule(
     outs = ["libhip_cuda_kernels.a"],
     tools = ["@rocm_sdk_includes//:hipcc"],
     cmd = (
-        "set -e; mkdir -p $(@D)/hipobjs; " +
+        "set -e; objdir=$(@D)/hip_cuda_lib_objs; rm -rf $$objdir; mkdir -p $$objdir; " +
         "for s in $(SRCS); do " +
-        "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$(@D)/hipobjs/$${b%.*}.o; " +
+        "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$$objdir/$${b%.*}.o; repo_root=$$(dirname $$s)/..; " +
         "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP " +
-        "    -I. -Icuda -Ibase -Iimage -Idisplay -Ithreads -Ivideo -Icodec -Inetwork -Ipython -Ipython/bindings " +
-        "    -Iexternal/jetson-utils -Iexternal/jetson-utils/cuda -Iexternal/jetson-utils/base -Iexternal/jetson-utils/image " +
-        "    -Iexternal/jetson-utils/display -Iexternal/jetson-utils/threads -Iexternal/jetson-utils/video -Iexternal/jetson-utils/codec -Iexternal/jetson-utils/network " +
+        "    -I$$repo_root -I$$repo_root/cuda -I$$repo_root/base -I$$repo_root/image -I$$repo_root/display -I$$repo_root/threads -I$$repo_root/video -I$$repo_root/codec -I$$repo_root/network -I$$repo_root/python -I$$repo_root/python/bindings " +
         "    $$s -o $$o; " +
         "  esac; " +
         "done; " +
-        "ar rcs $@ $(@D)/hipobjs/*.o"
+        "ar rcs $@ $$objdir/*.o"
     ),
     tags = ["no-sandbox"],
     visibility = ["//visibility:public"],
@@ -608,6 +623,51 @@ cc_import(
     static_library = ":hip_cuda_lib_gen",
     visibility = ["//visibility:public"],
     alwayslink = True,
+    target_compatible_with = select({
+        ":use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+genrule(
+    name = "hip_cuda_point_cloud_lib_gen",
+    srcs = [":hip_cuda_point_cloud_srcs"] + [
+        # headers to ensure they are in the sandbox during compilation
+        "cudaColormap.h",
+        "cudaFilterMode.h",
+        "cudaMisc.cuh",
+        "cudaPointCloud.h",
+        "cudaUtility.h",
+        "cuda_runtime_compat.h",
+        "//base:base_hdrs",
+        "//image:image_hdrs",
+    ],
+    outs = ["libhip_cuda_point_cloud_kernels.a"],
+    tools = ["@rocm_sdk_includes//:hipcc"],
+    cmd = (
+        "set -e; objdir=$(@D)/hip_cuda_point_cloud_objs; rm -rf $$objdir; mkdir -p $$objdir; " +
+        "for s in $(SRCS); do " +
+        "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$$objdir/$${b%.*}.o; repo_root=$$(dirname $$s)/..; " +
+        "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP " +
+        "    -I$$repo_root -I$$repo_root/cuda -I$$repo_root/base -I$$repo_root/image -I$$repo_root/display -I$$repo_root/threads -I$$repo_root/video -I$$repo_root/codec -I$$repo_root/network -I$$repo_root/python -I$$repo_root/python/bindings " +
+        "    $$s -o $$o; " +
+        "  esac; " +
+        "done; " +
+        "ar rcs $@ $$objdir/*.o"
+    ),
+    tags = ["no-sandbox"],
+    visibility = ["//visibility:public"],
+    toolchains = [],
+    target_compatible_with = select({
+        ":use_hip": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+cc_import(
+    name = "hip_cuda_point_cloud_lib",
+    static_library = ":hip_cuda_point_cloud_lib_gen",
+    visibility = ["//visibility:public"],
     target_compatible_with = select({
         ":use_hip": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -674,9 +734,10 @@ cc_library(
     includes = ["."],
     defines = HIP_DEFINES,
     visibility = ["//visibility:public"],
-    deps = [
-        "@local_cuda//:cuda_runtime",
-    ],
+    deps = select({
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )
 
 # Tests
@@ -684,7 +745,7 @@ cc_test(
     name = "cuda_utility_test",
     srcs = ["cuda_utility_test.cc"],
     copts = select({
-        ":use_hip": ["-UJETSON_USE_HIP", "-U__HIP_PLATFORM_AMD__"],
+        ":use_hip": ["-UJUT_INCLUDE_HIP_HEADERS"],
         "//conditions:default": [],
     }),
     deps = [":cuda_utility"],
@@ -694,7 +755,7 @@ cc_test(
     name = "cuda_math_test",
     srcs = ["cuda_math_test.cc"],
     copts = select({
-        ":use_hip": ["-UJETSON_USE_HIP", "-U__HIP_PLATFORM_AMD__"],
+        ":use_hip": ["-UJUT_INCLUDE_HIP_HEADERS"],
         "//conditions:default": [],
     }),
     deps = [":cuda_math"],
@@ -704,7 +765,7 @@ cc_test(
     name = "cuda_gl_header_test",
     srcs = ["cuda_gl_header_test.cc"],
     copts = select({
-        ":use_hip": ["-UJETSON_USE_HIP", "-U__HIP_PLATFORM_AMD__"],
+        ":use_hip": ["-UJUT_INCLUDE_HIP_HEADERS"],
         "//conditions:default": [],
     }),
     deps = [":cuda_compat_includes"],

@@ -36,6 +36,7 @@ cd "$TOPDIR"
 bazelisk build --repo_env=PYTHON_BIN_PATH="$PYTHON_BIN_PATH" --config=rocm \
 	//cuda:cuda_lib \
 	//display:display \
+	//display/gl-display-test:gl_display_test \
 	//image:image \
 	//video:video_output \
 	//camera:camera
