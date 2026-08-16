@@ -32,6 +32,9 @@
         #endif
         #include <hip/hip_runtime.h>
         #include <hip/hip_runtime_api.h>
+        #ifdef __noinline__
+        #undef __noinline__
+        #endif
     #else
 
     // Basic opaque handle types
@@ -123,6 +126,7 @@
     typedef struct { unsigned int x, y; }   uint2;
     typedef struct { unsigned int x, y, z; } uint3;
     typedef struct { unsigned int x, y, z, w; } uint4;
+    typedef struct { unsigned char x, y; } uchar2;
     typedef struct { unsigned char x, y, z; } uchar3;
     typedef struct { unsigned char x, y, z, w; } uchar4;
 
@@ -136,6 +140,7 @@
     inline __host__ __device__ uint2  make_uint2(unsigned int x, unsigned int y) { return uint2{x, y}; }
     inline __host__ __device__ uint3  make_uint3(unsigned int x, unsigned int y, unsigned int z) { return uint3{x, y, z}; }
     inline __host__ __device__ uint4  make_uint4(unsigned int x, unsigned int y, unsigned int z, unsigned int w) { return uint4{x, y, z, w}; }
+    inline __host__ __device__ uchar2 make_uchar2(unsigned char x, unsigned char y) { return uchar2{x, y}; }
     inline __host__ __device__ uchar3 make_uchar3(unsigned char x, unsigned char y, unsigned char z) { return uchar3{x, y, z}; }
     inline __host__ __device__ uchar4 make_uchar4(unsigned char x, unsigned char y, unsigned char z, unsigned char w) { return uchar4{x, y, z, w}; }
     #endif

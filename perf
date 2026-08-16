@@ -9,17 +9,132 @@ if [ "$CPU" == "x86_64" ]; then
   CPU="k8"
 fi
 
+usage() {
+	cat <<'USAGE'
+Usage: ./perf [--backend=auto|cuda|rocm] [bazel args...]
+
+Builds //... with optimized Bazel flags.  The default backend is auto:
+CUDA is used when available, otherwise ROCm/HIP is used when available.
+
+Options:
+  --backend=BACKEND  Select auto, cuda, or rocm.
+  --cuda             Shortcut for --backend=cuda.
+  --rocm             Shortcut for --backend=rocm.
+USAGE
+}
+
+BACKEND="${JETSON_UTILS_BACKEND:-${GPU_BACKEND:-auto}}"
+USER_ARGS=()
+ROCM_CONFIG_SEEN=0
+
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+		--backend=*)
+			BACKEND="${1#*=}"
+			;;
+		--backend)
+			shift
+			if [ "$#" -eq 0 ]; then
+				printf 'error: --backend requires auto, cuda, or rocm\n' >&2
+				exit 2
+			fi
+			BACKEND="$1"
+			;;
+		--cuda)
+			BACKEND="cuda"
+			;;
+		--rocm)
+			BACKEND="rocm"
+			;;
+		--config=rocm)
+			BACKEND="rocm"
+			ROCM_CONFIG_SEEN=1
+			USER_ARGS+=("$1")
+			;;
+		--define=jetson_use_hip=true)
+			BACKEND="rocm"
+			USER_ARGS+=("$1")
+			;;
+		--define)
+			USER_ARGS+=("$1")
+			shift
+			if [ "$#" -eq 0 ]; then
+				printf 'error: --define requires a value\n' >&2
+				exit 2
+			fi
+			if [ "$1" = "jetson_use_hip=true" ]; then
+				BACKEND="rocm"
+			fi
+			USER_ARGS+=("$1")
+			;;
+		--config)
+			USER_ARGS+=("$1")
+			shift
+			if [ "$#" -eq 0 ]; then
+				printf 'error: --config requires a value\n' >&2
+				exit 2
+			fi
+			if [ "$1" = "rocm" ]; then
+				BACKEND="rocm"
+				ROCM_CONFIG_SEEN=1
+			fi
+			USER_ARGS+=("$1")
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		*)
+			USER_ARGS+=("$1")
+			;;
+	esac
+	shift
+done
+
 ensure_python_env
-ensure_cuda_env
-ensure_rocm_env || true
+
+case "$BACKEND" in
+	auto)
+		if ensure_cuda_env; then
+			BACKEND="cuda"
+			ensure_rocm_env || true
+		elif ensure_rocm_env; then
+			BACKEND="rocm"
+		else
+			printf 'error: no supported GPU toolkit detected. Install CUDA or ROCm, or export CUDA_PATH/ROCM_PATH.\n' >&2
+			exit 1
+		fi
+		;;
+	cuda)
+		if ! ensure_cuda_env; then
+			printf 'error: CUDA backend selected, but no valid CUDA toolkit was found.\n' >&2
+			exit 1
+		fi
+		ensure_rocm_env || true
+		;;
+	rocm)
+		if ! ensure_rocm_env; then
+			printf 'error: ROCm backend selected, but no valid ROCm toolkit was found.\n' >&2
+			exit 1
+		fi
+		;;
+	*)
+		printf 'error: unknown backend %s (expected auto, cuda, or rocm)\n' "$BACKEND" >&2
+		exit 2
+		;;
+esac
 
 BAZEL_ARGS=(
 	"--config=opt"
 	"--cpu=${CPU}"
 )
 
+if [ "$BACKEND" = "rocm" ] && [ "$ROCM_CONFIG_SEEN" -eq 0 ]; then
+  BAZEL_ARGS+=("--config=rocm")
+fi
+
 if detect_glibc_conflict; then
   BAZEL_ARGS+=("--define=glibc_math_rsqrt_conflict=1")
 fi
 
-bazelisk build "${BAZEL_ARGS[@]}" "--repo_env=PYTHON_BIN_PATH=${PYTHON_BIN_PATH}" "$@" //...
+bazelisk build "${BAZEL_ARGS[@]}" "--repo_env=PYTHON_BIN_PATH=${PYTHON_BIN_PATH}" "${USER_ARGS[@]}" //...

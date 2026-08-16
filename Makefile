@@ -14,7 +14,9 @@ GLIBC_RSQRT_DEFINE := $(shell \
 )
 OPT_BAZEL_FLAGS := --config=opt --cpu=$(CPU) $(GLIBC_RSQRT_DEFINE)
 CUDA_TOOLCHAIN_ENV := source "$(TOPDIR)/toolchain_env.sh"; ensure_python_env; ensure_cuda_env; ensure_rocm_env || true;
-ROCM_TOOLCHAIN_ENV := source "$(TOPDIR)/toolchain_env.sh"; ensure_python_env; ensure_cuda_env; ensure_rocm_env;
+ROCM_TOOLCHAIN_ENV := source "$(TOPDIR)/toolchain_env.sh"; ensure_python_env; ensure_rocm_env;
+BACKEND ?= auto
+PERF_ARGS ?=
 
 all: print_targets
 
@@ -24,7 +26,7 @@ cuda:
 	bash -lc '$(CUDA_TOOLCHAIN_ENV) bazelisk build $(OPT_BAZEL_FLAGS) --repo_env=PYTHON_BIN_PATH=$$PYTHON_BIN_PATH //...'
 
 rocm:
-	bash -lc '$(ROCM_TOOLCHAIN_ENV) bazelisk build $(OPT_BAZEL_FLAGS) --repo_env=PYTHON_BIN_PATH=$$PYTHON_BIN_PATH --config=rocm //...'
+	$(MAKE) perf BACKEND=rocm
 
 rocm-test:
 	bash -lc '$(ROCM_TOOLCHAIN_ENV) ./env/test_rocm.sh'
@@ -34,7 +36,7 @@ missing_toolkit:
 	@exit 1
 
 perf:
-	./perf
+	./perf --backend=$(BACKEND) $(PERF_ARGS)
 
 debug:
 	./bld
@@ -62,9 +64,9 @@ print_targets:
 		'-------------' \
 		'all          Show this help text (same as print_targets).' \
 		'cuda         Build every Bazel target with the CUDA backend.' \
-		'rocm         Build every Bazel target with the HIP/ROCm backend.' \
+		'rocm         Build every Bazel target with the HIP/ROCm backend via ./perf.' \
 		'rocm-test    Build and test the committed HIP/ROCm validation target set.' \
-		'perf         Build every Bazel target with optimized flags via ./perf (includes glibc conflict workaround detection).' \
+		'perf         Build every Bazel target with optimized flags via ./perf; use BACKEND=rocm for ROCm/HIP.' \
 		'debug        Build every Bazel target with debug flags via ./bld; use for local iteration with symbols.' \
 		'' \
 		'Developer Workflow' \
