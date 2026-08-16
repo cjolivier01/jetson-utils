@@ -639,9 +639,10 @@ cc_library(
     ],
     includes = ["."],
     visibility = ["//visibility:public"],
-    deps = [
-        "@local_cuda//:cuda_runtime",
-    ],
+    deps = select({
+        ":use_hip": ["@rocm_sdk_includes//:rocm_sdk_core"],
+        "//conditions:default": ["@local_cuda//:cuda_runtime"],
+    }),
 )
 
 # Tests
