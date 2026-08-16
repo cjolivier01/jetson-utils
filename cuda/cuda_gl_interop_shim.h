@@ -1,17 +1,18 @@
 /*
  * CUDA-OpenGL interop shim with HIP support
  *
- * When building with HIP (JETSON_USE_HIP), this header maps the CUDA GL interop
- * functions used by this project to the corresponding HIP GL interop calls.
- * It intentionally uses wrapper functions to avoid depending on the HIP
- * graphics resource concrete type from translation units that expect CUDA types.
+ * When building with HIP (JETSON_USE_HIP or JUT_INCLUDE_HIP_HEADERS), this
+ * header maps the CUDA GL interop functions used by this project to the
+ * corresponding HIP GL interop calls. It intentionally uses wrapper functions
+ * to avoid depending on the HIP graphics resource concrete type from
+ * translation units that expect CUDA types.
  */
 
 #pragma once
 
 #include "cuda_runtime_compat.h"
 
-#ifdef JETSON_USE_HIP
+#if defined(JETSON_USE_HIP) || defined(JUT_INCLUDE_HIP_HEADERS)
 #include <GL/gl.h>
 
 #if defined(__HIP_DEVICE_COMPILE__)
@@ -99,9 +100,9 @@ static inline cudaError_t cudaGraphicsResourceGetMappedPointer(
     return hipGraphicsResourceGetMappedPointer(devPtr, size, reinterpret_cast<hipGraphicsResource*>(resource));
 }
 
-#else  // JETSON_USE_HIP
+#else  // JETSON_USE_HIP || JUT_INCLUDE_HIP_HEADERS
 
 // Default case: include CUDA's official header
 #include <cuda_gl_interop.h>
 
-#endif  // JETSON_USE_HIP
+#endif  // JETSON_USE_HIP || JUT_INCLUDE_HIP_HEADERS

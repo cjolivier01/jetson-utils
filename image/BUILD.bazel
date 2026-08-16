@@ -14,7 +14,12 @@ cc_library(
         "-Wno-error=switch",
         "-Wno-deprecated-declarations",
     ] + select({
-        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//cuda:use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -43,7 +48,12 @@ cc_library(
         "-Wno-error=switch",
         "-Wno-deprecated-declarations",
     ] + select({
-        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//cuda:use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -96,7 +106,12 @@ cc_library(
     copts = [
         "-Wno-error=switch",
     ] + select({
-        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//cuda:use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
         "//conditions:default": [],
     }),
     include_prefix = INCLUDE_PREFIX,

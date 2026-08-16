@@ -7,7 +7,12 @@ cc_library(
     ]),
     includes = ["."],
     copts = select({
-        "//cuda:use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        "//cuda:use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],

@@ -418,7 +418,12 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     copts = select({
-        ":use_hip": ["-DJUT_INCLUDE_HIP_HEADERS", "-isystem", "external/rocm_sdk_includes/include"],
+        ":use_hip": [
+            "-DJETSON_USE_HIP",
+            "-DJUT_INCLUDE_HIP_HEADERS",
+            "-isystem",
+            "external/rocm_sdk_includes/include",
+        ],
         "//conditions:default": [],
     }),
     deps = select({
@@ -552,9 +557,9 @@ genrule(
     cmd = (
         "set -e; mkdir -p $(@D)/hipobjs; " +
         "for s in $(SRCS); do " +
-        "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$(@D)/hipobjs/$${b%.*}.o; " +
+        "  case \"$$s\" in *.cu) b=$$(basename $$s); o=$(@D)/hipobjs/$${b%.*}.o; repo_root=$$(dirname $$s)/..; " +
         "    $(location @rocm_sdk_includes//:hipcc) -c --std=c++17 -fPIC -O2 -DJETSON_USE_HIP " +
-        "    -I. -Icuda -Ibase -Iimage -Idisplay -Ithreads -Ivideo -Icodec -Inetwork -Ipython -Ipython/bindings " +
+        "    -I$$repo_root -I$$repo_root/cuda -I$$repo_root/base -I$$repo_root/image -I$$repo_root/display -I$$repo_root/threads -I$$repo_root/video -I$$repo_root/codec -I$$repo_root/network -I$$repo_root/python -I$$repo_root/python/bindings " +
         "    $$s -o $$o; " +
         "  esac; " +
         "done; " +
@@ -637,6 +642,13 @@ cc_library(
         "cuda_gl_interop_shim.h",
         "cuda_runtime_compat.h",
     ],
+    defines = select({
+        ":use_hip": [
+            "JETSON_USE_HIP",
+            "JUT_INCLUDE_HIP_HEADERS",
+        ],
+        "//conditions:default": [],
+    }),
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = select({
