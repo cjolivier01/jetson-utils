@@ -25,7 +25,7 @@
 
 
 #include "cuda_runtime_compat.h"
-#ifndef JETSON_USE_HIP
+#if !defined(JETSON_USE_HIP) && !defined(JUT_INCLUDE_HIP_HEADERS)
 #include <cuda.h>
 #endif
 #include <stdio.h>

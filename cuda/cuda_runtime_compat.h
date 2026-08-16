@@ -1,14 +1,15 @@
 /*
  * CUDA/HIP runtime compatibility shim
  *
- * When JETSON_USE_HIP is defined, this header maps common CUDA runtime APIs
- * and types used in this project to their HIP equivalents so the same sources
- * can compile for AMD GPUs under ROCm/HIP. Otherwise it includes CUDA headers.
+ * When JETSON_USE_HIP or JUT_INCLUDE_HIP_HEADERS is defined, this header maps
+ * common CUDA runtime APIs and types used in this project to their HIP
+ * equivalents so the same sources can compile for AMD GPUs under ROCm/HIP.
+ * Otherwise it includes CUDA headers.
  */
 
 #pragma once
 
-#ifdef JETSON_USE_HIP
+#if defined(JETSON_USE_HIP) || defined(JUT_INCLUDE_HIP_HEADERS)
 
 // If building with HIP but the target platform macro isn't set yet, default to AMD.
 // For device compilation (hipcc), include the full HIP runtime headers.
@@ -274,8 +275,8 @@ enum cudaGraphicsMapFlags {
     cudaGraphicsMapFlagsWriteDiscard = 2,
 };
 
-#else  // JETSON_USE_HIP
+#else  // JETSON_USE_HIP || JUT_INCLUDE_HIP_HEADERS
 
 #include <cuda_runtime.h>
 
-#endif  // JETSON_USE_HIP
+#endif  // JETSON_USE_HIP || JUT_INCLUDE_HIP_HEADERS
