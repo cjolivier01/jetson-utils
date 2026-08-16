@@ -18,9 +18,12 @@
 #if defined(__HIP_DEVICE_COMPILE__)
 #include <hip/hip_gl_interop.h>
 #else
-// Host-only compilation. If HIP headers are present (via JUT_INCLUDE_HIP_HEADERS),
-// rely on their declarations. Otherwise, forward-declare minimal prototypes.
-#if !defined(JUT_INCLUDE_HIP_HEADERS)
+// Host-only compilation. When host translation units opt into HIP headers,
+// include the GL interop declarations explicitly because hip_runtime.h does not
+// provide them. Otherwise, forward-declare the minimal prototypes we use.
+#if defined(JUT_INCLUDE_HIP_HEADERS)
+#include <hip/hip_gl_interop.h>
+#else
 extern "C" {
 struct hipGraphicsResource;
 hipError_t hipGraphicsGLRegisterBuffer(struct hipGraphicsResource** resource, GLuint buffer, unsigned int flags);
