@@ -221,15 +221,21 @@ def _local_cuda_sdk_repo_impl(ctx):
     ]
 
     if root:
-        culibos = ""
-        for rel in [
-            "targets/x86_64-linux/lib/libculibos.a",
-            "targets/aarch64-linux/lib/libculibos.a",
-            "targets/sbsa-linux/lib/libculibos.a",
+        # Cross toolkits can contain both host and target libraries. Select the
+        # archive using Bazel's target CPU instead of the first existing path.
+        culibos = {}
+        for cpu, triples in [
+            ("x86_64", ["x86_64-linux"]),
+            ("aarch64", ["aarch64-linux", "sbsa-linux"]),
         ]:
-            if ctx.path(root + "/" + rel).exists:
-                culibos = rel
-                break
+            for triple in triples:
+                rel = "targets/%s/lib/libculibos.a" % triple
+                if ctx.path(root + "/" + rel).exists:
+                    build.append(
+                        'config_setting(name = "%s", constraint_values = ["@platforms//cpu:%s"])' % (cpu, cpu),
+                    )
+                    culibos[":" + cpu] = rel
+                    break
 
         if not culibos:
             fail("Found CUDA toolkit at %s but could not locate libculibos.a" % root)
@@ -238,7 +244,7 @@ def _local_cuda_sdk_repo_impl(ctx):
 
         build.extend([
             'filegroup(name = "nvcc", srcs = ["bin/nvcc"])',
-            'cc_import(name = "culibos", static_library = "%s")' % culibos,
+            'cc_import(name = "culibos", static_library = select(%s, no_match_error = "CUDA toolkit has no libculibos.a for the selected target CPU"))' % repr(culibos),
         ])
     else:
         build.extend([
