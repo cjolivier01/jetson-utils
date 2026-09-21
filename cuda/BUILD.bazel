@@ -762,6 +762,16 @@ cc_test(
 )
 
 cc_test(
+    name = "cuda_resize_roi_test",
+    srcs = ["cuda_resize_roi_test.cc"],
+    tags = ["requires-gpu"],
+    deps = [
+        ":cuda_cuda_lib",
+        ":cuda_lib_headers",
+    ],
+)
+
+cc_test(
     name = "cuda_gl_header_test",
     srcs = ["cuda_gl_header_test.cc"],
     copts = select({
