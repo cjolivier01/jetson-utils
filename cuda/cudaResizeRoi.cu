@@ -111,7 +111,7 @@ static cudaError_t launchResizeROI( T* input, size_t inputWidth, size_t inputHei
     if( inputWidth == 0 || inputHeight == 0 || outputWidth == 0 || outputHeight == 0 )
         return cudaErrorInvalidValue;
 
-    if( srcWidth == 0 || srcHeight == 0 || dstWidth == 0 || dstHeight == 0 )
+    if( srcWidth <= 0 || srcHeight <= 0 || dstWidth <= 0 || dstHeight <= 0 )
         return cudaErrorInvalidValue;
 
     // Validate that the source ROI is within the input image...
