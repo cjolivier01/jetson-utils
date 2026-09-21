@@ -2,35 +2,67 @@
 #include "cudaFilterMode.cuh"
 /* clang-format off */
 namespace {
+template<typename T>
+__device__ T cudaBilinearBlend( T p00, T p10, T p01, T p11, float dx, float dy )
+{
+    return (T)(((1.0f - dx) * (1.0f - dy) * p00) +
+               (dx * (1.0f - dy) * p10) +
+               ((1.0f - dx) * dy * p01) +
+               (dx * dy * p11));
+}
+
+template<>
+__device__ uchar3 cudaBilinearBlend( uchar3 p00, uchar3 p10, uchar3 p01, uchar3 p11, float dx, float dy )
+{
+    const float3 result = ((1.0f - dx) * (1.0f - dy) * make_float3(p00)) +
+                          (dx * (1.0f - dy) * make_float3(p10)) +
+                          ((1.0f - dx) * dy * make_float3(p01)) +
+                          (dx * dy * make_float3(p11));
+    return make_uchar3(result);
+}
+
+template<>
+__device__ uchar4 cudaBilinearBlend( uchar4 p00, uchar4 p10, uchar4 p01, uchar4 p11, float dx, float dy )
+{
+    const float4 result = ((1.0f - dx) * (1.0f - dy) * make_float4(p00)) +
+                          (dx * (1.0f - dy) * make_float4(p10)) +
+                          ((1.0f - dx) * dy * make_float4(p01)) +
+                          (dx * dy * make_float4(p11));
+    return make_uchar4(result);
+}
+
 //-----------------------------------------------------------------------------
 // New device function for filtering a pixel within a source ROI
 template<typename T, cudaFilterMode filter>
-__device__ T cudaFilterPixelROI( T* input, float x, float y, int width, int height )
+__device__ T cudaFilterPixelROI( T* input, float x, float y, int width,
+                                 int roiMinX, int roiMinY, int roiMaxX, int roiMaxY )
 {
     // For nearest-neighbor filtering.
-    #if filter == FILTER_POINT
+    if( filter == FILTER_POINT )
+    {
         int ix = __float2int_rn(x);
         int iy = __float2int_rn(y);
-        ix = min(max(ix, 0), width - 1);
-        iy = min(max(iy, 0), height - 1);
+        ix = min(max(ix, roiMinX), roiMaxX);
+        iy = min(max(iy, roiMinY), roiMaxY);
         return input[iy * width + ix];
+    }
     // For bilinear (linear) filtering.
-    #elif filter == FILTER_LINEAR
-        int ix = floorf(x);
-        int iy = floorf(y);
-        float dx = x - ix;
-        float dy = y - iy;
-        int ix1 = min(ix + 1, width - 1);
-        int iy1 = min(iy + 1, height - 1);
+    else
+    {
+        const float clampedX = fminf(fmaxf(x, (float)roiMinX), (float)roiMaxX);
+        const float clampedY = fminf(fmaxf(y, (float)roiMinY), (float)roiMaxY);
+        int ix = floorf(clampedX);
+        int iy = floorf(clampedY);
+        float dx = clampedX - ix;
+        float dy = clampedY - iy;
+        int ix1 = min(ix + 1, roiMaxX);
+        int iy1 = min(iy + 1, roiMaxY);
         T p00 = input[iy * width + ix];
         T p10 = input[iy * width + ix1];
         T p01 = input[iy1 * width + ix];
         T p11 = input[iy1 * width + ix1];
-        return (T)(((1.0f - dx) * (1.0f - dy) * p00) +
-                   (dx * (1.0f - dy) * p10) +
-                   ((1.0f - dx) * dy * p01) +
-                   (dx * dy * p11));
-    #endif
+        return cudaBilinearBlend(p00, p10, p01, p11, dx, dy);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -59,7 +91,8 @@ __global__ void gpuResizeROI( T* input, int inputWidth, int inputHeight,
     float src_coord_x = srcX + (dx + 0.5f) * scaleX - 0.5f;
     float src_coord_y = srcY + (dy + 0.5f) * scaleY - 0.5f;
 
-    T pixel = cudaFilterPixelROI<T, filter>(input, src_coord_x, src_coord_y, inputWidth, inputHeight);
+    T pixel = cudaFilterPixelROI<T, filter>(input, src_coord_x, src_coord_y, inputWidth,
+                                            srcX, srcY, srcX + srcWidth - 1, srcY + srcHeight - 1);
     output[out_y * outputWidth + out_x] = pixel;
 }
 
@@ -78,7 +111,7 @@ static cudaError_t launchResizeROI( T* input, size_t inputWidth, size_t inputHei
     if( inputWidth == 0 || inputHeight == 0 || outputWidth == 0 || outputHeight == 0 )
         return cudaErrorInvalidValue;
 
-    if( srcWidth == 0 || srcHeight == 0 || dstWidth == 0 || dstHeight == 0 )
+    if( srcWidth <= 0 || srcHeight <= 0 || dstWidth <= 0 || dstHeight <= 0 )
         return cudaErrorInvalidValue;
 
     // Validate that the source ROI is within the input image...
